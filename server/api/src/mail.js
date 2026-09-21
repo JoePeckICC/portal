@@ -1,5 +1,6 @@
 'use strict';
-// One place that sends. Transport: Gmail API (send as FROM_EMAIL via the service account's domain-wide delegation)
+// One place that sends. Transport: Gmail API via the service account's domain-wide delegation: it acts as MAIL_AS (a real mailbox)
+// and sends From: FROM_EMAIL (that mailbox's address, or one of its aliases such as care@).
 // or, when MAIL_TRANSPORT=log (local/dev/tests), print to the console and keep a copy in memory.
 const C = require('./config');
 const { esc, normEmail } = require('./util');
@@ -10,7 +11,7 @@ let gmail = null;
 async function gmailClient() {
   if (gmail) return gmail;
   const { google } = require('googleapis');
-  const auth = new google.auth.GoogleAuth({ scopes: ['https://www.googleapis.com/auth/gmail.send'], clientOptions: { subject: process.env.FROM_EMAIL || '' } });
+  const auth = new google.auth.GoogleAuth({ scopes: ['https://www.googleapis.com/auth/gmail.send'], clientOptions: { subject: process.env.MAIL_AS || process.env.FROM_EMAIL || '' } });
   gmail = google.gmail({ version: 'v1', auth });
   return gmail;
 }
