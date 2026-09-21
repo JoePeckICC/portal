@@ -1,0 +1,6 @@
+# Files that are part of the repo, not the website.
+wrangler.toml
+worker.js
+README.md
+.assetsignore
+.github/
