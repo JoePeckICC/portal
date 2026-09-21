@@ -73,7 +73,7 @@ async function addInner(ctx, p, c) {
   if (existing) await db.update('users', { email }, { role: 'family', name, relationship: rel, active: true }, c);
   else await db.insert('users', { email, name, role: 'family', client_id: ctx.clientId, active: true, relationship: rel }, c);
   const client = await core.clientById(ctx.clientId, c), co = await core.coordinatorFor(client, c);
-  const after = () => mail.notify(email, famName(client.family_name) + ' added you to their inner circle', 'You can see ' + (client.patient_first_name || 'their') + "'s plan, messages and appointments in the " + C.APP_NAME + ' portal, and message ' + ((co || {}).name || 'the coordinator') + ' yourself. Sign in with this email address — no password, we send you a link.', '', 'Open the portal');
+  const after = () => mail.notify(email, famName(client.family_name) + ' added you to their inner circle', 'You can see ' + (client.patient_first_name || 'their') + "'s plan, messages and appointments in the " + C.APP_NAME + ' portal, and message ' + ((co || {}).name || 'the coordinator') + ' yourself. To get in, go to the sign-in page, choose “First time here or forgot your password?”, and we will email you a link to set your password.', '', 'Open the portal');
   return { _after: after };
 }
 async function removeInner(ctx, p, c) {
@@ -90,6 +90,9 @@ async function signOutEverywhere(ctx, p, c) {
   await auth.signOutEverywhere(target);
   return { done: true, self: normEmail(target) === ctx.email };
 }
+async function changePassword(ctx, p) { return auth.changePassword(ctx.user, p); }
+// "Forget my devices": the next sign-in on any device asks for an emailed code again.
+async function forgetDevices(ctx) { await auth.forgetDevices(ctx.email); return { done: true }; }
 async function savePrefs(ctx, p, c) {
   const patch = {};
   if (p.prefs) { const cur = core.prefs(ctx.user); Object.keys(C.NOTIFY_KINDS).forEach(k => { if (p.prefs[k] !== undefined) cur[k] = !!p.prefs[k]; }); patch.prefs = JSON.stringify(cur); }
@@ -105,4 +108,4 @@ async function setStage(ctx, p, c) {
   return {};
 }
 
-module.exports = { saveProfile, changeEmail, saveAnswers, addInner, removeInner, signOutEverywhere, savePrefs, setStage };
+module.exports = { saveProfile, changeEmail, saveAnswers, addInner, removeInner, signOutEverywhere, changePassword, forgetDevices, savePrefs, setStage };

@@ -44,6 +44,9 @@ async function api(session, action, payload, req) {
   try {
     if (action === 'requestLink') return await auth.requestLink(payload.email);
     if (action === 'hello') return await auth.hello(payload, req, core.audit);
+    if (action === 'login') return await auth.login(payload, req, core.audit);
+    if (action === 'verifyCode') return await auth.verifyCode(payload, req, core.audit);
+    if (action === 'setPassword') return await auth.setPassword(payload, req, core.audit);
     const user = await auth.userForSession(session);
     if (!user) return { ok: false, error: 'signed_out' };
     const ctx = core.ctxFor(user, payload.clientId);

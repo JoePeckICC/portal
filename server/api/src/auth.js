@@ -85,10 +85,10 @@ async function bump(bucket, windowSec) {
   return r.count;
 }
 
-// ---- the sign-in link
+// ---- the emailed link: first-time password setup, or a forgotten password
 async function requestLink(email) {
   email = normEmail(email);
-  const generic = { ok: true, message: `If that email is on file, a sign-in link is on its way. It is good for ${C.LINK_MINUTES} minutes.` };
+  const generic = { ok: true, message: `If that email is on file, a link to set your password is on its way. It is good for ${C.LINK_MINUTES} minutes.` };
   if (!email || email.length > 200) return generic;
   if ((await bump('link:' + email, 60)) > C.RATE.linkPerMin) return generic;         // one a minute, quietly
   if ((await bump('linkh:' + email, 3600)) > C.RATE.linkPerHour) return generic;     // five an hour
@@ -96,11 +96,12 @@ async function requestLink(email) {
   const tok = makeToken(email, 'link', C.LINK_MINUTES); await noteNonce(tokNonce(tok), email, 'link');
   const url = `${C.PORTAL_URL}?t=${encodeURIComponent(tok)}`;
   const f = first(user.name) || 'there';
-  await mail.sendMail(email, `Your ${C.APP_NAME} sign-in link`, mail.frame(
+  const reset = !!user.password_hash;
+  await mail.sendMail(email, reset ? `Reset your ${C.APP_NAME} password` : `Set up your ${C.APP_NAME} password`, mail.frame(
     `<p style="font-size:17px">Hi ${esc(f)},</p>` +
-    `<p style="font-size:16px;line-height:1.5">Here is your link to the portal. It works for ${C.LINK_MINUTES} minutes and only from this email.</p>` +
-    `<p><a href="${url}" style="display:inline-block;background:#C09B36;color:#fff;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:3px">Open the portal</a></p>` +
-    `<p style="font-size:13px;color:#5B6470;line-height:1.5">If you did not ask for this, you can ignore it. Nobody can get in without this email.</p>`));
+    `<p style="font-size:16px;line-height:1.5">${reset ? 'Here is your link to choose a new password.' : 'Here is your link to set up your password for the portal.'} It works for ${C.LINK_MINUTES} minutes, one time.</p>` +
+    `<p><a href="${url}" style="display:inline-block;background:#C09B36;color:#fff;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:3px">${reset ? 'Choose a new password' : 'Set my password'}</a></p>` +
+    `<p style="font-size:13px;color:#5B6470;line-height:1.5">If you did not ask for this, you can ignore it. Your password stays the same until someone uses this link.</p>`));
   return generic;
 }
 
@@ -117,11 +118,122 @@ async function hello(p, req, audit) {
   }
   if (p.t) {
     const t = await verifyLinkToken(p.t, 'link');
-    if (t) { out.boot.session = await sessionFor(t.email, req); await audit({ email: t.email, role: 'link', clientId: '' }, 'signIn', {}, '', req); }
-    else { out.boot.error = 'That sign-in link has expired or was already used. Ask for a new one below.'; await audit({ email: '', role: 'link', clientId: '' }, 'signIn', {}, 'expired or used link', req); }
+    const u = t && await findUser(t.email);
+    if (u) {
+      const tok = makeToken(u.email, 'pwset', C.PWSET_MINUTES); await noteNonce(tokNonce(tok), u.email, 'pwset');
+      out.boot.pwset = { token: tok, email: u.email, reset: !!u.password_hash, name: first(u.name) };
+      await audit({ email: u.email, role: 'link', clientId: '' }, 'openPasswordLink', {}, '', req);
+    } else { out.boot.error = 'That link has expired or was already used. Ask for a new one below.'; await audit({ email: '', role: 'link', clientId: '' }, 'openPasswordLink', {}, 'expired or used link', req); }
   }
   if (out.boot.session === undefined) out.boot.session = null;
   return out;
 }
 
-module.exports = { makeToken, parseToken, tokNonce, noteNonce, verifyLinkToken, findUser, sessionFor, userForSession, signOutEverywhere, pruneSessions, bump, requestLink, hello };
+// ---- passwords
+const pw = require('./password');
+const sha = s => crypto.createHash('sha256').update(String(s)).digest('hex');
+const codeHash = (challengeId, code) => sign('code|' + challengeId + '|' + code);
+const WRONG = 'That email and password do not match. Check both, or use "Forgot your password?"';
+const LOCKED = `Too many tries. Wait ${C.LOCK_MINUTES} minutes, or use "Forgot your password?" to choose a new one.`;
+
+async function peek(bucket) { const r = await db.one(`select count from rate_limits where bucket=$1 and window_end > now()`, [bucket]); return r ? r.count : 0; }
+const clearBucket = bucket => db.q(`delete from rate_limits where bucket=$1`, [bucket]);
+const mask = e => { const [a, d] = String(e).split('@'); return (a.length <= 2 ? a[0] + '*' : a[0] + '***' + a.slice(-1)) + '@' + d; };
+
+async function trustedDevice(email, device) {
+  if (!device || typeof device !== 'string' || device.length > 128) return false;
+  const r = await db.one(`update trusted_devices set last_used_at=now() where token_hash=$1 and email=$2 and expires_at > now() returning token_hash`, [sha(device), email]);
+  return !!r;
+}
+async function trustDevice(email, req) {
+  const tok = crypto.randomBytes(32).toString('base64url');
+  await db.q(`insert into trusted_devices (token_hash,email,expires_at,user_agent) values ($1,$2,now() + make_interval(days => $3),$4)`,
+    [sha(tok), email, C.DEVICE_DAYS, req && String(req.ua || '').slice(0, 200) || null]);
+  return tok;
+}
+
+async function sendCode(email, name) {
+  const challengeId = crypto.randomBytes(24).toString('base64url');
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  await db.q(`insert into login_challenges (challenge_id,email,code_hash,expires_at) values ($1,$2,$3,now() + make_interval(mins => $4))`,
+    [challengeId, email, codeHash(challengeId, code), C.CODE_MINUTES]);
+  await mail.sendMail(email, `${code} is your ${C.APP_NAME} code`, mail.frame(
+    `<p style="font-size:17px">Hi ${esc(first(name) || 'there')},</p>` +
+    `<p style="font-size:16px;line-height:1.5">Someone just signed in to your portal with your password on a new device. If that was you, enter this code:</p>` +
+    `<p style="font-size:34px;font-weight:700;letter-spacing:.2em;margin:18px 0">${code}</p>` +
+    `<p style="font-size:14px;color:#5B6470;line-height:1.5">It works for ${C.CODE_MINUTES} minutes. If this was not you, someone knows your password. Use "Forgot your password?" on the sign-in page to change it now.</p>`));
+  return challengeId;
+}
+
+// Email + password. A remembered device goes straight in; anything else gets a code by email.
+async function login(p, req, audit) {
+  const email = normEmail(p.email), who = { email, role: 'login', clientId: '' };
+  if (!email || email.length > 200 || typeof p.password !== 'string') return { ok: false, error: WRONG };
+  if ((await bump('loginip:' + (req && req.ip || ''), 900)) > C.RATE.loginPerIp15) return { ok: false, error: 'Too many sign-in attempts from here. Wait 15 minutes and try again.' };
+  if ((await peek('pwfail:' + email)) >= C.LOCK_AFTER) { await audit(who, 'login', {}, 'locked', req); return { ok: false, error: LOCKED }; }
+  const u = await findUser(email);
+  const good = await pw.verify(p.password, u && u.password_hash);   // runs even for unknown emails, so timing gives nothing away
+  if (!u || !good) {
+    const n = await bump('pwfail:' + email, C.LOCK_MINUTES * 60);
+    await audit(who, 'login', {}, u ? (u.password_hash ? 'wrong password' : 'no password set yet') : 'unknown email', req);
+    return { ok: false, error: n >= C.LOCK_AFTER ? LOCKED : WRONG };
+  }
+  await clearBucket('pwfail:' + email);
+  if (await trustedDevice(u.email, p.device)) {
+    await audit({ email: u.email, role: u.role, clientId: '' }, 'login', {}, '', req);
+    return { ok: true, session: await sessionFor(u.email, req) };
+  }
+  if ((await bump('code:' + u.email, 900)) > C.RATE.codesPer15) return { ok: false, error: 'We have sent several codes already. Check your email, or wait 15 minutes.' };
+  const challenge = await sendCode(u.email, u.name);
+  await audit({ email: u.email, role: u.role, clientId: '' }, 'loginCodeSent', {}, '', req);
+  return { ok: true, needCode: true, challenge, sentTo: mask(u.email), minutes: C.CODE_MINUTES };
+}
+
+async function verifyCode(p, req, audit) {
+  const id = String(p.challenge || '').slice(0, 64), code = String(p.code || '').replace(/\D/g, '');
+  const ch = id && await db.one(`update login_challenges set attempts=attempts+1 where challenge_id=$1 and used_at is null returning *`, [id]);
+  if (!ch || ch.expires_at < new Date() || ch.attempts > C.CODE_TRIES) return { ok: false, error: 'That code has expired. Sign in again to get a new one.', expired: true };
+  if (code.length !== 6 || !safeEqual(codeHash(id, code), ch.code_hash)) {
+    await audit({ email: ch.email, role: 'login', clientId: '' }, 'loginCode', {}, 'wrong code', req);
+    const left = C.CODE_TRIES - ch.attempts;
+    return left > 0 ? { ok: false, error: `That code does not match. ${left} ${left === 1 ? 'try' : 'tries'} left.` } : { ok: false, error: 'Too many wrong codes. Sign in again to get a new one.', expired: true };
+  }
+  await db.q(`update login_challenges set used_at=now() where challenge_id=$1`, [id]);
+  const u = await findUser(ch.email); if (!u) return { ok: false, error: WRONG, expired: true };
+  const out = { ok: true, session: await sessionFor(u.email, req) };
+  if (p.remember !== false) out.device = await trustDevice(u.email, req);
+  await audit({ email: u.email, role: u.role, clientId: '' }, 'login', { what: p.remember !== false ? 'code, device remembered' : 'code' }, '', req);
+  return out;
+}
+
+// From the emailed link: choose a password, then you are in. The link itself proved the email,
+// so this device is remembered. Every other browser is signed out.
+async function setPassword(p, req, audit) {
+  const t = parseToken(p.token, 'pwset');
+  if (!t) return { ok: false, error: 'That link has expired. Ask for a new one.', expired: true };
+  const u = await findUser(t.email); if (!u) return { ok: false, error: 'That link has expired. Ask for a new one.', expired: true };
+  const bad = await pw.problem(p.password, u.email); if (bad) return { ok: false, error: bad };
+  if (!(await spendNonce(t.nonce, t.email, 'pwset'))) return { ok: false, error: 'That link was already used. Ask for a new one.', expired: true };
+  await db.q(`update users set password_hash=$2, password_set_at=now() where email=$1`, [u.email, await pw.hash(p.password)]);
+  await signOutEverywhere(u.email);
+  await clearBucket('pwfail:' + u.email);
+  await audit({ email: u.email, role: u.role, clientId: '' }, u.password_hash ? 'resetPassword' : 'setPassword', {}, '', req);
+  return { ok: true, session: await sessionFor(u.email, req), device: await trustDevice(u.email, req) };
+}
+
+// Signed in: change it knowing the current one. Other browsers are signed out; this one stays.
+async function changePassword(user, p) {
+  if (!(await pw.verify(p.current, user.password_hash))) { const e = new Error('Your current password is not right.'); e.expected = true; throw e; }
+  const bad = await pw.problem(p.next, user.email); if (bad) { const e = new Error(bad); e.expected = true; throw e; }
+  await db.q(`update users set password_hash=$2, password_set_at=now() where email=$1`, [user.email, await pw.hash(p.next)]);
+  await db.q(`delete from sessions where email=$1 and session_id<>$2`, [user.email, user._session && user._session.id || '']);
+  return { done: true };
+}
+
+async function forgetDevices(email) { await db.q(`delete from trusted_devices where email=$1`, [normEmail(email)]); }
+async function pruneLogin() {
+  await db.q(`delete from login_challenges where expires_at < now() - interval '1 day'`);
+  await db.q(`delete from trusted_devices where expires_at < now()`);
+}
+
+module.exports = { login, verifyCode, setPassword, changePassword, forgetDevices, pruneLogin,  makeToken, parseToken, tokNonce, noteNonce, verifyLinkToken, findUser, sessionFor, userForSession, signOutEverywhere, pruneSessions, bump, requestLink, hello };

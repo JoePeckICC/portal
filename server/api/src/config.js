@@ -5,6 +5,12 @@ const env = process.env;
 module.exports = {
   APP_NAME: 'InCadence Care',
   LINK_MINUTES: 20,
+  PWSET_MINUTES: 30,        // after opening the emailed link, time to choose a password
+  CODE_MINUTES: 10,         // the 6-digit code for a new device
+  CODE_TRIES: 5,
+  DEVICE_DAYS: 30,          // a device that passed the code is remembered this long
+  LOCK_AFTER: 5,            // wrong passwords in a row before the account pauses
+  LOCK_MINUTES: 15,
   SESSION_DAYS: Number(env.SESSION_DAYS || 30),
   IDLE_MINUTES: Number(env.IDLE_MINUTES || 0),           // 0 = no idle timeout (matches today); set to 30 for the healthcare norm
   STAGES: ['The diagnosis', 'Before surgery', 'The week of', 'Surgery day', 'The hospital stay', 'First weeks home', 'The long middle'],
@@ -40,7 +46,7 @@ module.exports = {
   API_URL: env.API_URL || '',                                // this service's own public address (for links in documents)
   ALLOWED_ORIGINS: (env.ALLOWED_ORIGINS || 'https://portal.incadencecare.com').split(',').map(s => s.trim()).filter(Boolean),
   SESSION_SECRET: env.SESSION_SECRET || '',                  // required in production (Secret Manager)
-  RATE: { linkPerMin: 1, linkPerHour: 5, apiPerMin: Number(env.API_PER_MIN || 240) },
+  RATE: { linkPerMin: 1, linkPerHour: 5, loginPerIp15: 30, codesPer15: 4, apiPerMin: Number(env.API_PER_MIN || 240) },
 };
 
 // What the page receives on first contact. Same shape as the Apps Script's bootConst_().

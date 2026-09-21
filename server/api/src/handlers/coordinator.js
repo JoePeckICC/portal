@@ -110,8 +110,8 @@ async function newFamily(ctx, p, c) {
   const url = `${C.PORTAL_URL}?t=${encodeURIComponent(tok)}`;
   const who = signin || fname;
   const after = () => mail.sendMail(email, 'Welcome to ' + C.APP_NAME + ' — your portal', mail.frame(
-    `<p style="font-size:17px">Hi ${esc(first(who))},</p><p style="font-size:16px;line-height:1.5">${esc(ctx.user.name)} set up your portal. The first thing inside is a short intake — a few questions so we can start carrying the right things. The link below works for three days; after that, ask for a new one from the sign-in page.</p>` +
-    `<p><a href="${url}" style="display:inline-block;background:#C09B36;color:#fff;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:3px">Open the portal</a></p>` +
+    `<p style="font-size:17px">Hi ${esc(first(who))},</p><p style="font-size:16px;line-height:1.5">${esc(ctx.user.name)} set up your portal. Use the button below to choose your password. The first thing inside is a short intake — a few questions so we can start carrying the right things. The button works for three days; after that, use “First time here or forgot your password?” on the sign-in page.</p>` +
+    `<p><a href="${url}" style="display:inline-block;background:#C09B36;color:#fff;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:3px">Set my password</a></p>` +
     (p.note ? `<blockquote style="margin:16px 0;padding:12px 16px;border-left:3px solid #C09B36;background:#F6F4EF;white-space:pre-wrap;font-size:15px;line-height:1.5">${esc(clean(p.note, 1000))}</blockquote>` : '') +
     `<p style="font-size:13px;color:#5B6470;line-height:1.5">Questions? Reply to this email or call ${esc(C.INCADENCE_PHONE)}.</p>`));
   return { client_id: cid, _after: after };

@@ -96,7 +96,7 @@ async function addCircle(ctx, p, c) {
   const row = await db.insert('circle', { circle_id: id(), client_id: ctx.clientId, supporter_email: email, supporter_name: name, relationship: rel, added_by: ctx.email, status: 'Active' }, c);
   if (!existing) await db.insert('users', { email, name, role: 'supporter', client_id: ctx.clientId, active: true }, c);
   else if (!existing.active) await db.q(`update users set active=true where email=$1`, [email], c);
-  const after = () => mail.notify(email, famName(client.family_name) + ' added you to their Circle', 'You can follow ' + client.patient_first_name + "'s recovery in the " + C.APP_NAME + ' portal. Sign in with this email address.', '', 'Open the portal');
+  const after = () => mail.notify(email, famName(client.family_name) + ' added you to their Circle', 'You can follow ' + client.patient_first_name + "'s recovery in the " + C.APP_NAME + ' portal. To get in, go to the sign-in page, choose “First time here or forgot your password?”, and we will email you a link to set your password.', '', 'Open the portal');
   return { member: row, _after: after };
 }
 async function removeCircle(ctx, p, c) {

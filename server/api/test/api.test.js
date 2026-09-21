@@ -17,19 +17,35 @@ test.before(async () => {
   await db.q('drop schema public cascade; create schema public');
   execSync(`psql "${process.env.DATABASE_URL}" -v ON_ERROR_STOP=1 -q -f ${ROOT}/db/schema.sql`, { stdio: 'pipe' });
   execSync(`node ${ROOT}/migrate/migrate.js --from-json ${ROOT}/migrate/fixture.json`, { stdio: 'pipe', env: process.env });
+  await require('../src/upgrade').run();
 });
 test.after(async () => { await require('../src/pdf').close(); await db.pool.end(); });
 
 const lastMail = () => mail.sent[mail.sent.length - 1];
 const linkFrom = m => decodeURIComponent(m.html.match(/\?t=([^"]+)"/)[1]);
 
+const PW = 'correct horse battery staple';
+const devices = {};   // email -> remembered-device token, like the page keeps in localStorage
+const codeFrom = m => m.html.match(/letter-spacing:\.2em;margin:18px 0">(\d{6})</)[1];
+
+// First time for an email: emailed link -> choose a password (device remembered).
+// After that: email + password on the remembered device.
 async function signIn(email) {
   await db.q(`delete from rate_limits`);
+  email = email.toLowerCase();
+  if (devices[email]) {
+    const r = await api(null, 'login', { email, password: PW, device: devices[email] }, { ip: '1.1.1.1' });
+    assert.equal(r.ok, true, r.error); assert.ok(r.session, 'remembered device goes straight in');
+    return r.session;
+  }
   const r = await api(null, 'requestLink', { email });
   assert.equal(r.ok, true);
   const h = await api(null, 'hello', { t: linkFrom(lastMail()) });
-  assert.equal(h.ok, true); assert.ok(h.boot.session, 'session issued');
-  return h.boot.session;
+  assert.equal(h.ok, true); assert.ok(h.boot.pwset, 'link opens the set-password screen');
+  const s = await api(null, 'setPassword', { token: h.boot.pwset.token, password: PW });
+  assert.equal(s.ok, true, s.error); assert.ok(s.session); assert.ok(s.device);
+  devices[email] = s.device;
+  return s.session;
 }
 
 test('hello without a token returns constants and no session', async () => {
@@ -46,12 +62,76 @@ test('requestLink is quiet for unknown emails and sends for known ones', async (
   assert.equal(r2.ok, true); assert.equal(mail.sent.length, n + 1); assert.equal(lastMail().to, 'pat@example.com');
 });
 
-test('a sign-in link works once', async () => {
+test('an emailed link works once and never signs in by itself', async () => {
   await db.q(`delete from rate_limits`);
   await api(null, 'requestLink', { email: 'pat@example.com' });
   const tok = linkFrom(lastMail());
-  const h1 = await api(null, 'hello', { t: tok }); assert.ok(h1.boot.session);
-  const h2 = await api(null, 'hello', { t: tok }); assert.equal(h2.boot.session, null); assert.match(h2.boot.error, /expired or was already used/);
+  const h1 = await api(null, 'hello', { t: tok }); assert.equal(h1.boot.session, null); assert.ok(h1.boot.pwset);
+  const h2 = await api(null, 'hello', { t: tok }); assert.equal(h2.boot.pwset, undefined); assert.match(h2.boot.error, /expired or was already used/);
+});
+
+test('passwords: first-time setup, rules, and the set-password link works once', async () => {
+  await db.q(`delete from rate_limits`);
+  const email = 'kiddo@example.com';
+  await db.q(`insert into users (email,name,role,client_id) values ($1,'Kid Test','family','c1') on conflict do nothing`, [email]);
+  assert.match((await api(null, 'login', { email, password: PW }, { ip: '2.2.2.2' })).error, /do not match/, 'no password yet');
+  await api(null, 'requestLink', { email });
+  assert.match(lastMail().subject, /Set up your/);
+  const h = await api(null, 'hello', { t: linkFrom(lastMail()) });
+  assert.equal(h.boot.pwset.reset, false);
+  assert.match((await api(null, 'setPassword', { token: h.boot.pwset.token, password: 'short' })).error, /12 characters/);
+  assert.match((await api(null, 'setPassword', { token: h.boot.pwset.token, password: 'kiddo-kiddo-kiddo-1' })).error, /email address out/);
+  const ok = await api(null, 'setPassword', { token: h.boot.pwset.token, password: PW });
+  assert.equal(ok.ok, true); assert.ok(ok.session); assert.ok(ok.device);
+  assert.equal((await api(null, 'setPassword', { token: h.boot.pwset.token, password: PW + '!' })).expired, true, 'the link is spent');
+  const row = await db.one(`select password_hash from users where email=$1`, [email]);
+  assert.match(row.password_hash, /^scrypt\$/); assert.ok(!row.password_hash.includes(PW), 'stored scrambled');
+  devices[email] = ok.device;
+});
+
+test('passwords: a new device needs the emailed code; a remembered one does not', async () => {
+  await db.q(`delete from rate_limits`);
+  const email = 'kiddo@example.com';
+  const r = await api(null, 'login', { email, password: PW }, { ip: '3.3.3.3' });
+  assert.equal(r.ok, true); assert.equal(r.needCode, true); assert.ok(!r.session, 'no session before the code');
+  assert.match(r.sentTo, /^k\*\*\*o@example\.com$/);
+  const code = codeFrom(lastMail());
+  const wrong = code === '000000' ? '111111' : '000000';
+  assert.match((await api(null, 'verifyCode', { challenge: r.challenge, code: wrong })).error, /4 tries left/);
+  const v = await api(null, 'verifyCode', { challenge: r.challenge, code });
+  assert.equal(v.ok, true); assert.ok(v.session); assert.ok(v.device);
+  assert.equal((await api(null, 'verifyCode', { challenge: r.challenge, code })).expired, true, 'a code works once');
+  const again = await api(null, 'login', { email, password: PW, device: v.device }, { ip: '3.3.3.3' });
+  assert.ok(again.session, 'remembered device skips the code');
+  const other = await api(null, 'login', { email, password: PW, device: devices['pat@example.com'] }, { ip: '3.3.3.3' });
+  assert.equal(other.needCode, true, "someone else's device token does not count");
+});
+
+test('passwords: five wrong tries pause the account, for known and unknown emails alike', async () => {
+  await db.q(`delete from rate_limits`);
+  for (const email of ['kiddo@example.com', 'ghost@example.com']) {
+    for (let i = 0; i < 4; i++) assert.match((await api(null, 'login', { email, password: 'nope nope nope' }, { ip: '4.4.4.4' })).error, /do not match/);
+    assert.match((await api(null, 'login', { email, password: 'nope nope nope' }, { ip: '4.4.4.4' })).error, /Too many tries/);
+  }
+  assert.match((await api(null, 'login', { email: 'kiddo@example.com', password: PW, device: devices['kiddo@example.com'] }, { ip: '4.4.4.4' })).error, /Too many tries/, 'even the right password waits');
+  await api(null, 'requestLink', { email: 'kiddo@example.com' });
+  assert.match(lastMail().subject, /Reset your/);
+  const h = await api(null, 'hello', { t: linkFrom(lastMail()) });
+  const s = await api(null, 'setPassword', { token: h.boot.pwset.token, password: PW });
+  assert.equal(s.ok, true, 'resetting clears the pause'); devices['kiddo@example.com'] = s.device;
+  await db.q(`update users set active=false where email='kiddo@example.com'`);   // keep later message tests' recipient lists as they were
+});
+
+test('passwords: changing it keeps this browser and signs out the rest', async () => {
+  const a = await signIn('pat@example.com'); const b = await signIn('pat@example.com');
+  assert.match((await api(a, 'changePassword', { current: 'wrong wrong wrong', next: PW + ' two' })).error, /current password/);
+  assert.match((await api(a, 'changePassword', { current: PW, next: 'short' })).error, /12 characters/);
+  assert.equal((await api(a, 'changePassword', { current: PW, next: PW + ' two' })).ok, true);
+  assert.equal((await api(a, 'bootstrap', {})).ok, true, 'this browser stays in');
+  assert.equal((await api(b, 'bootstrap', {})).error, 'signed_out', 'others are out');
+  assert.equal((await api(a, 'changePassword', { current: PW + ' two', next: PW })).ok, true);
+  const rows = await db.all(`select detail from audit where action in ('changePassword','login','setPassword')`);
+  assert.ok(rows.every(r => !JSON.stringify(r.detail).includes(PW)), 'passwords never reach the audit');
 });
 
 test('rate limit: one link a minute, quietly', async () => {
@@ -150,7 +230,7 @@ test('sign out everywhere kills every session', async () => {
 });
 
 test('audit records actions with ids only', async () => {
-  const rows = await db.all(`select action, who, detail from audit where action in ('sendMessage','signIn') order by at desc limit 5`);
+  const rows = await db.all(`select action, who, detail from audit where action in ('sendMessage','setPassword','login') order by at desc limit 5`);
   assert.ok(rows.length >= 2);
   const sm = rows.find(r => r.action === 'sendMessage');
   assert.ok(sm.detail.topicId); assert.equal(sm.detail.body, undefined, 'message bodies never reach the audit');
@@ -334,8 +414,9 @@ test('coordinator: new family, settings, in basket', async () => {
   assert.equal(nf.ok, true); assert.ok(nf.client_id);
   assert.equal(lastMail().to, 'linh@example.com'); assert.match(lastMail().html, /Welcome!/);
   const link = linkFrom(lastMail());
-  const h = await api(null, 'hello', { t: link }); assert.ok(h.boot.session, 'welcome link signs in');
-  const b = await api(h.boot.session, 'bootstrap', {});
+  const h = await api(null, 'hello', { t: link }); assert.ok(h.boot.pwset, 'welcome link opens set-password');
+  const sp = await api(null, 'setPassword', { token: h.boot.pwset.token, password: PW }); assert.ok(sp.session);
+  const b = await api(sp.session, 'bootstrap', {});
   assert.equal(b.client.family_name, 'Nguyen'); assert.equal(b.client.paid, false);
   const cs = await api(co, 'saveCoSettings', { notify: { message: 'instant' }, digestHour: 6, title: 'Founder' });
   assert.equal(cs.coSettings.notify.message, 'instant'); assert.equal(cs.coSettings.digestHour, 6);

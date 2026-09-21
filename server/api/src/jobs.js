@@ -42,6 +42,7 @@ async function medReminders() {
 // Sends each coordinator one email at their digest hour with everything queued since the last one. Also the daily housekeeping.
 async function dailyDigest() {
   await auth.pruneSessions();
+  await auth.pruneLogin();
   await db.q(`delete from rate_limits where window_end < now() - interval '1 day'`);
   const hour = hourIn(C.TZ), today = ymd(new Date(), C.TZ);
   if (hour === 4) await db.q(`delete from audit where at < now() - interval '366 days'`);

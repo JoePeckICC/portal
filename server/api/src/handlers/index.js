@@ -7,10 +7,10 @@ Object.assign(H, require('./stubs'), require('./bootstrap'), require('./messages
 // Reads never wait on a lock and are not audited unless they fail.
 H.READ_ONLY = { bootstrap: 1, billing: 1, allBilling: 1, inbasket: 1, resources: 1, planPdf: 1, summaryPdf: 1, readDischarge: 1, topicMessages: 1, exportClient: 1, slots: 1 };
 // Supporters (the wider circle) read updates and manage their own account. Nothing else.
-H.SUPPORTER_OK = { bootstrap: 1, savePrefs: 1, changeEmail: 1, signOutEverywhere: 1 };
+H.SUPPORTER_OK = { bootstrap: 1, savePrefs: 1, changeEmail: 1, signOutEverywhere: 1, changePassword: 1, forgetDevices: 1 };
 // A family's portal stays closed until their first payment is in. Consent and intake are always open.
 // Coordinator actions that are fine on an archived family (everything else is refused until reactivation).
-H.ARCHIVE_OK = { reactivateClient: 1, purgeClient: 1, exportClient: 1, savePrefs: 1, saveCoSettings: 1, newFamily: 1, saveResource: 1, signOutEverywhere: 1, changeEmail: 1 };
-H.OPEN_BEFORE_PAID = ['bootstrap', 'signConsent', 'saveIntake', 'submitIntake', 'planPdf', 'savePrefs', 'changeEmail'];
+H.ARCHIVE_OK = { changePassword: 1, forgetDevices: 1, reactivateClient: 1, purgeClient: 1, exportClient: 1, savePrefs: 1, saveCoSettings: 1, newFamily: 1, saveResource: 1, signOutEverywhere: 1, changeEmail: 1 };
+H.OPEN_BEFORE_PAID = ['bootstrap', 'changePassword', 'forgetDevices', 'signConsent', 'saveIntake', 'submitIntake', 'planPdf', 'savePrefs', 'changeEmail'];
 
 module.exports = H;
