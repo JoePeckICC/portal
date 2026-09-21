@@ -7,7 +7,7 @@ REGION=${REGION:-us-central1}          # closest region to Nashville with Cloud 
 gcloud config set project "$PROJECT"
 
 echo "== APIs"
-gcloud services enable run.googleapis.com sqladmin.googleapis.com secretmanager.googleapis.com cloudscheduler.googleapis.com storage.googleapis.com vision.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com sheets.googleapis.com gmail.googleapis.com calendar-json.googleapis.com
+gcloud services enable run.googleapis.com sqladmin.googleapis.com secretmanager.googleapis.com cloudscheduler.googleapis.com storage.googleapis.com vision.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com servicenetworking.googleapis.com compute.googleapis.com sheets.googleapis.com gmail.googleapis.com calendar-json.googleapis.com
 
 echo "== Service account the API runs as"
 gcloud iam service-accounts create portal-api --display-name "Portal API" 2>/dev/null || true
@@ -16,11 +16,17 @@ for role in roles/cloudsql.client roles/secretmanager.secretAccessor roles/stora
   gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$SA" --role "$role" --quiet >/dev/null
 done
 
+echo "== Private network path (Cloud SQL gets no public address; Cloud Run reaches it inside the VPC)"
+gcloud compute addresses describe google-managed-services-default --global >/dev/null 2>&1 || gcloud compute addresses create google-managed-services-default \
+  --global --purpose=VPC_PEERING --prefix-length=16 --network=default
+gcloud services vpc-peerings list --network=default --format='value(peering)' | grep -q servicenetworking || gcloud services vpc-peerings connect \
+  --service=servicenetworking.googleapis.com --ranges=google-managed-services-default --network=default
+
 echo "== Postgres (Cloud SQL; no public IP, Cloud Run connects over its socket)"
 gcloud sql instances describe portal-db >/dev/null 2>&1 || gcloud sql instances create portal-db \
   --database-version=POSTGRES_16 --tier=db-custom-1-3840 --region="$REGION" --storage-size=20GB --storage-auto-increase \
   --backup-start-time=08:00 --enable-point-in-time-recovery --retained-backups-count=30 --retained-transaction-log-days=7 \
-  --availability-type=zonal --no-assign-ip --network=default --deletion-protection
+  --availability-type=zonal --edition=enterprise --no-assign-ip --network=projects/${PROJECT}/global/networks/default --deletion-protection
 gcloud sql databases create portal --instance=portal-db 2>/dev/null || true
 DBPASS=$(openssl rand -base64 24 | tr -d '/+=')
 gcloud sql users create portal --instance=portal-db --password="$DBPASS" 2>/dev/null || gcloud sql users set-password portal --instance=portal-db --password="$DBPASS"

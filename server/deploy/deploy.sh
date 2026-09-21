@@ -12,6 +12,7 @@ SECRETS="DATABASE_URL=DATABASE_URL:latest,SESSION_SECRET=SESSION_SECRET:latest,J
 for s in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET; do gcloud secrets describe "$s" >/dev/null 2>&1 && SECRETS="$SECRETS,$s=$s:latest"; done
 gcloud run deploy portal-api --image "$IMG" --region "$REGION" --platform managed --allow-unauthenticated \
   --service-account "$SA" --add-cloudsql-instances "$CONN" --set-secrets "$SECRETS" \
+  --network default --subnet default --vpc-egress private-ranges-only \
   --set-env-vars "NODE_ENV=production,TZ=America/Chicago,PORTAL_URL=https://portal.incadencecare.com,ALLOWED_ORIGINS=https://portal.incadencecare.com,UPLOAD_BUCKET=${PROJECT}-uploads,MAIL_TRANSPORT=${MAIL_TRANSPORT:-log},FROM_EMAIL=${FROM_EMAIL:-},CALENDAR_USER=${CALENDAR_USER:-},IDLE_MINUTES=${IDLE_MINUTES:-0}" \
   --cpu 2 --memory 1Gi --min-instances 1 --max-instances 20 --concurrency 40 --timeout 60
 URL=$(gcloud run services describe portal-api --region "$REGION" --format 'value(status.url)')
