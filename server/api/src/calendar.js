@@ -5,19 +5,16 @@ const C = require('./config');
 const { must, id } = require('./util');
 const { localToIso } = require('./time');
 
-let cal = null;
-function client() {
-  if (cal) return cal;
+async function client() {
   const { google } = require('googleapis');
-  const auth = new google.auth.GoogleAuth({ scopes: ['https://www.googleapis.com/auth/calendar'], clientOptions: { subject: process.env.CALENDAR_USER || '' } });
-  cal = google.calendar({ version: 'v3', auth });
-  return cal;
+  const auth = await require('./gauth').authFor(process.env.CALENDAR_USER || '', ['https://www.googleapis.com/auth/calendar']);
+  return google.calendar({ version: 'v3', auth });
 }
 const enabled = () => !!process.env.CALENDAR_USER;
 
 async function busyOn(open, close) {
   if (!enabled()) return [];
-  const r = await client().freebusy.query({ requestBody: { timeMin: open.toISOString(), timeMax: close.toISOString(), timeZone: C.TZ, items: [{ id: 'primary' }] } });
+  const r = await (await client()).freebusy.query({ requestBody: { timeMin: open.toISOString(), timeMax: close.toISOString(), timeZone: C.TZ, items: [{ id: 'primary' }] } });
   return ((r.data.calendars || {}).primary || {}).busy || [];
 }
 async function freeSlots(day, minutes) {
@@ -38,11 +35,11 @@ async function createEvent({ title, start, end, guests, description, location, v
   if (!enabled()) return { id: '', link: '' };
   const body = { summary: title, description, location, start: { dateTime: start.toISOString(), timeZone: C.TZ }, end: { dateTime: end.toISOString(), timeZone: C.TZ }, attendees: guests.map(email => ({ email })) };
   if (video) body.conferenceData = { createRequest: { requestId: id(), conferenceSolutionKey: { type: 'hangoutsMeet' } } };
-  const r = await client().events.insert({ calendarId: 'primary', sendUpdates: 'all', conferenceDataVersion: video ? 1 : 0, requestBody: body });
+  const r = await (await client()).events.insert({ calendarId: 'primary', sendUpdates: 'all', conferenceDataVersion: video ? 1 : 0, requestBody: body });
   return { id: r.data.id || '', link: r.data.hangoutLink || '' };
 }
 async function deleteEvent(eventId) {
   if (!enabled() || !eventId) return;
-  await client().events.delete({ calendarId: 'primary', eventId: String(eventId).split('@')[0], sendUpdates: 'all' });
+  await (await client()).events.delete({ calendarId: 'primary', eventId: String(eventId).split('@')[0], sendUpdates: 'all' });
 }
 module.exports = { freeSlots, createEvent, deleteEvent, enabled };

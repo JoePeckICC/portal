@@ -7,7 +7,7 @@ REGION=${REGION:-us-central1}          # closest region to Nashville with Cloud 
 gcloud config set project "$PROJECT"
 
 echo "== APIs"
-gcloud services enable run.googleapis.com sqladmin.googleapis.com secretmanager.googleapis.com cloudscheduler.googleapis.com storage.googleapis.com vision.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com servicenetworking.googleapis.com compute.googleapis.com sheets.googleapis.com gmail.googleapis.com calendar-json.googleapis.com
+gcloud services enable run.googleapis.com sqladmin.googleapis.com secretmanager.googleapis.com cloudscheduler.googleapis.com storage.googleapis.com vision.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com servicenetworking.googleapis.com compute.googleapis.com iamcredentials.googleapis.com sheets.googleapis.com gmail.googleapis.com calendar-json.googleapis.com
 
 echo "== Service account the API runs as"
 gcloud iam service-accounts create portal-api --display-name "Portal API" 2>/dev/null || true
@@ -15,6 +15,12 @@ SA="portal-api@${PROJECT}.iam.gserviceaccount.com"
 for role in roles/cloudsql.client roles/secretmanager.secretAccessor roles/storage.objectAdmin; do
   gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$SA" --role "$role" --quiet >/dev/null
 done
+# Lets the API act as a Workspace user (send mail as care@, read the coordinator's calendar) without a downloaded key.
+gcloud iam service-accounts add-iam-policy-binding "$SA" --member "serviceAccount:$SA" --role roles/iam.serviceAccountTokenCreator --quiet >/dev/null
+
+echo "== Let Cloud Build read the uploaded source and push images (new projects no longer grant this by default)"
+PN=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
+gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:${PN}-compute@developer.gserviceaccount.com" --role roles/cloudbuild.builds.builder --quiet >/dev/null
 
 echo "== Private network path (Cloud SQL gets no public address; Cloud Run reaches it inside the VPC)"
 gcloud compute addresses describe google-managed-services-default --global >/dev/null 2>&1 || gcloud compute addresses create google-managed-services-default \

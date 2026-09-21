@@ -6,14 +6,11 @@ const C = require('./config');
 const { esc, normEmail } = require('./util');
 
 const sent = [];                                   // dev/test inbox
-let gmail = null;
 
 async function gmailClient() {
-  if (gmail) return gmail;
   const { google } = require('googleapis');
-  const auth = new google.auth.GoogleAuth({ scopes: ['https://www.googleapis.com/auth/gmail.send'], clientOptions: { subject: process.env.MAIL_AS || process.env.FROM_EMAIL || '' } });
-  gmail = google.gmail({ version: 'v1', auth });
-  return gmail;
+  const auth = await require('./gauth').authFor(process.env.MAIL_AS || process.env.FROM_EMAIL || '', ['https://www.googleapis.com/auth/gmail.send']);
+  return google.gmail({ version: 'v1', auth });
 }
 
 function mime({ to, from, bcc, subject, html }) {

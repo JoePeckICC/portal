@@ -38,7 +38,7 @@ Emails print to the console when `MAIL_TRANSPORT=log`; in production they go thr
 | STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET | secrets |
 | PORTAL_URL, API_URL, ALLOWED_ORIGINS | addresses; CORS allows only ALLOWED_ORIGINS |
 | UPLOAD_BUCKET | private bucket for documents |
-| MAIL_TRANSPORT (`gmail`/`log`), FROM_EMAIL | sending |
+| MAIL_TRANSPORT (`gmail`/`log`), FROM_EMAIL, MAIL_AS | sending: MAIL_AS is the real mailbox the API acts as; FROM_EMAIL can be one of its aliases |
 | CALENDAR_USER | coordinator's Workspace address for booking (domain-wide delegation) |
 | IDLE_MINUTES (default 0 = off), SESSION_DAYS (30) | session policy |
 | RETAIN_YEARS (7) | archive retention |

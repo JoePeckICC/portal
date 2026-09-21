@@ -1,6 +1,6 @@
 'use strict';
 // The one API the page talks to: POST /api  { session, action, payload }  ->  { ok, ... } | { ok:false, error }
-// Plus: GET /healthz, GET /files/:uploadId (documents, session-checked), POST /stripe/webhook.
+// Plus: GET /health (not /healthz: Google's front end swallows that path), GET /files/:uploadId (documents, session-checked), POST /stripe/webhook.
 const http = require('http');
 const C = require('./config');
 const db = require('./db');
@@ -84,7 +84,7 @@ async function handle(req, res) {
   const info = reqInfo(req);
   if (!cors(req, res)) return send(res, 403, { ok: false, error: 'Origin not allowed' });
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
-  if (url.pathname === '/healthz') { try { await db.q('select 1'); return send(res, 200, { ok: true }); } catch (e) { return send(res, 503, { ok: false }); } }
+  if (url.pathname === '/health') { try { await db.q('select 1'); return send(res, 200, { ok: true }); } catch (e) { return send(res, 503, { ok: false }); } }
 
   if ((url.pathname === '/api' || url.pathname === '/') && req.method === 'POST') {
     if ((await auth.bump('api:' + info.ip, 60)) > C.RATE.apiPerMin) return send(res, 429, { ok: false, error: 'Slow down a little and try again.' });
