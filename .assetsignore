@@ -4,3 +4,5 @@ worker.js
 README.md
 .assetsignore
 .github/
+.git/
+.git
