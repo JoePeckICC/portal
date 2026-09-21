@@ -1,0 +1,37 @@
+{
+  "Clients": [
+    ["client_id","family_name","patient_first_name","patient_last_name","surgery_date","current_stage","status","coordinator_email","circle_enabled","paid","plan_ready","phone","billing_status","monthly_amount","stripe_customer_id","legacy_col"],
+    ["c1","Test Family","Pat","Test","2026-10-02","Before surgery","Active","joe@incadencecare.com","FALSE","TRUE","TRUE","615-555-0100","Active","249","cus_test1","keep me"],
+    ["c2","Second Family","Sam","Second","","At home","Active","joe@incadencecare.com","TRUE","FALSE","FALSE","","","","",""]
+  ],
+  "Users": [
+    ["email","name","role","client_id","active","relationship","session_ver","prefs"],
+    ["Pat@Example.com","Pat Test","client","c1","TRUE","","2","{\"tz\":\"America/Chicago\"}"],
+    ["joe@incadencecare.com","Joe Peck","coordinator","","TRUE","","1",""],
+    ["sis@example.com","Sis","family","c1","TRUE","Sister","1","not json"]
+  ],
+  "Links": [["nonce","email","kind","issued_at","used_at"],["abc123","pat@example.com","link","2026-09-20T10:00:00Z","2026-09-20T10:01:00Z"]],
+  "Plan": [["plan_id","client_id","stage","category","item","detail","owner","status","target_date","updated_at","draft"],["p1","c1","Before surgery","Home","Clear the stairs","","Family","Not started","2026-09-30","2026-09-20T10:00:00Z","TRUE"]],
+  "Tasks": [["task_id","client_id","title","category","status","owner","due_date","notes","updated_at"],["t1","c1","Pick up walker","Equipment","Done","Sis","2026-09-25","","2026-09-21T01:00:00Z"]],
+  "Goals": [["goal_id","client_id","title","detail","status","added_by","updated_at"],["g1","c1","Walk to mailbox","","Active","pat@example.com","2026-09-21T01:00:00Z"]],
+  "Topics": [["topic_id","client_id","title","kind","status","created_by","created_at","last_at"],["tp1","c1","Questions about meds","","Active","pat@example.com","2026-09-20T10:00:00Z","2026-09-21T02:00:00Z"]],
+  "Messages": [["message_id","client_id","topic_id","sender_email","sent_at","body","read_by_client","read_by_coordinator","urgent","attachments"],
+    ["m1","c1","tp1","pat@example.com","2026-09-20T10:00:00Z","Hi Joe","TRUE","TRUE","",""],
+    ["m2","c1","tp1","joe@incadencecare.com","2026-09-21T02:00:00Z","Hi Pat","FALSE","TRUE","FALSE","[{\"upload_id\":\"u1\"}]"]],
+  "Updates": [["update_id","client_id","posted_at","posted_by","stage","title","body","visible_to_circle"],["up1","c1","2026-09-21T02:00:00Z","joe@incadencecare.com","Before surgery","Plan ready","","TRUE"]],
+  "Circle": [["circle_id","client_id","supporter_email","supporter_name","relationship","added_by","added_at","status"],["ci1","c1","aunt@example.com","Aunt","Aunt","pat@example.com","2026-09-21T02:00:00Z","Active"]],
+  "Intake": [["client_id","question_id","answer","note","updated_at","updated_by"],["c1","0.1","I'm the person having surgery","","2026-09-20T09:00:00Z","pat@example.com"],["c1","G.6","2026-10-02","","2026-09-20T09:00:00Z","pat@example.com"]],
+  "Appointments": [["appt_id","client_id","title","starts_at","location","note","status","updated_at","kind","mode","minutes","event_id","booked_by","about","link","visit_note"],["a1","c1","Pre-op visit","2026-09-28T14:00:00","VUMC","","Scheduled","2026-09-21T02:00:00Z","","","","","","","",""]],
+  "CareTeam": [["member_id","client_id","name","role","org","phone","address","notes","kind","added_by","status","updated_at"],["ct1","c1","Dr. Potter","Surgeon","VUMC","","","","","joe@incadencecare.com","Active","2026-09-21T02:00:00Z"]],
+  "Referrals": [["referral_id","client_id","vendor","service","contact","note","status","added_by","updated_at"]],
+  "Medications": [["med_id","client_id","name","dose","instructions","prescriber","frequency","times","refills_left","next_refill","notes","status","added_by","added_at","updated_at","updated_by"],["md1","c1","Keppra","500 mg","with food","Dr. Potter","Twice daily","08:00,20:00","2","2026-10-15","","Accepted","joe@incadencecare.com","2026-09-21T02:00:00Z","2026-09-21T02:00:00Z",""]],
+  "Doses": [["dose_id","client_id","med_id","due_at","status","taken_at","by"],["d1","c1","md1","2026-09-22T08:00:00","Due","",""],["d2","c1","md1","2026-09-22T20:00:00","Taken","2026-09-22T20:05:00","pat@example.com"]],
+  "Uploads": [["upload_id","client_id","kind","name","url","file_id","uploaded_by","uploaded_at","note","shared"],["u1","c1","Discharge","discharge.pdf","https://drive.google.com/x","1AbC","pat@example.com","2026-09-21T02:00:00Z","","TRUE"]],
+  "VendorBills": [["bill_id","client_id","vendor","service","amount","status","due_date","note","added_by","updated_at"],["b1","c1","Acme Home Health","Aide","$1,200.50","Due","2026-10-01","","joe@incadencecare.com","2026-09-21T02:00:00Z"]],
+  "Assistance": [["program_id","client_id","name","what","status","note","link","updated_at"]],
+  "Resources": [["resource_id","title","kind","track","stage","by","minutes","summary","url","body","status","sort","added_by","added_at","updated_at"],["r1","What to pack","Article","Brain","Before surgery","Joe","3","","","Pack light.","Published","1","joe@incadencecare.com","2026-09-21T02:00:00Z","2026-09-21T02:00:00Z"]],
+  "Recommendations": [["rec_id","client_id","resource_id","note","by","at","opened_at"],["rc1","c1","r1","Read before Friday","joe@incadencecare.com","2026-09-21T02:00:00Z",""]],
+  "ResourceViews": [["view_id","resource_id","client_id","email","at"],["v1","r1","c1","pat@example.com","2026-09-21T03:00:00Z"]],
+  "Digest": [["item_id","coordinator","kind","subject","lead","body","url","created_at","sent_at"]],
+  "Audit": [["at","who","role","action","client_id","detail","error"],["2026-09-21T02:00:00Z","joe@incadencecare.com","coordinator","saveMed","c1","{\"medId\":\"md1\"}",""],["2026-09-21T02:01:00Z","pat@example.com","client","bootstrap","c1","",""]]
+}
