@@ -33,7 +33,7 @@ async function freeSlots(day, minutes) {
 // Creates the event with the family as guests; returns { id, link } (a Meet link for video calls).
 async function createEvent({ title, start, end, guests, description, location, video }) {
   if (!enabled()) return { id: '', link: '' };
-  const body = { summary: title, description, location, start: { dateTime: start.toISOString(), timeZone: C.TZ }, end: { dateTime: end.toISOString(), timeZone: C.TZ }, attendees: guests.map(email => ({ email })) };
+  const body = { summary: title, description, location, visibility: 'private', start: { dateTime: start.toISOString(), timeZone: C.TZ }, end: { dateTime: end.toISOString(), timeZone: C.TZ }, attendees: guests.map(email => ({ email })) };   // Private: family detail stays off the shared domain calendar (HIPAA)
   if (video) body.conferenceData = { createRequest: { requestId: id(), conferenceSolutionKey: { type: 'hangoutsMeet' } } };
   const r = await (await client()).events.insert({ calendarId: 'primary', sendUpdates: 'all', conferenceDataVersion: video ? 1 : 0, requestBody: body });
   return { id: r.data.id || '', link: r.data.hangoutLink || '' };
