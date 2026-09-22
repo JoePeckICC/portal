@@ -5,7 +5,7 @@ const core = require('../core');
 const { must, ymd } = require('../util');
 
 const coOnly = ctx => must(ctx.role === 'coordinator', 'Not allowed');
-const RETAIN_YEARS = Number(process.env.RETAIN_YEARS || 7);
+const RETAIN_YEARS = Number(process.env.RETAIN_YEARS || 8);
 
 async function archiveClient(ctx, p, c) {
   coOnly(ctx);
