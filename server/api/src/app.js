@@ -119,8 +119,7 @@ async function serveFile(req, res, url, info) {
   if (ctx.role === 'family' && u.shared === false) return send(res, 404, { ok: false, error: 'Not found' });
   if (!u.storage_key) return send(res, 409, { ok: false, error: 'This file still lives in Drive; it moves over in the file migration.' });
   const bytes = await require('./storage').get(u.storage_key);
-  await core.audit(ctx, 'openFile', { uploadId }, '', info); const _m = String(u.mime || '').toLowerCase().split(';')[0].trim(), _in = ['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'text/plain'].includes(_m), _fn = String(u.name || 'file').replace(/[
-"\]+/g, '_');   // uploads are untrusted: safe preview types render inline, the rest download
+  await core.audit(ctx, 'openFile', { uploadId }, '', info); const _m = String(u.mime || '').toLowerCase().split(';')[0].trim(), _in = ['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'text/plain'].includes(_m), _fn = String(u.name || 'file').replace(/[^A-Za-z0-9._ -]+/g, '_');   // uploads are untrusted: safe preview types render inline, the rest download
   res.writeHead(200, { 'Content-Type': _in ? _m : 'application/octet-stream', 'Content-Length': bytes.length, 'Content-Disposition': (_in ? 'inline' : 'attachment') + '; filename="' + _fn + '"', 'Content-Security-Policy': "default-src 'none'; sandbox; frame-ancestors 'none'", 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' });
   res.end(bytes);
 }
