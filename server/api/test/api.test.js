@@ -473,7 +473,7 @@ test('archive: lock, export, reactivate, purge rules', async () => {
   const co = await signIn('joe@incadencecare.com');
   const pat = await signIn('pat@example.com');
   const a = await api(co, 'archiveClient', { clientId: 'c1' });
-  assert.equal(a.ok, true); assert.equal(a.client.status, 'Archived'); assert.match(a.retain_until, /^2033-/);
+  assert.equal(a.ok, true); assert.equal(a.client.status, 'Archived'); assert.match(a.retain_until, new RegExp('^' + (new Date().getFullYear() + 8) + '-'));
   assert.equal((await api(pat, 'bootstrap', {})).error, 'signed_out', 'family is locked out');
   assert.match((await api(co, 'addTask', { clientId: 'c1', title: 'x' })).error, /archived/, 'read-only for the coordinator');
   const b = await api(co, 'bootstrap', { clientId: 'c1' }); assert.equal(b.ok, true, 'chart still opens');
