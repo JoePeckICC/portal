@@ -10,7 +10,7 @@ gcloud artifacts repositories describe portal --location="$REGION" >/dev/null 2>
 ( cd "$(dirname "$0")/../api" && gcloud builds submit --tag "$IMG" . )
 SECRETS="DATABASE_URL=DATABASE_URL:latest,SESSION_SECRET=SESSION_SECRET:latest,JOBS_KEY=JOBS_KEY:latest"
 for s in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET HUNTRESS_HEC_TOKEN; do gcloud secrets describe "$s" >/dev/null 2>&1 && SECRETS="$SECRETS,$s=$s:latest"; done
-gcloud run deploy portal-api --image "$IMG" --region "$REGION" --platform managed --allow-unauthenticated \
+gcloud run deploy portal-api --image "$IMG" --region "$REGION" --platform managed --no-invoker-iam-check \
   --service-account "$SA" --add-cloudsql-instances "$CONN" --set-secrets "$SECRETS" \
   --network default --subnet default --vpc-egress private-ranges-only \
   --set-env-vars "NODE_ENV=production,TZ=America/Chicago,PORTAL_URL=https://portal.incadencecare.com,ALLOWED_ORIGINS=https://portal.incadencecare.com,UPLOAD_BUCKET=${PROJECT}-uploads,MAIL_TRANSPORT=${MAIL_TRANSPORT:-gmail},FROM_EMAIL=${FROM_EMAIL:-care@incadencecare.com},MAIL_AS=${MAIL_AS:-joe@incadencecare.com},CALENDAR_USER=${CALENDAR_USER:-joe@incadencecare.com},IDLE_MINUTES=${IDLE_MINUTES:-0},RETAIN_YEARS=${RETAIN_YEARS:-8}" \
