@@ -13,7 +13,7 @@ for s in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET HUNTRESS_HEC_TOKEN; do gcloud s
 gcloud run deploy portal-api --image "$IMG" --region "$REGION" --platform managed --allow-unauthenticated \
   --service-account "$SA" --add-cloudsql-instances "$CONN" --set-secrets "$SECRETS" \
   --network default --subnet default --vpc-egress private-ranges-only \
-  --set-env-vars "NODE_ENV=production,TZ=America/Chicago,PORTAL_URL=https://portal.incadencecare.com,ALLOWED_ORIGINS=https://portal.incadencecare.com,UPLOAD_BUCKET=${PROJECT}-uploads,MAIL_TRANSPORT=${MAIL_TRANSPORT:-log},FROM_EMAIL=${FROM_EMAIL:-},MAIL_AS=${MAIL_AS:-},CALENDAR_USER=${CALENDAR_USER:-},IDLE_MINUTES=${IDLE_MINUTES:-0}" \
+  --set-env-vars "NODE_ENV=production,TZ=America/Chicago,PORTAL_URL=https://portal.incadencecare.com,ALLOWED_ORIGINS=https://portal.incadencecare.com,UPLOAD_BUCKET=${PROJECT}-uploads,MAIL_TRANSPORT=${MAIL_TRANSPORT:-gmail},FROM_EMAIL=${FROM_EMAIL:-care@incadencecare.com},MAIL_AS=${MAIL_AS:-joe@incadencecare.com},CALENDAR_USER=${CALENDAR_USER:-joe@incadencecare.com},IDLE_MINUTES=${IDLE_MINUTES:-0},RETAIN_YEARS=${RETAIN_YEARS:-8}" \
   --cpu 2 --memory 1Gi --min-instances 1 --max-instances 20 --concurrency 40 --timeout 60
 URL=$(gcloud run services describe portal-api --region "$REGION" --format 'value(status.url)')
 # The service needs its own address for the document links it hands out.
