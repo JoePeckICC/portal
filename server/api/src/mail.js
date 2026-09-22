@@ -18,7 +18,7 @@ function mime({ to, from, bcc, subject, html }) {
   const b = 'b' + Date.now().toString(36);
   const enc = s => Buffer.from(s, 'utf8').toString('base64');
   return [
-    `From: ${C.APP_NAME} <${from}>`, `To: ${to}`, bcc ? `Bcc: ${bcc}` : null, `Subject: =?UTF-8?B?${enc(subject)}?=`,
+    `From: ${C.APP_NAME} <${from}>`, from ? `Reply-To: ${from}` : null, `To: ${to}`, bcc ? `Bcc: ${bcc}` : null, `Subject: =?UTF-8?B?${enc(subject)}?=`,
     'MIME-Version: 1.0', `Content-Type: multipart/alternative; boundary="${b}"`, '',
     `--${b}`, 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', enc(text), '',
     `--${b}`, 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', enc(html), '', `--${b}--`,
