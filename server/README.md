@@ -41,14 +41,14 @@ Emails print to the console when `MAIL_TRANSPORT=log`; in production they go thr
 | MAIL_TRANSPORT (`gmail`/`log`), FROM_EMAIL, MAIL_AS | sending: MAIL_AS is the real mailbox the API acts as; FROM_EMAIL can be one of its aliases |
 | CALENDAR_USER | coordinator's Workspace address for booking (domain-wide delegation) |
 | IDLE_MINUTES (default 0 = off), SESSION_DAYS (30) | session policy |
-| RETAIN_YEARS (7) | archive retention |
+| RETAIN_YEARS (8) | archive retention |
 
 ## What the API guarantees
 - Every request is pinned to the signed-in person's family; coordinators pick a family, nobody else can.
 - Writes run in a transaction under a per-family lock; reads never wait.
 - Sign-in links: 20 minutes, single use, 1/min and 5/hour per address. Sessions are server-side and revocable ("sign out everywhere").
 - Documents are served only through `/files/<id>` with a signed, per-person, per-file link (24 h). No public URLs.
-- Audit: who did what to which family, ids only, kept 366 days.
+- Audit: who did what to which family, ids only, kept 8 years.
 - Archived families are locked and read-only; purge needs a coordinator, the retention date, and the family name typed back.
 
 ## Sign-in
@@ -63,7 +63,7 @@ account for 15 minutes. The emailed link is only for setting a password the firs
 - `record_history`: before/after of every clinical and financial row, stamped with who (Postgres triggers).
   Append-only; a purge after the retention period removes that family's rows.
 - Both are also written to Cloud Logging as structured lines (`jsonPayload.audit=true`) and routed by
-  `deploy/logging.sh` into a locked compliance bucket kept 6 years, together with Google's own audit logs.
+  `deploy/logging.sh` into a locked compliance bucket kept 8 years, together with Google's own audit logs.
 - Coordinators see it all under **Access log** in the portal, with CSV export.
 - `deploy/alerts.sh`: uptime, 5xx, security events (lockout / export / purge), failed jobs -> email.
 
