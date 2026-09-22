@@ -26,7 +26,7 @@ echo "   portal-api updated"
 
 echo "== Google's logs -> Pub/Sub -> forwarder -> Huntress"
 gcloud pubsub topics describe huntress-siem >/dev/null 2>&1 || gcloud pubsub topics create huntress-siem >/dev/null
-FILTER='logName:"cloudaudit.googleapis.com" OR resource.type="cloud_run_job" OR (resource.type="cloud_run_revision" AND httpRequest.status>=400) OR (resource.type="cloud_run_revision" AND severity>=WARNING AND NOT jsonPayload.audit=true) OR resource.type="cloud_scheduler_job"'
+FILTER='logName:"cloudaudit.googleapis.com" OR resource.type="cloud_run_job" OR (resource.type="cloud_run_revision" AND httpRequest.status>=400) OR (resource.type="cloud_run_revision" AND severity>=WARNING AND NOT jsonPayload.audit=true) OR resource.type="cloud_scheduler_job"'; FILTER="($FILTER) AND NOT resource.labels.service_name=\"huntress-forwarder\""   # never forward the forwarder's own logs (feedback loop)
 DEST="pubsub.googleapis.com/projects/${PROJECT}/topics/huntress-siem"
 if gcloud logging sinks describe huntress-sink >/dev/null 2>&1; then gcloud logging sinks update huntress-sink "$DEST" --log-filter="$FILTER" --quiet >/dev/null
 else gcloud logging sinks create huntress-sink "$DEST" --log-filter="$FILTER" --quiet >/dev/null; fi
@@ -34,7 +34,7 @@ WRITER=$(gcloud logging sinks describe huntress-sink --format='value(writerIdent
 gcloud pubsub topics add-iam-policy-binding huntress-siem --member="$WRITER" --role=roles/pubsub.publisher --quiet >/dev/null
 ( cd "$(dirname "$0")/../huntress-forwarder" && gcloud functions deploy huntress-forwarder --gen2 --region "$REGION" --runtime nodejs22 --entry-point forward \
     --trigger-topic huntress-siem --service-account "$SA" --set-secrets HUNTRESS_HEC_TOKEN=HUNTRESS_HEC_TOKEN:latest \
-    --memory 256Mi --max-instances 5 --quiet >/dev/null )
+    --memory 256Mi --cpu 1 --concurrency 20 --max-instances 5 --quiet >/dev/null )
 gcloud run services add-iam-policy-binding huntress-forwarder --region "$REGION" --member="serviceAccount:$SA" --role=roles/run.invoker --quiet >/dev/null; echo "   forwarder deployed"
 
 echo "== Test event"
