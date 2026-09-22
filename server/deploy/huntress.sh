@@ -35,7 +35,7 @@ gcloud pubsub topics add-iam-policy-binding huntress-siem --member="$WRITER" --r
 ( cd "$(dirname "$0")/../huntress-forwarder" && gcloud functions deploy huntress-forwarder --gen2 --region "$REGION" --runtime nodejs22 --entry-point forward \
     --trigger-topic huntress-siem --service-account "$SA" --set-secrets HUNTRESS_HEC_TOKEN=HUNTRESS_HEC_TOKEN:latest \
     --memory 256Mi --max-instances 5 --quiet >/dev/null )
-echo "   forwarder deployed"
+gcloud run services add-iam-policy-binding huntress-forwarder --region "$REGION" --member="serviceAccount:$SA" --role=roles/run.invoker --quiet >/dev/null; echo "   forwarder deployed"
 
 echo "== Test event"
 URL=$(gcloud run services describe portal-api --region "$REGION" --format 'value(status.url)')
