@@ -14,10 +14,11 @@ const all = async (text, params, client) => (await q(text, params, client)).rows
 
 // Runs fn inside a transaction. Writes that touch one family also take that family's advisory lock,
 // so two requests for the same family never interleave (the Apps Script used one global lock; this is per family).
-async function tx(fn, lockKey) {
+async function tx(fn, lockKey, actor) {
   const c = await pool.connect();
   try {
     await c.query('begin');
+    if (actor) await c.query(`select set_config('app.who', $1, true), set_config('app.role', $2, true), set_config('app.ip', $3, true)`, [String(actor.email || ''), String(actor.role || ''), String(actor.ip || '')]);
     if (lockKey) await c.query('select pg_advisory_xact_lock(hashtext($1))', [String(lockKey)]);
     const out = await fn(c);
     await c.query('commit');

@@ -176,6 +176,7 @@ async function login(p, req, audit) {
   if (!u || !good) {
     const n = await bump('pwfail:' + email, C.LOCK_MINUTES * 60);
     await audit(who, 'login', {}, u ? (u.password_hash ? 'wrong password' : 'no password set yet') : 'unknown email', req);
+    if (n === C.LOCK_AFTER && u) await require('./core').securityAlert('account paused after wrong passwords', `${u.name || email} (${email}) had ${C.LOCK_AFTER} wrong passwords in a row from ${req && req.ip || 'an unknown address'}, so sign-in is paused for ${C.LOCK_MINUTES} minutes.`, 'If this was not them, their password may be known to someone else. You can ask them to reset it from the sign-in page.');
     return { ok: false, error: n >= C.LOCK_AFTER ? LOCKED : WRONG };
   }
   await clearBucket('pwfail:' + email);

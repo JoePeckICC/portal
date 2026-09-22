@@ -138,7 +138,10 @@ async function main() {
     for (const tab of ORDER) {
       if (!data[tab]) { report.push([tab, 'missing tab', 0, 0]); continue; }
       const spec = MAP[tab], cols = await columnTypes(db, spec.table);
-      if (spec.key === null && !dry) await db.query(`delete from ${spec.table}`);   // audit: full reload
+      if (spec.key === null && !dry) {   // audit is append-only once live: load it only into an empty table
+        const n = await db.query(`select count(*)::int as n from ${spec.table}`);
+        if (n.rows[0].n > 0) { console.log(`${tab} -> ${spec.table} skipped (already has ${n.rows[0].n} rows)`); continue; }
+      }
       const { n, skipped } = await upsert(db, spec, cols, toObjects(data[tab]), dry);
       report.push([tab, spec.table, n, skipped]);
     }

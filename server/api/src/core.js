@@ -13,8 +13,10 @@ function ctxFor(user, pickedClientId) {
 }
 const fam = ctx => ctx.role === 'client' || ctx.role === 'family';
 
-// ---- audit: who did what to which family, when. Ids and statuses only; never message bodies, notes or answers.
-const AUDIT_SKIP = { billing: 1, allBilling: 1, inbasket: 1, resources: 1, topicMessages: 1, readTopic: 1 };
+// ---- audit: who did what (and looked at what) for which family, when. Ids and statuses only; never message
+// bodies, notes or answers. Every row also goes to Cloud Logging as a structured line, where a locked log
+// bucket keeps a copy nothing in this app can edit or delete.
+const AUDIT_SKIP = {};
 const AUDIT_KEYS = ['topicId', 'taskId', 'apptId', 'medId', 'uploadId', 'resourceId', 'goalId', 'memberId', 'referralId', 'billId', 'programId', 'planId', 'updateId', 'circleId', 'invoiceId', 'email', 'status', 'stage', 'kind', 'shared', 'urgent', 'what', 'amount'];
 async function audit(ctx, action, payload, error, req) {
   try {
@@ -22,9 +24,22 @@ async function audit(ctx, action, payload, error, req) {
     const d = {}; AUDIT_KEYS.forEach(k => { if (payload && payload[k] !== undefined && payload[k] !== '') d[k] = String(payload[k]).slice(0, 60); });
     if (payload && payload.files && payload.files.length) d.files = payload.files.length;
     if (payload && payload.meds && payload.meds.length) d.meds = payload.meds.length;
+    const row = { who: ctx && ctx.email || '', role: ctx && ctx.role || '', action, client_id: ctx && ctx.clientId || null, detail: d, error: String(error || '').slice(0, 200), ip: req && req.ip || null };
+    const line = { severity: row.error ? 'WARNING' : 'NOTICE', audit: true, event: 'portal.' + action, outcome: row.error ? 'failure' : 'success', ...row, ua: req && String(req.ua || '').slice(0, 120) || '' };
+    if (process.env.NODE_ENV !== 'test') console.log(JSON.stringify(line));
+    require('./hec').send(line);
     await db.q(`insert into audit (who,role,action,client_id,detail,error,ip) values ($1,$2,$3,$4,$5,$6,$7)`,
-      [ctx && ctx.email || '', ctx && ctx.role || '', action, ctx && ctx.clientId || null, JSON.stringify(d).slice(0, 1000), String(error || '').slice(0, 200), req && req.ip || null]);
+      [row.who, row.role, row.action, row.client_id, JSON.stringify(d).slice(0, 1000), row.error, row.ip]);
   } catch (e) { console.error('audit failed', e.message); }
+}
+
+// ---- security alerts: the things a coordinator should hear about the moment they happen
+async function securityAlert(subject, lead, body) {
+  require('./hec').send({ severity: 'WARNING', audit: true, event: 'portal.security_alert', outcome: 'failure', subject, message: lead });
+  try {
+    const cos = await db.all(`select email from users where lower(role)='coordinator' and active`);
+    for (const c of cos) await mail.notify(c.email, 'Security: ' + subject, lead, body || '', 'Open the access log');
+  } catch (e) { console.error('security alert failed', e.message); }
 }
 
 // ---- lookups
@@ -123,4 +138,4 @@ async function notifyFamily(clientId, kind, subject, lead, body, cta, skip) {
   }
 }
 
-module.exports = { ctxFor, fam, audit, clientById, usersFor, coordinatorFor, publicClient, prefs, coSettings, docPublic, fileUrl, msgPublic, topicsFor, topicById, recentMessages, autoMsg, notifyCo, notifyFamily, must, esc, first, byAsc, byDesc };
+module.exports = { securityAlert, ctxFor, fam, audit, clientById, usersFor, coordinatorFor, publicClient, prefs, coSettings, docPublic, fileUrl, msgPublic, topicsFor, topicById, recentMessages, autoMsg, notifyCo, notifyFamily, must, esc, first, byAsc, byDesc };

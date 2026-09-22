@@ -65,7 +65,7 @@ async function api(session, action, payload, req) {
         must(!cl || cl.status !== 'Archived', 'This family is archived. Reactivate them to make changes.');
       }
       // Writes run in a transaction under the family's lock; reads run plain.
-      out = H.READ_ONLY[action] ? await h(ctx, payload) : await db.tx(c => h(ctx, payload, c), ctx.clientId || ctx.email);
+      out = H.READ_ONLY[action] ? await h(ctx, payload) : await db.tx(c => h(ctx, payload, c), ctx.clientId || ctx.email, { email: ctx.email, role: ctx.role, ip: req && req.ip });
       const after = out && out._after; if (out) delete out._after;
       out = wire(out || {}); out.ok = true;
       await core.audit(ctx, action, payload, '', req);

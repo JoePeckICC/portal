@@ -229,8 +229,52 @@ test('sign out everywhere kills every session', async () => {
   assert.equal((await api(s2, 'bootstrap', {})).error, 'signed_out');
 });
 
+test('every view is logged, the log is append-only, and history keeps before/after', async () => {
+  const co = await signIn('joe@incadencecare.com'); const pat = await signIn('pat@example.com');
+  await db.q(`delete from audit where who='pat@example.com' and action='topicMessages'`).catch(() => {});
+  const topics = (await api(pat, 'bootstrap', {})).topics || [];
+  if (topics.length) { await api(pat, 'topicMessages', { topicId: topics[0].topic_id }); }
+  await api(pat, 'billing', {});
+  const views = await db.all(`select action from audit where who='pat@example.com' and action in ('billing','topicMessages','bootstrap') and at > now() - interval '1 minute'`);
+  assert.ok(views.some(v => v.action === 'billing') && views.some(v => v.action === 'bootstrap'), 'views are in the audit trail');
+  await assert.rejects(db.q(`delete from audit where who='pat@example.com'`), /append-only/, 'audit rows cannot be deleted');
+  await assert.rejects(db.q(`update audit set who='x' where who='pat@example.com'`), /append-only/, 'audit rows cannot be changed');
+  // a change lands in the history with who + before/after
+  const t = await api(co, 'addTask', { clientId: 'c1', title: 'History test task', due: '2026-12-24' });
+  const id = t.task.task_id;
+  assert.equal((await api(co, 'setTaskStatus', { clientId: 'c1', taskId: id, status: 'Done' })).ok, true);
+  const h = await db.all(`select who, role, op, before, after from record_history where table_name='tasks' and row_id=$1 order by history_id`, [id]);
+  assert.equal(h.length, 2); assert.equal(h[0].op, 'insert'); assert.equal(h[0].who, 'joe@incadencecare.com'); assert.equal(h[0].role, 'coordinator'); assert.equal(h[0].after.title, 'History test task');
+  assert.equal(h[1].op, 'update'); assert.equal(h[1].before.status, 'Not started'); assert.equal(h[1].after.status, 'Done');
+  await assert.rejects(db.q(`delete from record_history where row_id=$1`, [id]), /append-only/);
+  const users = await db.all(`select before, after from record_history where table_name='users' and row_id='pat@example.com'`);
+  assert.ok(users.length && users.every(r => !(r.before && r.before.password_hash) && !(r.after && r.after.password_hash)), 'password hashes never enter the history');
+  // the access log shows it to the coordinator, and to nobody else
+  const log = await api(co, 'accessLog', { clientId: 'c1' });
+  assert.equal(log.ok, true); assert.ok(log.entries.length > 0);
+  assert.ok(log.entries.some(e => e.kind === 'view' && e.who === 'pat@example.com'), 'views appear');
+  assert.ok(log.entries.some(e => e.record === 'Task' && e.changes && e.changes.status && e.changes.status.to === 'Done'), 'record changes appear with the changed fields');
+  const byPerson = await api(co, 'accessLog', { clientId: '', email: 'pat@example.com', from: '2020-01-01' });
+  assert.ok(byPerson.entries.length > 0 && byPerson.entries.every(e => e.who === 'pat@example.com'));
+  assert.equal((await api(pat, 'accessLog', { clientId: 'c1' })).ok, false, 'families cannot read the log');
+});
+
+test('security alerts reach the coordinator: lockout and export', async () => {
+  await db.q(`delete from rate_limits`);
+  const n = mail.sent.length;
+  for (let i = 0; i < 5; i++) await api(null, 'login', { email: 'pat@example.com', password: 'wrong wrong wrong' }, { ip: '9.9.9.9' });
+  const alert = mail.sent.slice(n).find(m => /Security: account paused/.test(m.subject));
+  assert.ok(alert && alert.to === 'joe@incadencecare.com', 'lockout alert goes to the coordinator');
+  await db.q(`delete from rate_limits`);
+  const co = await signIn('joe@incadencecare.com');
+  const n2 = mail.sent.length;
+  const ex = await api(co, 'exportClient', { clientId: 'c1' });
+  assert.equal(ex.ok, true); const doc = JSON.parse(Buffer.from(ex.b64, 'base64').toString()); assert.ok(doc.users.length && doc.users.every(u => u.password_hash === undefined), 'exports never carry password hashes');
+  assert.ok(mail.sent.slice(n2).some(m => /Security: a family record was exported/.test(m.subject)));
+});
+
 test('audit records actions with ids only', async () => {
-  const rows = await db.all(`select action, who, detail from audit where action in ('sendMessage','setPassword','login') order by at desc limit 5`);
+  const rows = await db.all(`select action, who, detail from audit where action in ('sendMessage','setPassword','login') order by at desc limit 40`);
   assert.ok(rows.length >= 2);
   const sm = rows.find(r => r.action === 'sendMessage');
   assert.ok(sm.detail.topicId); assert.equal(sm.detail.body, undefined, 'message bodies never reach the audit');

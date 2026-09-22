@@ -50,3 +50,32 @@ Emails print to the console when `MAIL_TRANSPORT=log`; in production they go thr
 - Documents are served only through `/files/<id>` with a signed, per-person, per-file link (24 h). No public URLs.
 - Audit: who did what to which family, ids only, kept 366 days.
 - Archived families are locked and read-only; purge needs a coordinator, the retention date, and the family name typed back.
+
+## Sign-in
+
+Email + password (scrypt-hashed, breach-checked, 12+ characters). A new device also needs a 6-digit code
+emailed to the account; a device that passed it is remembered 30 days. Five wrong passwords pause the
+account for 15 minutes. The emailed link is only for setting a password the first time or resetting it.
+
+## Audit and logging
+
+- `audit`: every action, view and sign-in (who, role, family, record ids, error, IP). Append-only.
+- `record_history`: before/after of every clinical and financial row, stamped with who (Postgres triggers).
+  Append-only; a purge after the retention period removes that family's rows.
+- Both are also written to Cloud Logging as structured lines (`jsonPayload.audit=true`) and routed by
+  `deploy/logging.sh` into a locked compliance bucket kept 6 years, together with Google's own audit logs.
+- Coordinators see it all under **Access log** in the portal, with CSV export.
+- `deploy/alerts.sh`: uptime, 5xx, security events (lockout / export / purge), failed jobs -> email.
+
+## Huntress (Managed SIEM)
+
+Ready to connect; nothing sends until the token exists.
+1. Huntress portal -> SIEM -> Source Management -> Add Source -> **Generic HEC** ("InCadence portal").
+2. Put the token it shows into Secret Manager as `HUNTRESS_HEC_TOKEN`.
+3. `bash deploy/huntress.sh` — the API then ships every audit event (`event: portal.<action>`, `outcome`,
+   `who`, `role`, `client_id`, `ip`, `ua`, `error`) to `hec.huntress.io`, and a small forwarder
+   (`huntress-forwarder/`) relays Google's own logs (infrastructure changes, secret reads, failed requests,
+   job errors) through a Pub/Sub sink to the same source. Sourcetypes: `incadence:portal`, `google:gcp:audit`,
+   `google:gcp:log`.
+4. Google Workspace itself (mail, admin changes) is connected inside the Huntress portal, not here.
+Test from anywhere: `HUNTRESS_HEC_TOKEN=... node tools/hec-test.js`.

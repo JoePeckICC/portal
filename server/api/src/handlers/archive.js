@@ -32,6 +32,8 @@ async function exportClient(ctx) {
   const tables = ['users', 'plan_items', 'tasks', 'goals', 'topics', 'messages', 'updates', 'circle', 'intake_answers', 'appointments', 'care_team', 'referrals', 'medications', 'doses', 'uploads', 'vendor_bills', 'assistance', 'recommendations', 'resource_views'];
   const out = { exported_at: new Date().toISOString(), by: ctx.email, client: cl };
   for (const t of tables) out[t] = await db.all(`select * from ${t} where client_id=$1`, [cl.client_id]);
+  if (out.users) out.users = out.users.map(u => { const { password_hash, ...rest } = u; return rest; });
+  await core.securityAlert('a family record was exported', `${ctx.user.name || ctx.email} exported the full record for the ${cl.family_name} family.`, 'Exports are normal when a family leaves or asks for their records. If nobody asked for this one, look at the access log.');
   out.audit = await db.all(`select at, who, role, action, detail from audit where client_id=$1 order by at`, [cl.client_id]);
   return { b64: Buffer.from(JSON.stringify(out, null, 1)).toString('base64'), name: `Record - ${cl.family_name || cl.client_id} - ${ymd(new Date(), 'UTC')}.json` };
 }
@@ -48,6 +50,10 @@ async function purgeClient(ctx, p, c) {
   await db.q(`delete from sessions where email in (select email from users where client_id=$1)`, [cl.client_id], c);
   await db.q(`delete from users where client_id=$1`, [cl.client_id], c);
   await db.q(`delete from clients where client_id=$1`, [cl.client_id], c);
+  // The change history holds the records themselves, so it goes with them. The audit trail (ids only) stays.
+  await db.q(`select set_config('app.purge', $1, true)`, [cl.client_id], c);
+  await db.q(`delete from record_history where client_id=$1`, [cl.client_id], c);
+  await core.securityAlert('a family record was purged', `${ctx.user.name || ctx.email} permanently deleted the ${cl.family_name} family's records after their retention period.`, '');
   return { purged: cl.client_id };
 }
 
