@@ -13,15 +13,15 @@ URL=$(gcloud run services describe portal-api --region "$REGION" --format 'value
 HOST=${URL#https://}
 
 echo "== Where alerts go"
-CH=$(gcloud monitoring channels list --filter="type=email AND labels.email_address=$EMAIL" --format='value(name)' | head -1)
-[ -n "$CH" ] || CH=$(gcloud monitoring channels create --display-name="Coordinator email" --type=email --channel-labels="email_address=$EMAIL" --format='value(name)')
+CH=$(gcloud beta monitoring channels list --filter="type=email AND labels.email_address=$EMAIL" --format='value(name)' | head -1)
+[ -n "$CH" ] || CH=$(gcloud beta monitoring channels create --display-name="Coordinator email" --type=email --channel-labels="email_address=$EMAIL" --format='value(name)')
 echo "   $CH"
 
 echo "== Uptime check on $HOST/health"
-UC=$(gcloud monitoring uptime list-configs --filter='displayName="portal-api health"' --format='value(name)' | head -1)
+UC=$(gcloud beta monitoring uptime list-configs --filter='displayName="portal-api health"' --format='value(name)' | head -1)
 if [ -z "$UC" ]; then
-  gcloud monitoring uptime create "portal-api health" --resource-type=uptime-url --resource-labels="host=$HOST,project_id=$PROJECT" --protocol=https --path=/health --port=443 --period=1 --timeout=10 --matcher-content='"ok":true' --matcher-type=contains-string >/dev/null
-  UC=$(gcloud monitoring uptime list-configs --filter='displayName="portal-api health"' --format='value(name)' | head -1)
+  gcloud beta monitoring uptime create "portal-api health" --resource-type=uptime-url --resource-labels="host=$HOST,project_id=$PROJECT" --protocol=https --path=/health --port=443 --period=1 --timeout=10 --matcher-content='"ok":true' --matcher-type=contains-string >/dev/null
+  UC=$(gcloud beta monitoring uptime list-configs --filter='displayName="portal-api health"' --format='value(name)' | head -1)
 fi
 UCID=${UC##*/}
 
