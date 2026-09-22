@@ -367,7 +367,7 @@ label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
 <body>
 <div id="app"></div>
 <script>
-var API_URL = "https://portal-api-94785728612.us-central1.run.app/api";
+var API_URL = "https://script.google.com/macros/s/AKfycbwA6TUiyXlC8FykTv-Eoj8RY-JT3DzG4Qn7lfZdh6GeP24gOXWuyi9qWWY9MsxUud0/exec";
 var BOOT = { appName: 'InCadence Care', stages: [], categories: [], planStatuses: [], taskStatuses: [], topicKinds: {}, bookKinds: {}, bookHours: { from: 7, to: 21 }, phone: '', referralStatuses: [], defaultMonthly: '', assistStatuses: [], coKinds: {}, session: null, error: null };
 // Same shape as google.script.run, over fetch. text/plain keeps the browser from preflighting; Apps Script answers with the JSON.
 window.google = { script: { run: {
@@ -460,9 +460,69 @@ function render(){
   app.innerHTML='';app.appendChild(S.data.me.role==='coordinator'?coShell():shell());
 }
 
+// ---------------------------------------------------------------- sign-in
+// Email + password; a new device also gets a 6-digit code by email. The emailed link is only for
+// setting a password the first time, or choosing a new one.
+function pre(action,payload){return new Promise(function(res){google.script.run.withSuccessHandler(function(r){res(r||{ok:false,error:'The portal did not answer. Try again in a moment.'})}).withFailureHandler(function(e){res({ok:false,error:(e&&e.message)||'Could not reach the portal. Try again in a moment.'})}).api(null,action,payload||{})})}
+function signedIn(r){S.session=r.session;store('ic_session',r.session);if(r.device)store('ic_dev',r.device);S.auth=null;BOOT.pwset=null;BOOT.error=null;S.data=null;render();refresh()}
+function gateCard(inner){var c=el('<div>'+sitebar()+'<div class="gate" style="min-height:calc(100vh - 60px)"><form class="card" novalidate><div class="k">'+esc(BOOT.appName)+'</div>'+inner+'</form></div></div>');return c}
+function busy(b,on,label){b.disabled=on;if(label)b.textContent=label}
 function gate(){
-  var c=el('<div>'+sitebar()+'<div class="gate" style="min-height:calc(100vh - 60px)"><form class="card" id="gf"><div class="k">'+esc(BOOT.appName)+'</div><h1 style="margin:12px 0 8px">Client portal</h1><p class="muted" style="margin:0 0 20px">Enter the email your coordinator has on file. We will send you a link. No password to remember.</p>'+(BOOT.error?'<p class="err" style="margin:0 0 14px">'+esc(BOOT.error)+'</p>':'')+'<div class="field"><label for="em">Email</label><input id="em" type="email" autocomplete="email" required></div><button class="btn block" type="submit">Send me a link</button><p id="gm" class="small muted" style="margin:14px 0 0"></p></form></div></div>');
-  $('#gf',c).onsubmit=function(ev){ev.preventDefault();var b=$('button',c);b.disabled=true;b.textContent='Sending…';google.script.run.withSuccessHandler(function(r){$('#gm',c).textContent=(r&&r.message)||'Check your email.';b.disabled=false;b.textContent='Send me a link'}).withFailureHandler(function(){$('#gm',c).textContent='Could not send just now. Try again in a minute.';b.disabled=false;b.textContent='Send me a link'}).api(null,'requestLink',{email:$('#em',c).value})};
+  var A=S.auth||(BOOT.pwset?{mode:'setpw'}:{mode:'login'});S.auth=A;
+  var c,f,err;
+  function showErr(m){err.textContent=m||'';err.style.display=m?'':'none'}
+  if(A.mode==='setpw'){
+    var P=BOOT.pwset||{};
+    c=gateCard('<h1 style="margin:12px 0 8px">'+(P.reset?'Choose a new password':'Set your password')+'</h1><p class="muted" style="margin:0 0 20px">'+(P.name?'Hi '+esc(P.name)+'. ':'')+'You will use this with your email to sign in from now on. At least 12 characters. A short sentence you will remember works well.</p><p class="err" style="margin:0 0 14px;display:none"></p><div class="field"><label for="un">Email</label><input id="un" type="email" autocomplete="username" value="'+esc(P.email||'')+'" readonly></div><div class="field"><label for="p1">New password</label><input id="p1" type="password" autocomplete="new-password" minlength="12" required></div><div class="field"><label for="p2">Type it again</label><input id="p2" type="password" autocomplete="new-password" required></div><label class="small" style="display:flex;gap:8px;align-items:center;margin:-4px 0 16px"><input type="checkbox" id="sh" style="width:auto"> Show passwords</label><button class="btn block" type="submit">'+(P.reset?'Save and sign in':'Set password and sign in')+'</button>');
+    f=$('form',c);err=$('.err',c);
+    $('#sh',c).onchange=function(){var t=this.checked?'text':'password';$('#p1',c).type=t;$('#p2',c).type=t};
+    f.onsubmit=function(ev){ev.preventDefault();var a=$('#p1',c).value,b=$('#p2',c).value,btn=$('button',f);
+      if(a.length<12){showErr('Use at least 12 characters.');return}
+      if(a!==b){showErr('The two passwords do not match.');return}
+      busy(btn,true,'Saving…');pre('setPassword',{token:P.token,password:a}).then(function(r){
+        if(r.ok&&r.session){signedIn(r);return}
+        busy(btn,false,P.reset?'Save and sign in':'Set password and sign in');
+        if(r.expired){BOOT.pwset=null;S.auth={mode:'forgot',msg:r.error};render();return}
+        showErr(r.error)})};
+    setTimeout(function(){var i=$('#p1',c);if(i)i.focus()},0);
+    return c;
+  }
+  if(A.mode==='code'){
+    c=gateCard('<h1 style="margin:12px 0 8px">Check your email</h1><p class="muted" style="margin:0 0 20px">This is a new device, so we emailed a 6-digit code to <b>'+esc(A.sentTo||'you')+'</b>. It works for '+esc(A.minutes||10)+' minutes.</p><p class="err" style="margin:0 0 14px;display:none"></p><div class="field"><label for="cd">Code</label><input id="cd" inputmode="numeric" autocomplete="one-time-code" maxlength="7" pattern="[0-9 ]*" style="font-size:24px;letter-spacing:.3em" required></div><label class="small" style="display:flex;gap:8px;align-items:center;margin:-4px 0 16px"><input type="checkbox" id="rm" checked style="width:auto"> Remember this device for 30 days</label><button class="btn block" type="submit">Continue</button><p class="small muted" style="margin:14px 0 0">No email? Check spam, or <a href="#" id="bk">start over</a> to get a new code.</p>');
+    f=$('form',c);err=$('.err',c);
+    $('#bk',c).onclick=function(ev){ev.preventDefault();S.auth={mode:'login',email:A.email};render()};
+    f.onsubmit=function(ev){ev.preventDefault();var btn=$('button',f),code=$('#cd',c).value.replace(/\D/g,'');
+      if(code.length!==6){showErr('The code is 6 digits.');return}
+      busy(btn,true,'Checking…');pre('verifyCode',{challenge:A.challenge,code:code,remember:$('#rm',c).checked}).then(function(r){
+        if(r.ok&&r.session){signedIn(r);return}
+        busy(btn,false,'Continue');
+        if(r.expired){S.auth={mode:'login',email:A.email,msg:r.error};render();return}
+        showErr(r.error);$('#cd',c).select()})};
+    setTimeout(function(){var i=$('#cd',c);if(i)i.focus()},0);
+    return c;
+  }
+  if(A.mode==='forgot'){
+    c=gateCard('<h1 style="margin:12px 0 8px">Set or reset your password</h1><p class="muted" style="margin:0 0 20px">Enter the email your coordinator has on file. We will send a link to choose your password.</p><p class="err" style="margin:0 0 14px;display:none"></p><div class="field"><label for="em">Email</label><input id="em" type="email" autocomplete="email" required value="'+esc(A.email||'')+'"></div><button class="btn block" type="submit">Email me a link</button><p id="gm" class="small muted" style="margin:14px 0 0"></p><p class="small" style="margin:14px 0 0"><a href="#" id="bk">Back to sign in</a></p>');
+    f=$('form',c);err=$('.err',c);showErr(A.msg||BOOT.error);
+    $('#bk',c).onclick=function(ev){ev.preventDefault();S.auth={mode:'login',email:$('#em',c).value};BOOT.error=null;render()};
+    f.onsubmit=function(ev){ev.preventDefault();var btn=$('button',f),em=$('#em',c).value.trim();
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){showErr('That email does not look right.');return}
+      showErr('');busy(btn,true,'Sending…');pre('requestLink',{email:em}).then(function(r){$('#gm',c).textContent=(r&&r.message)||'Check your email.';busy(btn,false,'Email me a link')})};
+    return c;
+  }
+  // login
+  c=gateCard('<h1 style="margin:12px 0 8px">Client portal</h1><p class="muted" style="margin:0 0 20px">Sign in with your email and password.</p><p class="err" style="margin:0 0 14px;display:none"></p><div class="field"><label for="em">Email</label><input id="em" type="email" autocomplete="username" required value="'+esc(A.email||load('ic_last')||'')+'"></div><div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required></div><button class="btn block" type="submit">Sign in</button><p class="small" style="margin:16px 0 0"><a href="#" id="fg">First time here, or forgot your password?</a></p>');
+  f=$('form',c);err=$('.err',c);showErr(A.msg||BOOT.error);
+  $('#fg',c).onclick=function(ev){ev.preventDefault();S.auth={mode:'forgot',email:$('#em',c).value};BOOT.error=null;render()};
+  f.onsubmit=function(ev){ev.preventDefault();var btn=$('button',f),em=$('#em',c).value.trim(),pw=$('#pw',c).value;
+    if(!em||!pw){showErr('Enter your email and password.');return}
+    showErr('');busy(btn,true,'Signing in…');store('ic_last',em);
+    pre('login',{email:em,password:pw,device:load('ic_dev')||''}).then(function(r){
+      if(r.ok&&r.session){signedIn(r);return}
+      busy(btn,false,'Sign in');
+      if(r.ok&&r.needCode){S.auth={mode:'code',email:em,challenge:r.challenge,sentTo:r.sentTo,minutes:r.minutes};render();return}
+      showErr(r.error);$('#pw',c).value='';$('#pw',c).focus()})};
+  setTimeout(function(){var i=$(A.email||load('ic_last')?'#pw':'#em',c);if(i)i.focus()},0);
   return c;
 }
 
@@ -745,15 +805,15 @@ function chipEl(){
 function settingsView(){
   var d=S.data,co=d.me.role==='coordinator',fam=d.me.role==='family';S.sp=S.sp||'hub';
   if(co&&['hub','info','answers','inner','notify'].indexOf(S.sp)>=0)S.sp='co';
-  var pages=co?[['co','Coordinator settings'],['perso','Personalization']]:[['info','Personal information'],['answers','My answers'],['inner','Inner circle'],['notify','Notifications'],['perso','Personalization']];
+  var pages=co?[['co','Coordinator settings'],['perso','Personalization'],['security','Password & security']]:[['info','Personal information'],['answers','My answers'],['inner','Inner circle'],['notify','Notifications'],['perso','Personalization'],['security','Password & security']];
   var v=el('<div></div>');
   if(S.sp==='hub'){
-    var cards=[['info','Personal information','Name, phone, address, email, emergency contact.'],['answers','My answers','What you told us at the start. Change what has changed; the rest stays put.'],['inner','Inner circle','Spouse, parents, adult children — their own logins, the same view as you.'],['notify','Notifications','Which emails you get.'],['perso','Personalization','How the portal greets you, and your color.'],['billing','Billing','Invoices, payments, vendors, and financial assistance.']];
+    var cards=[['info','Personal information','Name, phone, address, email, emergency contact.'],['answers','My answers','What you told us at the start. Change what has changed; the rest stays put.'],['inner','Inner circle','Spouse, parents, adult children — their own logins, the same view as you.'],['notify','Notifications','Which emails you get.'],['perso','Personalization','How the portal greets you, and your color.'],['billing','Billing','Invoices, payments, vendors, and financial assistance.'],['security','Password & security','Change your password, forget remembered devices, sign out everywhere.']];
     v.appendChild(el('<div class="head"><div class="k">Settings</div><h1>Your account</h1></div>'));
     var grid=el('<div class="shub"></div>');
     cards.forEach(function(c){var a=el('<a href="#" class="card'+(c[0]?'':' soon')+'"><b>'+esc(c[1])+'</b><div class="small muted">'+esc(c[2])+'</div></a>');a.onclick=function(ev){ev.preventDefault();if(!c[0])return;if(c[0]==='billing'){go('billing');return}S.sp=c[0];render()};grid.appendChild(a)});
     v.appendChild(grid);
-    var so=el('<div class="card" style="margin-top:14px"><span class="k">Security</span><p class="small muted" style="margin:6px 0 10px">Signed in somewhere you shouldn’t be — a shared computer, a lost phone? This signs every browser out, including this one. Ask for a new link to get back in.</p><button class="btn quiet sm" type="button">Sign out everywhere</button></div>');$('button',so).onclick=function(){if(!confirm('Sign out of every browser, including this one?'))return;call('signOutEverywhere').then(function(){signOut()}).catch(alertErr)};v.appendChild(so);
+    var so=el('<div class="card" style="margin-top:14px"><span class="k">Security</span><p class="small muted" style="margin:6px 0 10px">Signed in somewhere you shouldn’t be — a shared computer, a lost phone? This signs every browser out, including this one. Sign back in with your password.</p><button class="btn quiet sm" type="button">Sign out everywhere</button></div>');$('button',so).onclick=function(){if(!confirm('Sign out of every browser, including this one?'))return;call('signOutEverywhere').then(function(){signOut()}).catch(alertErr)};v.appendChild(so);
     v.appendChild(el('<p class="small muted" style="margin-top:18px">Anything you cannot change here, ask '+esc(first(d.coordinator&&d.coordinator.name)||'your coordinator')+' in Messages.</p>'));
     return v;
   }
@@ -761,8 +821,22 @@ function settingsView(){
   var nav=$('.snav',lay);
   if(!co){var h=el('<a href="#">All settings</a>');h.onclick=function(ev){ev.preventDefault();S.sp='hub';render()};nav.appendChild(h)}
   pages.forEach(function(p){var a=el('<a href="#" class="'+(S.sp===p[0]?'on':'')+'">'+p[1]+'</a>');a.onclick=function(ev){ev.preventDefault();S.sp=p[0];render()};nav.appendChild(a)});
-  $('.sbody',lay).appendChild({info:infoPage,answers:answersPage,inner:innerPage,notify:notifyPage,perso:persoPage,co:coSettingsPage}[S.sp]());
+  $('.sbody',lay).appendChild({info:infoPage,answers:answersPage,inner:innerPage,notify:notifyPage,perso:persoPage,co:coSettingsPage,security:securityPage}[S.sp]());
   v.appendChild(lay);
+  return v;
+}
+function securityPage(){
+  var v=el('<div><h2>Password &amp; security</h2><p class="muted small" style="margin:4px 0 16px">Changing your password keeps this browser signed in and signs out every other one.</p>'+
+    '<form class="card" id="cp" novalidate><span class="k">Change password</span><input type="email" autocomplete="username" value="'+esc(S.data.me.email)+'" style="display:none" readonly><div class="field" style="margin-top:10px"><label for="cp0">Current password</label><input id="cp0" type="password" autocomplete="current-password"></div><div class="field"><label for="cp1">New password</label><input id="cp1" type="password" autocomplete="new-password"></div><div class="field"><label for="cp2">Type it again</label><input id="cp2" type="password" autocomplete="new-password"></div><p class="err small" style="margin:0 0 10px"></p><p class="ok small" style="margin:0 0 10px"></p><button class="btn sm" type="submit">Change password</button></form>'+
+    '<div class="card" style="margin-top:14px"><span class="k">Remembered devices</span><p class="small muted" style="margin:6px 0 10px">Devices that passed the emailed code skip it for 30 days. Forget them all and the next sign-in anywhere asks for a code again.</p><button class="btn quiet sm" type="button" id="fd">Forget remembered devices</button></div>'+
+    '<div class="card" style="margin-top:14px"><span class="k">Sign out everywhere</span><p class="small muted" style="margin:6px 0 10px">A shared computer, a lost phone? This signs every browser out, including this one.</p><button class="btn quiet sm" type="button" id="soe">Sign out everywhere</button></div></div>');
+  var f=$('#cp',v);
+  f.onsubmit=function(ev){ev.preventDefault();var a=$('#cp1',v).value,b=$('#cp2',v).value,btn=$('button',f);$('.ok',f).textContent='';
+    if(a.length<12){$('.err',f).textContent='Use at least 12 characters.';return}
+    if(a!==b){$('.err',f).textContent='The two new passwords do not match.';return}
+    btn.disabled=true;call('changePassword',{current:$('#cp0',v).value,next:a}).then(function(){$('.err',f).textContent='';$('.ok',f).textContent='Password changed. Other browsers are signed out.';$all('input[type=password]',f).forEach(function(i){i.value=''});btn.disabled=false}).catch(function(x){$('.err',f).textContent=x.message;btn.disabled=false})};
+  $('#fd',v).onclick=function(){var b=this;b.disabled=true;call('forgetDevices').then(function(){store('ic_dev',null);b.textContent='Forgotten'}).catch(function(x){b.disabled=false;alertErr(x)})};
+  $('#soe',v).onclick=function(){if(!confirm('Sign out of every browser, including this one?'))return;call('signOutEverywhere').then(function(){signOut()}).catch(alertErr)};
   return v;
 }
 function ro(){var r=S.data.me.role;return r==='family'}
@@ -1071,7 +1145,7 @@ function coShell(){
   var needs=S.ib&&S.ib.counts?S.ib.counts.needs:'';
   var s=el('<div class="ws"><header class="wsbar"><a class="wslogo" href="#">'+LOCKUP+'</a><span class="wsrole">Coordinator</span><nav class="wsnav"></nav><div class="wsright"><div class="wsfind"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input placeholder="Find a family" autocomplete="off"><div class="wsdrop"></div></div><span class="wsneeds'+(needs?' hot':'')+'"></span><a href="#" class="wsref" title="Reload from the Sheet (after editing it by hand)">&#8635;</a><span class="whoami"></span></div></header><div class="wsbody"></div></div>');
   $('.wsref',s).onclick=function(ev){ev.preventDefault();var a=this;a.style.opacity='.4';call('flushCache').then(function(){S.ib=null;S.res=null;return refresh()}).catch(alertErr)};
-  var nav=$('.wsnav',s);[['inbasket','In Basket'],['chart','Family chart'],['schedule','Schedule'],['billing','Billing'],['library','Library'],['newfam','+ New family']].forEach(function(t){var a=el('<a href="#" class="'+(S.cv===t[0]?'on':'')+'">'+t[1]+'</a>');a.onclick=function(ev){ev.preventDefault();S.cv=t[0];if(t[0]==='chart'&&['inbasket','schedule','billing'].indexOf(S.view)>=0)S.view='chart';if(t[0]==='chart'&&!S.view)S.view='chart';render()};nav.appendChild(a)});
+  var nav=$('.wsnav',s);[['inbasket','In Basket'],['chart','Family chart'],['schedule','Schedule'],['billing','Billing'],['library','Library'],['audit','Access log'],['newfam','+ New family']].forEach(function(t){var a=el('<a href="#" class="'+(S.cv===t[0]?'on':'')+'">'+t[1]+'</a>');a.onclick=function(ev){ev.preventDefault();S.cv=t[0];if(t[0]==='chart'&&['inbasket','schedule','billing'].indexOf(S.view)>=0)S.view='chart';if(t[0]==='chart'&&!S.view)S.view='chart';render()};nav.appendChild(a)});
   $('.wsneeds',s).textContent=needs?needs+' need you':'';$('.wsneeds',s).onclick=function(){S.cv='inbasket';render()};
   $('.whoami',s).appendChild(chipEl());
   $('.wslogo',s).onclick=function(ev){ev.preventDefault();S.cv='inbasket';render()};
@@ -1083,6 +1157,7 @@ function coShell(){
   else if(S.cv==='schedule')body.appendChild(scheduleView());
   else if(S.cv==='newfam')body.appendChild(newFamilyView());
   else if(S.cv==='library')body.appendChild(libraryView());
+  else if(S.cv==='audit')body.appendChild(auditView());
   else if(S.cv==='billing')body.appendChild(el('<div class="wspage"><div class="wrap">'+'<div class="head"><div class="k">Billing</div><h1>Every family.</h1></div></div></div>')),$('.wrap',body).appendChild(allBillingPage());
   else body.appendChild(chartView());
   return s;
@@ -1408,6 +1483,28 @@ function resOpenPage(){
   return v;
 }
 // coordinator: the library
+// ---------------------------------------------------------------- access log (coordinator)
+function auditView(){
+  var d=S.data,A=S.al||(S.al={clientId:S.clientId||'',email:'',from:'',to:'',rows:null,page:0,more:false,busy:false,err:'',kinds:{view:true,change:true,'sign-in':true,failed:true}});
+  var fams=(d.families||[]).slice().sort(function(a,b){return String(a.family_name).localeCompare(String(b.family_name))});
+  var v=el('<div class="wspage"><div class="wrap"><div class="head"><div class="k">Access log</div><h1>Who looked at what, and what changed.</h1><p class="muted small" style="margin:6px 0 0">Every view, edit and sign-in is recorded with the person, the time and the address it came from. Record changes show what a field said before and after. Nothing in this log can be edited or deleted.</p></div>'+
+    '<form class="card alf" style="display:grid;grid-template-columns:1fr 1fr 130px 130px auto;gap:10px;align-items:end;margin-bottom:14px"><div class="field" style="margin:0"><label>Family</label><select name="clientId"><option value="">Any family</option>'+fams.map(function(f){return '<option value="'+esc(f.client_id)+'"'+(A.clientId===f.client_id?' selected':'')+'>'+esc(famName(f.family_name))+'</option>'}).join('')+'</select></div><div class="field" style="margin:0"><label>Person (email)</label><input name="email" type="email" value="'+esc(A.email)+'" placeholder="anyone"></div><div class="field" style="margin:0"><label>From</label><input name="from" type="date" value="'+esc(A.from)+'"></div><div class="field" style="margin:0"><label>To</label><input name="to" type="date" value="'+esc(A.to)+'"></div><button class="btn sm" type="submit">Show</button></form>'+
+    '<div class="small muted" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:0 0 10px"><span>Show:</span>'+['view','change','sign-in','failed'].map(function(k){return '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-k="'+k+'"'+(A.kinds[k]?' checked':'')+' style="width:auto"> '+k+'</label>'}).join('')+'<span style="flex:1"></span><a href="#" class="btn quiet sm ex">Download CSV</a></div>'+
+    '<div class="pn"><div class="wt"><div class="wh" style="grid-template-columns:150px 170px 80px 1fr 110px"><div>When</div><div>Who</div><div>Kind</div><div>What</div><div>From</div></div></div></div><p class="err small" style="margin:10px 0"></p><p class="small muted more" style="margin:10px 0"></p></div></div>');
+  var f=$('.alf',v),T=$('.wt',v);
+  function fetchLog(page){A.busy=true;A.err='';render();call('accessLog',{clientId:A.clientId,email:A.email,from:A.from,to:A.to,page:page}).then(function(r){A.rows=page?(A.rows||[]).concat(r.entries):r.entries;A.page=page;A.more=r.more;A.busy=false;render()}).catch(function(e){A.busy=false;A.err=e.message;render()})}
+  f.onsubmit=function(ev){ev.preventDefault();A.clientId=f.clientId.value;A.email=f.email.value.trim();A.from=f.from.value;A.to=f.to.value;if(!A.clientId&&!A.email){A.err='Pick a family or enter an email.';render();return}fetchLog(0)};
+  $all('input[data-k]',v).forEach(function(cb){cb.onchange=function(){A.kinds[cb.getAttribute('data-k')]=cb.checked;render()}});
+  function line(e){if(e.record){var ch=Object.keys(e.changes||{}).map(function(k){var c=e.changes[k];return k+': '+(c.from==null?'—':JSON.stringify(c.from))+' → '+(c.to==null?'—':JSON.stringify(c.to))});return e.record+' '+(e.action==='insert'?'added':e.action==='delete'?'deleted':'changed')+(ch.length?' — '+ch.join('; '):'')}var dd=e.detail||{};var ks=Object.keys(dd).map(function(k){return k+'='+dd[k]});return e.action+(ks.length?' ('+ks.join(', ')+')':'')+(e.error?' — '+e.error:'')}
+  var shown=(A.rows||[]).filter(function(e){return A.kinds[e.kind]!==false});
+  if(A.rows===null)T.appendChild(el('<div class="wempty">Pick a family or a person, then Show.</div>'));
+  else if(!shown.length)T.appendChild(el('<div class="wempty">Nothing recorded for that search.</div>'));
+  shown.forEach(function(e){var cls=e.kind==='failed'?' style="color:#8A2E2E"':'';T.appendChild(el('<div class="wr" style="grid-template-columns:150px 170px 80px 1fr 110px;align-items:start"><div class="small">'+esc(fmtDay(e.at))+' '+esc(fmtTime(e.at))+'</div><div class="small" style="overflow:hidden;text-overflow:ellipsis">'+esc(e.who||'')+'<div class="muted">'+esc(e.role||'')+'</div></div><div class="small"'+cls+'>'+esc(e.kind)+'</div><div class="small" style="white-space:pre-wrap;word-break:break-word">'+esc(line(e))+'</div><div class="small muted">'+esc(e.ip||'')+'</div></div>'))});
+  $('.err',v).textContent=A.err;var more=$('.more',v);
+  if(A.busy)more.textContent='Loading…';else if(A.more){var a=el('<a href="#">Show earlier entries</a>');a.onclick=function(ev){ev.preventDefault();fetchLog(A.page+1)};more.appendChild(a)}
+  $('.ex',v).onclick=function(ev){ev.preventDefault();if(!shown.length)return;var csv=[['When','Who','Role','Kind','What','IP']].concat(shown.map(function(e){return[new Date(e.at).toISOString(),e.who||'',e.role||'',e.kind,line(e),e.ip||'']})).map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"'}).join(',')}).join('\r\n');var b=new Blob([csv],{type:'text/csv'}),u=URL.createObjectURL(b),l=document.createElement('a');l.href=u;l.download='access-log-'+(A.clientId||A.email||'all')+'-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(l);l.click();setTimeout(function(){URL.revokeObjectURL(u);l.remove()},500)};
+  return v;
+}
 function libraryView(){
   var d=S.data;
   if(!S.res||S.res.cid!==S.clientId){if(!S.resLoading){S.resLoading=true;loadRes().then(function(){S.resLoading=false;render()}).catch(function(e){S.resLoading=false;S.res={resources:[],recs:[],cid:S.clientId,error:e.message};render()})}return el('<div class="wspage"><div class="wempty">Opening the library…</div></div>')}
