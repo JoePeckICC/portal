@@ -7,7 +7,7 @@ const db = require('./db');
 const auth = require('./auth');
 const core = require('./core');
 const H = require('./handlers');
-const { wire, isTrue, must } = require('./util');
+const { wire, isTrue, must } = require('./util'); const SEC = { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'" };
 
 const MAX_BODY = 12 * 1024 * 1024;        // four 10 MB files arrive base64'd in chunks of one; keep the door reasonable
 
@@ -24,7 +24,7 @@ function reqInfo(req) {
   return { ip: fwd || req.socket.remoteAddress || '', ua: req.headers['user-agent'] || '' };
 }
 function send(res, status, body, headers) {
-  const h = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...(headers || {}) };
+  const h = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...SEC, ...(headers || {}) };
   res.writeHead(status, h); res.end(typeof body === 'string' ? body : JSON.stringify(body));
 }
 function cors(req, res) {
@@ -99,7 +99,7 @@ async function handle(req, res) {
   if (url.pathname === '/stripe/webhook' && req.method === 'POST') return require('./webhook').handle(req, res, await readBody(req));
   if (url.pathname.startsWith('/jobs/') && req.method === 'POST') {
     const key = process.env.JOBS_KEY || '';
-    if (!key || req.headers['x-jobs-key'] !== key) return send(res, 403, { ok: false, error: 'Not allowed' });
+    if (!key || !require('./util').safeEqual(String(req.headers['x-jobs-key'] || ''), key)) return send(res, 403, { ok: false, error: 'Not allowed' });
     try { return send(res, 200, await require('./jobs').run(url.pathname.slice('/jobs/'.length))); } catch (e) { return send(res, 500, { ok: false, error: e.message }); }
   }
   send(res, 404, { ok: false, error: 'Not found' });
@@ -119,8 +119,9 @@ async function serveFile(req, res, url, info) {
   if (ctx.role === 'family' && u.shared === false) return send(res, 404, { ok: false, error: 'Not found' });
   if (!u.storage_key) return send(res, 409, { ok: false, error: 'This file still lives in Drive; it moves over in the file migration.' });
   const bytes = await require('./storage').get(u.storage_key);
-  await core.audit(ctx, 'openFile', { uploadId }, '', info);
-  res.writeHead(200, { 'Content-Type': u.mime || 'application/octet-stream', 'Content-Length': bytes.length, 'Content-Disposition': `inline; filename="${encodeURIComponent(u.name)}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' });
+  await core.audit(ctx, 'openFile', { uploadId }, '', info); const _m = String(u.mime || '').toLowerCase().split(';')[0].trim(), _in = ['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'text/plain'].includes(_m), _fn = String(u.name || 'file').replace(/[
+"\]+/g, '_');   // uploads are untrusted: safe preview types render inline, the rest download
+  res.writeHead(200, { 'Content-Type': _in ? _m : 'application/octet-stream', 'Content-Length': bytes.length, 'Content-Disposition': (_in ? 'inline' : 'attachment') + '; filename="' + _fn + '"', 'Content-Security-Policy': "default-src 'none'; sandbox; frame-ancestors 'none'", 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' });
   res.end(bytes);
 }
 
