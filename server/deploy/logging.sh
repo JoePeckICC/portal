@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Long-term, tamper-proof logging. Run once (re-running is safe, except the LOCK step, which is final).
 #
-#   1. Everything the project logs is kept 6 years (2200 days) instead of 30.
+#   1. Everything the project logs is kept 8 years (2922 days) instead of 30.
 #   2. A separate "compliance" log bucket receives the records an audit asks for:
 #        - Google's own audit logs (who changed infrastructure, who read a secret or a file)
 #        - the portal's access log (every view / change / sign-in, as the app emits it)
@@ -10,7 +10,7 @@
 #   3. Google records reads of secrets, database admin calls and document storage (off by default).
 set -euo pipefail
 PROJECT=${PROJECT:-incadence-portal}; REGION=${REGION:-us-central1}
-DAYS=${RETAIN_DAYS:-2200}
+DAYS=${RETAIN_DAYS:-2922}   # 8 years
 gcloud config set project "$PROJECT" >/dev/null
 
 echo "== 1. Keep all logs for $DAYS days"
@@ -32,7 +32,7 @@ python3 - "$PROJECT" <<'EOF'
 import json, subprocess, sys
 p = sys.argv[1]
 pol = json.loads(subprocess.check_output(['gcloud', 'projects', 'get-iam-policy', p, '--format=json']))
-want = {'secretmanager.googleapis.com': ['DATA_READ', 'DATA_WRITE'], 'sqladmin.googleapis.com': ['DATA_READ', 'DATA_WRITE'],
+want = {'secretmanager.googleapis.com': ['DATA_READ', 'DATA_WRITE'], 'cloudsql.googleapis.com': ['DATA_READ', 'DATA_WRITE'],
         'storage.googleapis.com': ['DATA_READ', 'DATA_WRITE'], 'iam.googleapis.com': ['DATA_READ', 'DATA_WRITE'], 'run.googleapis.com': ['DATA_READ', 'DATA_WRITE']}
 cfgs = {c['service']: c for c in pol.get('auditConfigs', [])}
 for svc, types in want.items():
