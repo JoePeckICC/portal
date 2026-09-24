@@ -32,8 +32,10 @@ const INTAKE_STEPS_ = [
     { id: 'G.6b', q: "What's the most pressing thing in the next 48 hours?", type: 'text', long: true, showIf: { id: 'G.6', is: ['This is an emergency, or it has already happened'] } },
     { id: 'G.9', q: 'Expected hospital stay', type: 'choice', req: true, opts: ['Home the same day', 'One night', '2–3 nights', '4–7 nights', 'More than a week', DK_] },
     { id: 'G.10', q: 'After the hospital, {IS} expected to go straight home?', type: 'choice', req: true, noteOpen: true,
-      opts: ['Straight home', 'To rehab or a nursing facility first', 'Not sure yet', DK_],
-      why: 'This matters more than almost anything else on this form.' }
+      opts: ['Straight home', 'To rehab or a nursing facility first', DK_],
+      why: 'This matters more than almost anything else on this form.' },
+    { id: 'G.11', q: 'What health insurance covers {NAME_OBJ}?', type: 'multi', opts: ['Medicare', 'Medicare Advantage', 'Medicaid', 'Private or through work', 'VA or TRICARE', 'None', DK_],
+      why: 'Pick all that apply. It tells us what rehab, equipment and home help are likely to be covered.' }
   ]},
   { id: 'home', title: 'Getting home, and the household', lead: 'Three things that shape the first week.', qs: [
     { id: 'L.1', q: 'Who will drive {NAME_OBJ} home from the hospital?', type: 'text', req: true, ph: 'Name and phone', noteOpen: true,
@@ -50,7 +52,7 @@ const INTAKE_STEPS_ = [
 
 const CONSENT_ITEMS_ = [
   ['We are a non-clinical support service.', 'InCadence Care LLC is not a healthcare provider. We do not diagnose, treat, prescribe, or give medical advice. Your care team does that.'],
-  ['Health information you share with us.', "You've told us about the diagnosis and the surgery because it shapes the support plan we build. We use it only for that. We don't interpret it, advise on it, or tell you what to expect medically, and we don't share it with anyone without your written permission."],
+  ['Health information you share with us.', "You'll tell us about the diagnosis and the surgery because it shapes the support plan we build. We use it only for that. We don't interpret it, advise on it, or tell you what to expect medically, and we don't share it with anyone without your written permission."],
   ['We coordinate; you pay providers directly.', 'We find and arrange services on your behalf. Payment goes from you to those providers. We never take custody of your funds.'],
   ['Records and authorizations.', "If we're helping with records, bills, or authorizations, we'll send separate release forms — one per provider."],
   ['Medications.', "If we're helping with medication organization, we'll collect the medication list separately and only with your written permission. We build the schedule your care team prescribed. We never advise on what to take or how much."],
