@@ -559,6 +559,9 @@ test('a booked family: intake, then Pay when ready (no invoice is sent), then th
     assert.deepEqual(calls, [], 'finishing the intake sends nothing to Stripe');
     const plan = await api(olga, 'planPdf', {});
     assert.equal(plan.ok, false); assert.match(plan.error, /not ready yet/);          // the plan waits for the coordinator
+    assert.match((await api(olga, 'checkoutLink', {})).error, /after your meeting/);        // no paying before the meeting
+    assert.deepEqual(calls, []);
+    await db.q(`update clients c set plan_ready=true from users u where u.client_id=c.client_id and u.email='olga@example.com'`);
     const co = await api(olga, 'checkoutLink', {});
     assert.equal(co.ok, true, co.error); assert.equal(co.url, 'https://checkout.stripe.test/cs_1');
     assert.deepEqual(calls, ['POST /v1/customers', 'POST /v1/checkout/sessions subscription ' + C.DEFAULT_MONTHLY * 100]);
@@ -584,4 +587,35 @@ test('Pay when ready is for families only', async () => {
   const co = await signIn('joe@incadencecare.com');
   const r = await api(co, 'checkoutLink', { clientId: 'c2' });
   assert.equal(r.ok, false); assert.match(r.error, /Not allowed/);
+});
+
+test('changes after submitting: one email to the coordinator, listing what changed', async () => {
+  const booking = require('../src/booking');
+  process.env.BOOKING_HOOK_KEY = 'hook-key-for-tests-0123456789';
+  await booking.handle({ 'x-hook-key': process.env.BOOKING_HOOK_KEY }, { email: 'quinn@example.com', name: 'Quinn Quill' });
+  delete process.env.BOOKING_HOOK_KEY;
+  const q = await signIn('quinn@example.com');
+  const spec = (await api(q, 'bootstrap', {})).intakeSpec;
+  const signed = await api(q, 'signConsent', { consent: { initials: spec.consent.map(() => 'QQ'), name: 'Quinn Quill', relationship: 'Self' } });
+  assert.deepEqual(signed.intake.consent.items, spec.consent, 'the wording is kept with the signature');
+  const answers = {};
+  spec.steps.forEach(st => st.qs.forEach(x => { if (x.req && !x.showIf) answers[x.id] = { a: x.type === 'choice' ? x.opts[0] : x.type === 'date' ? '2026-11-03' : 'x' }; }));
+  await api(q, 'saveIntake', { answers });
+  assert.equal((await api(q, 'submitIntake', {})).intake.status, 'Submitted');
+  // Saving a step with nothing changed (the Back button does this) is not a change.
+  assert.equal((await api(q, 'saveIntake', { answers })).intake.status, 'Submitted');
+  mail.sent.length = 0;
+  await db.q(`delete from digest`);
+  await api(q, 'saveIntake', { answers: { 'G.10': { a: "I don't know", n: '' } } });
+  await api(q, 'saveIntake', { answers: { 'G.10': { a: 'To rehab or a nursing facility first', n: 'Son wants rehab' } } });
+  const r = await api(q, 'saveIntake', { answers: { 'G.11': { a: 'Medicare; VA or TRICARE', n: '' } } });
+  assert.equal(r.intake.status, 'Updated after submitting');
+  const done = await api(q, 'submitIntake', {});
+  assert.equal(done.intake.status, 'Submitted'); assert.deepEqual(done.intake.changed, {});
+  const got = (await db.all(`select * from digest where kind='intake'`)).concat(mail.sent.map(m => ({ subject: m.subject, body: JSON.stringify(m) })));
+  assert.equal(got.length, 1, 'one email');
+  assert.match(got[0].subject, /changed their intake answers/);
+  const body = got[0].body + ' ' + (got[0].lead || '');
+  assert.match(body, /Straight home" → "To rehab or a nursing facility first" \(note changed too\)/);
+  assert.match(body, /What health insurance covers they\?: "—" → "Medicare; VA or TRICARE"/);
 });
