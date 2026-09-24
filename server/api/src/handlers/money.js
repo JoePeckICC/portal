@@ -25,17 +25,6 @@ async function startBilling(ctx, p, c) {
   else await core.autoMsg(ctx.clientId, 'Billing started: $' + amount.toFixed(2) + ' a month. Your first invoice is on its way by email; you can also pay it under Billing.', c);
   return pub(ctx, c);
 }
-// Started on its own when a family submits the intake (added 2026-09-24), so the Pay now button is
-// the next thing they see: the default monthly amount and the first invoice by email, the same as
-// the coordinator's Start billing. Skipped when Stripe is not connected, billing already exists,
-// or the family is already open. Change the amount afterward with changeAmount.
-async function autoStartBilling(clientId, c) {
-  if (!B.connected()) return false;
-  const cl = await core.clientById(clientId, c);
-  if (!cl || isTrue(cl.paid) || cl.stripe_customer_id) return false;
-  await startBilling({ role: 'coordinator', email: 'system', clientId }, { amount: C.DEFAULT_MONTHLY }, c);
-  return true;
-}
 async function changeAmount(ctx, p, c) {
   coOnly(ctx);
   const cl = await core.clientById(ctx.clientId, c); must(cl && cl.stripe_customer_id, 'Start billing first');
@@ -72,6 +61,26 @@ async function portalLink(ctx) {
   famOnly(ctx);
   const cl = await core.clientById(ctx.clientId); must(cl && cl.stripe_customer_id, 'Billing has not started yet');
   const sess = await B.stripe('POST', '/v1/billing_portal/sessions', { customer: cl.stripe_customer_id, return_url: C.PORTAL_URL });
+  return { url: sess.url };
+}
+// Pay when you're ready (added 2026-09-24). A family that has not paid can start their monthly plan
+// from the page themselves: no invoice is sent. Stripe Checkout creates the subscription and takes the
+// first month on the spot; the invoice.paid webhook then opens the portal (billing.markPaid), and
+// checkout.session.completed records the subscription (webhook.js). The amount is whatever the
+// coordinator set for the family, else DEFAULT_MONTHLY.
+async function checkoutLink(ctx, p, c) {
+  famOnly(ctx);
+  const cl = await core.clientById(ctx.clientId, c); must(cl, 'Not found');
+  must(!isTrue(cl.paid), 'Your portal is already open.');
+  must(!cl.stripe_subscription_id, 'Your plan is already set up. You can pay the open invoice under Billing.');
+  const payer = await db.one(`select * from users where client_id=$1 and active and lower(role)='client' order by email limit 1`, [ctx.clientId], c);
+  let cust = cl.stripe_customer_id;
+  if (!cust) {
+    cust = (await B.stripe('POST', '/v1/customers', { email: (payer || ctx.user).email, name: famName(cl.family_name), 'metadata[client_id]': ctx.clientId })).id;
+    await db.update('clients', { client_id: cl.client_id }, { stripe_customer_id: cust }, c);
+  }
+  const amount = Number(cl.monthly_amount) > 0 ? Number(cl.monthly_amount) : C.DEFAULT_MONTHLY;
+  const sess = await B.stripe('POST', '/v1/checkout/sessions', { mode: 'subscription', customer: cust, 'line_items[0][quantity]': 1, 'line_items[0][price_data][currency]': 'usd', 'line_items[0][price_data][product]': await B.stripeProduct(), 'line_items[0][price_data][unit_amount]': Math.round(amount * 100), 'line_items[0][price_data][recurring][interval]': 'month', 'metadata[client_id]': ctx.clientId, 'subscription_data[metadata][client_id]': ctx.clientId, success_url: C.PORTAL_URL + '?paid=1', cancel_url: C.PORTAL_URL });
   return { url: sess.url };
 }
 // Card on file: Stripe Checkout in setup mode. The card lands on the customer; billingFor makes it the default.
@@ -169,6 +178,4 @@ async function allBilling(ctx) {
   return { invoices: rows, totals: t, families: fams };
 }
 
-module.exports = { startBilling, changeAmount, pauseBilling, billing, portalLink, cardSetupLink, payInvoice, setAutopay, chargeOnce, sendReminder, refundInvoice, addCredit, allBilling };
-// Not an action: handlers/index.js copies only enumerable exports into the action table, so this stays server-side.
-Object.defineProperty(module.exports, 'autoStartBilling', { value: autoStartBilling, enumerable: false });
+module.exports = { startBilling, changeAmount, pauseBilling, billing, portalLink, checkoutLink, cardSetupLink, payInvoice, setAutopay, chargeOnce, sendReminder, refundInvoice, addCredit, allBilling };
