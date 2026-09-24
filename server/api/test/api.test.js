@@ -488,3 +488,95 @@ test('archive: lock, export, reactivate, purge rules', async () => {
   assert.equal(typeof (await jobs.run('dailyDigest')).sent, 'number');
   assert.equal(typeof (await jobs.run('medReminders')).families, 'number');
 });
+
+test('booking hook: a new booker gets a locked family and a set-password link, once', async () => {
+  const booking = require('../src/booking');
+  const C = require('../src/config');
+  process.env.BOOKING_HOOK_KEY = 'hook-key-for-tests-0123456789';
+  const key = { 'x-hook-key': process.env.BOOKING_HOOK_KEY };
+  let [st, out] = await booking.handle({ 'x-hook-key': 'wrong' }, { email: 'nora@example.com' });
+  assert.equal(st, 403);
+  [st, out] = await booking.handle(key, { email: 'not an email' });
+  assert.equal(st, 400);
+  [st, out] = await booking.handle(key, { email: 'Nora@Example.com', name: 'Nora Newcomb', phone: '(615) 555-0123' });
+  assert.equal(st, 200); assert.equal(out.created, true); assert.match(out.url, /\?t=/);
+  assert.equal(auth.parseToken(decodeURIComponent(out.url.split('?t=')[1]), 'link').email, 'nora@example.com');
+  const u = await db.one(`select * from users where email='nora@example.com'`);
+  assert.equal(u.role, 'client');
+  const cl = await db.one(`select * from clients where client_id=$1`, [u.client_id]);
+  assert.equal(cl.paid, false); assert.equal(cl.coordinator_email, 'joe@incadencecare.com');
+  assert.equal(cl.patient_first_name, 'Nora'); assert.equal(cl.family_name, 'Newcomb'); assert.equal(cl.phone, '(615) 555-0123');
+  // Booking again makes nothing new; a fresh link until they choose a password, then just the portal.
+  [st, out] = await booking.handle(key, { email: 'nora@example.com', name: 'Nora Newcomb' });
+  assert.equal(out.created, false); assert.match(out.url, /\?t=/);
+  assert.equal((await db.one(`select count(*)::int n from users where email='nora@example.com'`)).n, 1);
+  await db.q(`update users set password_hash='x' where email='nora@example.com'`);
+  [st, out] = await booking.handle(key, { email: 'nora@example.com' });
+  assert.equal(out.created, false); assert.equal(out.url, C.PORTAL_URL);
+  // Without a key configured the hook is shut.
+  delete process.env.BOOKING_HOOK_KEY;
+  [st] = await booking.handle(key, { email: 'someone@example.com' });
+  assert.equal(st, 403);
+});
+
+test('the booking hook is not an action, and neither is automatic billing', async () => {
+  const co = await signIn('joe@incadencecare.com');
+  const r = await api(co, 'autoStartBilling', {});
+  assert.equal(r.ok, false); assert.equal(r.error, 'Unknown action');
+});
+
+test('a booked family: intake first, then billing starts on its own at the default amount', async () => {
+  const booking = require('../src/booking');
+  const B = require('../src/billing');
+  const C = require('../src/config');
+  process.env.BOOKING_HOOK_KEY = 'hook-key-for-tests-0123456789';
+  await booking.handle({ 'x-hook-key': process.env.BOOKING_HOOK_KEY }, { email: 'olga@example.com', name: 'Olga Oakes' });
+  delete process.env.BOOKING_HOOK_KEY;
+  const olga = await signIn('olga@example.com');
+  const boot = await api(olga, 'bootstrap', {});
+  assert.equal(boot.client.paid, false); assert.ok(boot.intakeSpec); assert.equal(boot.tasks, undefined);
+  const spec = boot.intakeSpec;
+  await api(olga, 'signConsent', { consent: { initials: spec.consent.map(() => 'OO'), name: 'Olga Oakes', relationship: 'Self' } });
+  const answers = {};
+  spec.steps.forEach(st => st.qs.forEach(q => { if (q.req && !q.showIf) answers[q.id] = { a: q.type === 'choice' ? q.opts[0] : q.type === 'date' ? '2026-11-03' : 'x' }; }));
+  assert.equal((await api(olga, 'saveIntake', { answers })).ok, true);
+  // Stripe, faked: record what is asked of it.
+  const saved = { stripe: B.stripe, subParams: B.subParams, sendFirstInvoice: B.sendFirstInvoice, key: process.env.STRIPE_SECRET_KEY };
+  const calls = [];
+  process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
+  B.stripe = async (method, path, params) => { calls.push(method + ' ' + path); return path === '/v1/customers' ? { id: 'cus_olga' } : { id: 'sub_olga', latest_invoice: 'in_1' }; };
+  B.subParams = async (cust, amount) => ({ customer: cust, amount });
+  B.sendFirstInvoice = async () => { calls.push('send first invoice'); };
+  try {
+    const sub = await api(olga, 'submitIntake', {});
+    assert.equal(sub.ok, true, sub.error); assert.equal(sub.intake.status, 'Submitted');
+  } finally { Object.assign(B, { stripe: saved.stripe, subParams: saved.subParams, sendFirstInvoice: saved.sendFirstInvoice }); if (saved.key === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = saved.key; }
+  assert.deepEqual(calls, ['POST /v1/customers', 'POST /v1/subscriptions', 'send first invoice']);
+  const cl = await db.one(`select c.* from clients c join users u on u.client_id=c.client_id where u.email='olga@example.com'`);
+  assert.equal(cl.stripe_customer_id, 'cus_olga'); assert.equal(Number(cl.monthly_amount), C.DEFAULT_MONTHLY); assert.equal(cl.paid, false);
+  const still = await api(olga, 'newTopic', { kind: 'question' });
+  assert.equal(still.ok, false); assert.match(still.error, /first payment/);
+});
+
+test('a Stripe failure never loses the intake', async () => {
+  const booking = require('../src/booking');
+  const B = require('../src/billing');
+  process.env.BOOKING_HOOK_KEY = 'hook-key-for-tests-0123456789';
+  await booking.handle({ 'x-hook-key': process.env.BOOKING_HOOK_KEY }, { email: 'pia@example.com', name: 'Pia Park' });
+  delete process.env.BOOKING_HOOK_KEY;
+  const pia = await signIn('pia@example.com');
+  const spec = (await api(pia, 'bootstrap', {})).intakeSpec;
+  await api(pia, 'signConsent', { consent: { initials: spec.consent.map(() => 'PP'), name: 'Pia Park', relationship: 'Self' } });
+  const answers = {};
+  spec.steps.forEach(st => st.qs.forEach(q => { if (q.req && !q.showIf) answers[q.id] = { a: q.type === 'choice' ? q.opts[0] : q.type === 'date' ? '2026-11-03' : 'x' }; }));
+  await api(pia, 'saveIntake', { answers });
+  const saved = { stripe: B.stripe, key: process.env.STRIPE_SECRET_KEY };
+  process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
+  B.stripe = async () => { throw new Error('Stripe is down'); };
+  let sub;
+  try { sub = await api(pia, 'submitIntake', {}); }
+  finally { B.stripe = saved.stripe; if (saved.key === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = saved.key; }
+  assert.equal(sub.ok, true, sub.error); assert.equal(sub.intake.status, 'Submitted');
+  const cl = await db.one(`select c.* from clients c join users u on u.client_id=c.client_id where u.email='pia@example.com'`);
+  assert.equal(cl.stripe_customer_id, null);
+});
