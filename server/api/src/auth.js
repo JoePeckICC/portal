@@ -74,6 +74,8 @@ async function signOutEverywhere(email) {
   await db.q(`update users set session_ver=session_ver+1 where email=$1`, [normEmail(email)]);
   await db.q(`delete from sessions where email=$1`, [normEmail(email)]);
 }
+// Signing out on one browser: that session is gone on the server too, not just forgotten by the page.
+async function endSession(sessionId) { if (sessionId && typeof sessionId === 'string') await db.q(`delete from sessions where session_id=$1`, [sessionId]); }
 async function pruneSessions() { await db.q(`delete from sessions where expires_at < now()`); await db.q(`delete from sign_in_tokens where issued_at < now() - interval '2 days'`); }
 
 // ---- rate limits (database-backed so every instance shares them)
@@ -237,4 +239,4 @@ async function pruneLogin() {
   await db.q(`delete from trusted_devices where expires_at < now()`);
 }
 
-module.exports = { login, verifyCode, setPassword, changePassword, forgetDevices, pruneLogin,  makeToken, parseToken, tokNonce, noteNonce, verifyLinkToken, findUser, sessionFor, userForSession, signOutEverywhere, pruneSessions, bump, requestLink, hello };
+module.exports = { login, verifyCode, setPassword, changePassword, forgetDevices, pruneLogin,  makeToken, parseToken, tokNonce, noteNonce, verifyLinkToken, findUser, sessionFor, userForSession, endSession, signOutEverywhere, pruneSessions, bump, requestLink, hello };
