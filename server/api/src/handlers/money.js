@@ -72,6 +72,7 @@ async function checkoutLink(ctx, p, c) {
   famOnly(ctx);
   const cl = await core.clientById(ctx.clientId, c); must(cl, 'Not found');
   must(!isTrue(cl.paid), 'Your portal is already open.');
+  must(isTrue(cl.plan_ready), 'Payment opens after your meeting, once your plan is ready.');   // Joe's call, 2026-09-24
   must(!cl.stripe_subscription_id, 'Your plan is already set up. You can pay the open invoice under Billing.');
   const payer = await db.one(`select * from users where client_id=$1 and active and lower(role)='client' order by email limit 1`, [ctx.clientId], c);
   let cust = cl.stripe_customer_id;
