@@ -519,16 +519,12 @@ test('booking hook: a new booker gets a locked family and a set-password link, o
   assert.equal(st, 403);
 });
 
-test('the booking hook is not an action, and neither is automatic billing', async () => {
-  const co = await signIn('joe@incadencecare.com');
-  const r = await api(co, 'autoStartBilling', {});
-  assert.equal(r.ok, false); assert.equal(r.error, 'Unknown action');
-});
-
-test('a booked family: intake first, then billing starts on its own at the default amount', async () => {
+test('a booked family: intake, then Pay when ready (no invoice is sent), then the portal opens', async () => {
   const booking = require('../src/booking');
   const B = require('../src/billing');
   const C = require('../src/config');
+  const webhook = require('../src/webhook');
+  const crypto = require('crypto');
   process.env.BOOKING_HOOK_KEY = 'hook-key-for-tests-0123456789';
   await booking.handle({ 'x-hook-key': process.env.BOOKING_HOOK_KEY }, { email: 'olga@example.com', name: 'Olga Oakes' });
   delete process.env.BOOKING_HOOK_KEY;
@@ -541,42 +537,47 @@ test('a booked family: intake first, then billing starts on its own at the defau
   spec.steps.forEach(st => st.qs.forEach(q => { if (q.req && !q.showIf) answers[q.id] = { a: q.type === 'choice' ? q.opts[0] : q.type === 'date' ? '2026-11-03' : 'x' }; }));
   assert.equal((await api(olga, 'saveIntake', { answers })).ok, true);
   // Stripe, faked: record what is asked of it.
-  const saved = { stripe: B.stripe, subParams: B.subParams, sendFirstInvoice: B.sendFirstInvoice, key: process.env.STRIPE_SECRET_KEY };
+  const saved = { stripe: B.stripe, stripeProduct: B.stripeProduct, key: process.env.STRIPE_SECRET_KEY, wh: process.env.STRIPE_WEBHOOK_SECRET };
   const calls = [];
-  process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
-  B.stripe = async (method, path, params) => { calls.push(method + ' ' + path); return path === '/v1/customers' ? { id: 'cus_olga' } : { id: 'sub_olga', latest_invoice: 'in_1' }; };
-  B.subParams = async (cust, amount) => ({ customer: cust, amount });
-  B.sendFirstInvoice = async () => { calls.push('send first invoice'); };
+  process.env.STRIPE_SECRET_KEY = 'sk_test_fake'; process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+  B.stripe = async (method, path, params) => { calls.push(method + ' ' + path + (params && params.mode ? ' ' + params.mode : '') + (params && params['line_items[0][price_data][unit_amount]'] ? ' ' + params['line_items[0][price_data][unit_amount]'] : '')); return path === '/v1/customers' ? { id: 'cus_olga' } : path === '/v1/invoices' ? { data: [] } : { id: 'cs_1', url: 'https://checkout.stripe.test/cs_1' }; };
+  B.stripeProduct = async () => 'prod_test';
+  const hook = async ev => {
+    const raw = JSON.stringify(ev), t = Math.floor(Date.now() / 1000);
+    const sig = crypto.createHmac('sha256', 'whsec_test').update(t + '.' + raw).digest('hex');
+    const res = { code: 0, writeHead(c) { this.code = c; }, end() {} };
+    await webhook.handle({ headers: { 'stripe-signature': 't=' + t + ',v1=' + sig } }, res, Buffer.from(raw));
+    return res.code;
+  };
   try {
     const sub = await api(olga, 'submitIntake', {});
     assert.equal(sub.ok, true, sub.error); assert.equal(sub.intake.status, 'Submitted');
-  } finally { Object.assign(B, { stripe: saved.stripe, subParams: saved.subParams, sendFirstInvoice: saved.sendFirstInvoice }); if (saved.key === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = saved.key; }
-  assert.deepEqual(calls, ['POST /v1/customers', 'POST /v1/subscriptions', 'send first invoice']);
-  const cl = await db.one(`select c.* from clients c join users u on u.client_id=c.client_id where u.email='olga@example.com'`);
-  assert.equal(cl.stripe_customer_id, 'cus_olga'); assert.equal(Number(cl.monthly_amount), C.DEFAULT_MONTHLY); assert.equal(cl.paid, false);
-  const still = await api(olga, 'newTopic', { kind: 'question' });
-  assert.equal(still.ok, false); assert.match(still.error, /first payment/);
+    assert.deepEqual(calls, [], 'finishing the intake sends nothing to Stripe');
+    const plan = await api(olga, 'planPdf', {});
+    assert.equal(plan.ok, false); assert.match(plan.error, /not ready yet/);          // the plan waits for the coordinator
+    const co = await api(olga, 'checkoutLink', {});
+    assert.equal(co.ok, true, co.error); assert.equal(co.url, 'https://checkout.stripe.test/cs_1');
+    assert.deepEqual(calls, ['POST /v1/customers', 'POST /v1/checkout/sessions subscription ' + C.DEFAULT_MONTHLY * 100]);
+    let cl = await db.one(`select c.* from clients c join users u on u.client_id=c.client_id where u.email='olga@example.com'`);
+    assert.equal(cl.stripe_customer_id, 'cus_olga'); assert.equal(cl.paid, false); assert.equal(cl.stripe_subscription_id, null);
+    assert.match((await api(olga, 'newTopic', { kind: 'question' })).error, /first payment/);
+    // Stripe reports back: the checkout finished, and the first month is paid.
+    assert.equal(await hook({ type: 'checkout.session.completed', data: { object: { id: 'cs_1', mode: 'subscription', customer: 'cus_olga', subscription: 'sub_olga', amount_subtotal: C.DEFAULT_MONTHLY * 100 } } }), 200);
+    assert.equal(await hook({ type: 'invoice.paid', data: { object: { id: 'in_1', customer: 'cus_olga' } } }), 200);
+    cl = await db.one(`select * from clients where client_id=$1`, [cl.client_id]);
+    assert.equal(cl.paid, true); assert.equal(cl.stripe_subscription_id, 'sub_olga'); assert.equal(Number(cl.monthly_amount), C.DEFAULT_MONTHLY); assert.equal(cl.billing_status, 'Active');
+    assert.equal((await api(olga, 'newTopic', { kind: 'question' })).ok, true, 'the portal is open');
+    const again = await api(olga, 'checkoutLink', {});
+    assert.equal(again.ok, false); assert.match(again.error, /already open/);
+  } finally {
+    Object.assign(B, { stripe: saved.stripe, stripeProduct: saved.stripeProduct });
+    if (saved.key === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = saved.key;
+    if (saved.wh === undefined) delete process.env.STRIPE_WEBHOOK_SECRET; else process.env.STRIPE_WEBHOOK_SECRET = saved.wh;
+  }
 });
 
-test('a Stripe failure never loses the intake', async () => {
-  const booking = require('../src/booking');
-  const B = require('../src/billing');
-  process.env.BOOKING_HOOK_KEY = 'hook-key-for-tests-0123456789';
-  await booking.handle({ 'x-hook-key': process.env.BOOKING_HOOK_KEY }, { email: 'pia@example.com', name: 'Pia Park' });
-  delete process.env.BOOKING_HOOK_KEY;
-  const pia = await signIn('pia@example.com');
-  const spec = (await api(pia, 'bootstrap', {})).intakeSpec;
-  await api(pia, 'signConsent', { consent: { initials: spec.consent.map(() => 'PP'), name: 'Pia Park', relationship: 'Self' } });
-  const answers = {};
-  spec.steps.forEach(st => st.qs.forEach(q => { if (q.req && !q.showIf) answers[q.id] = { a: q.type === 'choice' ? q.opts[0] : q.type === 'date' ? '2026-11-03' : 'x' }; }));
-  await api(pia, 'saveIntake', { answers });
-  const saved = { stripe: B.stripe, key: process.env.STRIPE_SECRET_KEY };
-  process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
-  B.stripe = async () => { throw new Error('Stripe is down'); };
-  let sub;
-  try { sub = await api(pia, 'submitIntake', {}); }
-  finally { B.stripe = saved.stripe; if (saved.key === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = saved.key; }
-  assert.equal(sub.ok, true, sub.error); assert.equal(sub.intake.status, 'Submitted');
-  const cl = await db.one(`select c.* from clients c join users u on u.client_id=c.client_id where u.email='pia@example.com'`);
-  assert.equal(cl.stripe_customer_id, null);
+test('Pay when ready is for families only', async () => {
+  const co = await signIn('joe@incadencecare.com');
+  const r = await api(co, 'checkoutLink', { clientId: 'c2' });
+  assert.equal(r.ok, false); assert.match(r.error, /Not allowed/);
 });
