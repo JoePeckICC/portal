@@ -21,7 +21,53 @@ function readBody(req) {
 }
 function reqInfo(req) {
   const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  return { ip: fwd || req.socket.remoteAddress || '', ua: req.headers['user-agent'] || '' };
+  const viaPortal = isProxied(req) && String(req.headers['x-client-ip'] || '').trim();   // the portal's worker passes the family's own address
+  return { ip: viaPortal || fwd || req.socket.remoteAddress || '', ua: req.headers['user-agent'] || '' };
+}
+
+// ---- session cookies (added 2026-09-24)
+// When the page calls through the portal's own address (portal.incadencecare.com/api, where the Cloudflare
+// worker adds X-Portal-Proxy), the session and remembered-device tokens travel in HttpOnly cookies that no
+// script on the page can read, instead of sitting in the page's localStorage. Calls made straight to this
+// service keep the old way (token in the body), so an older copy of the page keeps working during a rollout.
+const SES_COOKIE = '__Host-ic_s', DEV_COOKIE = '__Host-ic_d';
+const isProxied = req => req.headers['x-portal-proxy'] === '1';
+function readCookies(req) {
+  const out = {};
+  String(req.headers.cookie || '').split(';').forEach(p => {
+    const i = p.indexOf('='); if (i < 1) return;
+    try { out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim()); } catch {}
+  });
+  return out;
+}
+const cookie = (name, value, days) => name + '=' + (value ? encodeURIComponent(value) : '') + '; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=' + (value ? Math.round(days * 86400) : 0);
+
+// One /api call through the portal: tokens come from the cookies, and any token the call hands out
+// goes back as a cookie (the page only learns "true").
+async function proxiedApi(req, res, b, info) {
+  const jar = readCookies(req), set = [];
+  const session = jar[SES_COOKIE] || null;
+  const payload = b.payload && typeof b.payload === 'object' ? b.payload : {};
+  if (b.action === 'login' && !payload.device) payload.device = jar[DEV_COOKIE] || '';
+  if (b.action === 'signOut') {
+    if (session) await auth.endSession(session);
+    res.setHeader('Set-Cookie', cookie(SES_COOKIE, '', 0));
+    return { ok: true };
+  }
+  const out = await api(session, b.action, payload, info);
+  const fresh = out.session || (out.boot && out.boot.session);
+  if (typeof fresh === 'string' && fresh) {
+    set.push(cookie(SES_COOKIE, fresh, C.SESSION_DAYS));
+    if (out.session) out.session = true;
+    if (out.boot && out.boot.session) out.boot.session = true;
+  } else if (b.action === 'hello' && out.boot && session) {
+    if (await auth.userForSession(session)) out.boot.session = true;      // already signed in on this browser
+    else set.push(cookie(SES_COOKIE, '', 0));
+  } else if (out.error === 'signed_out' && session) set.push(cookie(SES_COOKIE, '', 0));
+  if (typeof out.device === 'string' && out.device) { set.push(cookie(DEV_COOKIE, out.device, C.DEVICE_DAYS)); out.device = true; }
+  if (b.action === 'forgetDevices' && out.ok) set.push(cookie(DEV_COOKIE, '', 0));
+  if (set.length) res.setHeader('Set-Cookie', set);
+  return out;
 }
 function send(res, status, body, headers) {
   const h = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...SEC, ...(headers || {}) };
@@ -92,6 +138,7 @@ async function handle(req, res) {
   if ((url.pathname === '/api' || url.pathname === '/') && req.method === 'POST') {
     if ((await auth.bump('api:' + info.ip, 60)) > C.RATE.apiPerMin) return send(res, 429, { ok: false, error: 'Slow down a little and try again.' });
     let b; try { b = JSON.parse((await readBody(req)).toString('utf8') || '{}'); } catch (e) { return send(res, e.status || 400, { ok: false, error: e.status === 413 ? 'That is too large to send.' : 'Bad request' }); }
+    if (isProxied(req)) return send(res, 200, await proxiedApi(req, res, b, info));
     return send(res, 200, await api(b.session || null, b.action, b.payload, info));
   }
 
@@ -133,4 +180,4 @@ function createServer() {
   return http.createServer((req, res) => handle(req, res).catch(e => { console.error('unhandled', e); try { send(res, 500, { ok: false, error: 'Something went wrong on our side.' }); } catch {} }));
 }
 
-module.exports = { api, createServer, handle };
+module.exports = { api, createServer, handle, readCookies };
