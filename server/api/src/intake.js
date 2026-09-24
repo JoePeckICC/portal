@@ -7,12 +7,13 @@ const { id, clean, first } = require('./util');
 
 // { status, submitted_at, consent, answers: { id: { a, n, t } } }
 async function readIntake(clientId, c) {
-  const out = { status: 'Not started', submitted_at: '', consent: null, answers: {} };
+  const out = { status: 'Not started', submitted_at: '', consent: null, changed: {}, answers: {} };
   (await db.all(`select * from intake_answers where client_id=$1`, [clientId], c)).forEach(r => {
     const q = String(r.question_id);
     if (q === '_status') out.status = String(r.answer || 'Not started');
     else if (q === '_submitted_at') out.submitted_at = r.answer;
     else if (q === '_consent') { try { out.consent = JSON.parse(r.answer); } catch { out.consent = null; } }
+    else if (q === '_changed') { try { out.changed = JSON.parse(r.answer || '{}') || {}; } catch { out.changed = {}; } }
     else out.answers[q] = { a: plainAnswer(r.answer), n: r.note == null ? '' : String(r.note), t: r.updated_at };
   });
   return out;
