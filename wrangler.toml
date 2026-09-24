@@ -6,3 +6,4 @@ compatibility_date = "2026-09-01"
 directory = "./"
 not_found_handling = "single-page-application"
 binding = "ASSETS"
+run_worker_first = true   # so POST /api reaches worker.js (the API pass-through) instead of the static assets
