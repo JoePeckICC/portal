@@ -418,7 +418,7 @@ a.ixh-ghost:hover{border-color:#C09B36;color:#1C2A3A;text-decoration:none}
 <body>
 <div id="app"></div>
 <script>
-var API_URL = "https://portal-api-94785728612.us-central1.run.app/api";
+var API_URL = "/api";   // the portal worker passes this to the API; sign-in lives in HttpOnly cookies, never in page storage
 var BOOT = { appName: 'InCadence Care', stages: [], categories: [], planStatuses: [], taskStatuses: [], topicKinds: {}, bookKinds: {}, bookHours: { from: 7, to: 21 }, phone: '', referralStatuses: [], defaultMonthly: '', assistStatuses: [], coKinds: {}, session: null, error: null };
 // Same shape as google.script.run, over fetch. text/plain keeps the browser from preflighting; Apps Script answers with the JSON.
 window.google = { script: { run: {
@@ -426,7 +426,7 @@ window.google = { script: { run: {
   withFailureHandler: function (f) { var o = Object.create(this); o._f = f; return o; },
   api: function (session, action, payload) {
     var self = this;
-    fetch(API_URL + '?api=1', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ session: session, action: action, payload: payload || {} }), redirect: 'follow', credentials: 'omit' })
+    fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: action, payload: payload || {} }), credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error('The portal did not answer (' + r.status + '). Try again in a moment.'); return r.json(); })
       .then(function (j) { if (self._s) self._s(j); })
       .catch(function (e) { if (self._f) self._f(e); else console.error(e); });
@@ -508,7 +508,7 @@ function stClass(s){s=String(s||'');return s==='Done'?'done':s==='In progress'?'
 function stIcon(s){s=String(s||'');return s==='Done'?ICON.done:s==='In progress'?ICON.doing:s==='Blocked'?ICON.blocked:ICON.todo}
 function stWord(s,co){s=String(s||'Not started');if(s==='In progress')return co?(first(co.name)+' is on it'):'In progress';return s}
 function call(action,payload){return new Promise(function(res,rej){google.script.run.withSuccessHandler(function(r){if(!r||!r.ok){if(r&&r.error==='signed_out'){signOut();return}rej(new Error(r&&r.error||'Something went wrong'));return}res(r)}).withFailureHandler(function(e){rej(e)}).api(S.session,action,Object.assign({clientId:S.clientId},payload||{}))})}
-function signOut(){S.session=null;S.data=null;store('ic_session',null);render()}
+function signOut(){google.script.run.api(null,'signOut',{});S.session=null;S.data=null;render()}
 
 // ---------------------------------------------------------------- boot
 (function(){
@@ -518,8 +518,8 @@ function signOut(){S.session=null;S.data=null;store('ic_session',null);render()}
   google.script.run.withSuccessHandler(function(r){
     if(r&&r.ok&&r.boot)Object.keys(r.boot).forEach(function(k){BOOT[k]=r.boot[k]});
     else BOOT.error=(r&&r.error)||'Could not reach the portal.';
-    if(BOOT.session){S.session=BOOT.session;store('ic_session',BOOT.session)}
-    else S.session=load('ic_session');
+    store('ic_session',null);store('ic_dev',null);   // from before sign-in moved to cookies; nothing is kept in page storage now
+    S.session=BOOT.session?true:null;
     S.clientId=load('ic_client')||'';
     if(card==='saved'){S.view='billing';S.bp='method';S.touched=true;S.cardSaved=true}
     render();
@@ -547,7 +547,7 @@ function render(){
 // Email + password; a new device also gets a 6-digit code by email. The emailed link is only for
 // setting a password the first time, or choosing a new one.
 function pre(action,payload){return new Promise(function(res){google.script.run.withSuccessHandler(function(r){res(r||{ok:false,error:'The portal did not answer. Try again in a moment.'})}).withFailureHandler(function(e){res({ok:false,error:(e&&e.message)||'Could not reach the portal. Try again in a moment.'})}).api(null,action,payload||{})})}
-function signedIn(r){S.session=r.session;store('ic_session',r.session);if(r.device)store('ic_dev',r.device);S.auth=null;BOOT.pwset=null;BOOT.error=null;S.data=null;render();refresh()}
+function signedIn(r){S.session=true;S.auth=null;BOOT.pwset=null;BOOT.error=null;S.data=null;render();refresh()}
 function gateCard(inner,top){var c=el('<div style="min-height:100vh;display:flex;flex-direction:column">'+siteheader()+'<div class="gate" style="flex:1;min-height:0;padding:clamp(40px,7vw,80px) 24px 64px;align-items:flex-start"><form class="card" novalidate>'+(top||'<div class="k">'+esc(BOOT.appName)+'</div>')+inner+'</form></div>'+sitefooter()+'</div>');return c}
 function busy(b,on,label){b.disabled=on;if(label)b.textContent=label}
 function gate(){
@@ -603,7 +603,7 @@ function gate(){
   f.onsubmit=function(ev){ev.preventDefault();var btn=$('button',f),em=$('#em',c).value.trim(),pw=$('#pw',c).value;
     if(!em||!pw){showErr('Enter your email and password.');return}
     showErr('');busy(btn,true,'Signing in…');store('ic_last',em);
-    pre('login',{email:em,password:pw,device:load('ic_dev')||''}).then(function(r){
+    pre('login',{email:em,password:pw}).then(function(r){
       if(r.ok&&r.session){signedIn(r);return}
       busy(btn,false,'Sign in');
       if(r.ok&&r.needCode){S.auth={mode:'code',email:em,challenge:r.challenge,sentTo:r.sentTo,minutes:r.minutes};render();return}
@@ -921,7 +921,7 @@ function securityPage(){
     var miss=pwMissing(a);if(miss.length){$('.err',f).textContent='Your new password still needs: '+miss.join(', ')+'.';return}
     if(a!==b){$('.err',f).textContent='The two new passwords do not match.';return}
     btn.disabled=true;call('changePassword',{current:$('#cp0',v).value,next:a}).then(function(){$('.err',f).textContent='';$('.ok',f).textContent='Password changed. Other browsers are signed out.';$all('input[type=password]',f).forEach(function(i){i.value=''});btn.disabled=false}).catch(function(x){$('.err',f).textContent=x.message;btn.disabled=false})};
-  $('#fd',v).onclick=function(){var b=this;b.disabled=true;call('forgetDevices').then(function(){store('ic_dev',null);b.textContent='Forgotten'}).catch(function(x){b.disabled=false;alertErr(x)})};
+  $('#fd',v).onclick=function(){var b=this;b.disabled=true;call('forgetDevices').then(function(){b.textContent='Forgotten'}).catch(function(x){b.disabled=false;alertErr(x)})};
   $('#soe',v).onclick=function(){if(!confirm('Sign out of every browser, including this one?'))return;call('signOutEverywhere').then(function(){signOut()}).catch(alertErr)};
   return v;
 }
