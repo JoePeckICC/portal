@@ -24,7 +24,7 @@ test.after(async () => { await require('../src/pdf').close(); await db.pool.end(
 const lastMail = () => mail.sent[mail.sent.length - 1];
 const linkFrom = m => decodeURIComponent(m.html.match(/\?t=([^"]+)"/)[1]);
 
-const PW = 'correct horse battery staple';
+const PW = 'Correct horse battery staple 9!';
 const devices = {};   // email -> remembered-device token, like the page keeps in localStorage
 const codeFrom = m => m.html.match(/letter-spacing:\.2em;margin:18px 0">(\d{6})</)[1];
 
@@ -81,6 +81,10 @@ test('passwords: first-time setup, rules, and the set-password link works once',
   assert.equal(h.boot.pwset.reset, false);
   assert.match((await api(null, 'setPassword', { token: h.boot.pwset.token, password: 'short' })).error, /12 characters/);
   assert.match((await api(null, 'setPassword', { token: h.boot.pwset.token, password: 'kiddo-kiddo-kiddo-1' })).error, /email address out/);
+  assert.match((await api(null, 'setPassword', { token: h.boot.pwset.token, password: 'correct horse battery staple' })).error, /needs a capital letter, a number and a symbol/);
+  assert.match((await api(null, 'setPassword', { token: h.boot.pwset.token, password: 'CORRECT HORSE BATTERY 9!' })).error, /needs a lowercase letter\./);
+  assert.match((await api(null, 'setPassword', { token: h.boot.pwset.token, password: 'Correct horse battery staple!' })).error, /needs a number\./);
+  assert.match((await api(null, 'setPassword', { token: h.boot.pwset.token, password: 'MyPassword is 2 long!' })).error, /easy to guess/);
   const ok = await api(null, 'setPassword', { token: h.boot.pwset.token, password: PW });
   assert.equal(ok.ok, true); assert.ok(ok.session); assert.ok(ok.device);
   assert.equal((await api(null, 'setPassword', { token: h.boot.pwset.token, password: PW + '!' })).expired, true, 'the link is spent');
