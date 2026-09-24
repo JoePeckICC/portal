@@ -11,8 +11,8 @@
 // a password, otherwise the plain portal address.
 //
 // Nothing here opens the portal. Until the first payment, app.js lets a family reach only the
-// consent, the intake form and Billing (H.OPEN_BEFORE_PAID). Submitting the intake starts billing
-// (money.autoStartBilling), which puts the Pay now button in front of them.
+// consent, the intake form and Billing (H.OPEN_BEFORE_PAID). No invoice is sent: Billing shows a
+// "Pay when you're ready" button (money.checkoutLink), and paying opens the rest of the portal.
 const C = require('./config');
 const db = require('./db');
 const auth = require('./auth');
