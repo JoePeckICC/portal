@@ -486,7 +486,12 @@ function sitefooter(){
 
 // ---------------------------------------------------------------- utilities
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function el(html){var t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstChild}
+function el(html){var t=document.createElement('template');t.innerHTML=html.trim();return t.content.childNodes.length>1?t.content:t.content.firstChild}
+// Password rules the server also enforces (server/api/src/password.js). Shown as a live checklist.
+function pwChecks(a){a=a||'';return [['At least 12 characters',a.length>=12],['A lowercase letter',/[a-z]/.test(a)],['A capital letter',/[A-Z]/.test(a)],['A number',/[0-9]/.test(a)],['A symbol, like ! or #',/[^A-Za-z0-9\s]/.test(a)]]}
+function pwMissing(a){return pwChecks(a).filter(function(c){return !c[1]}).map(function(c){return c[0].toLowerCase()})}
+function pwList(){return '<ul class="pwck small" style="list-style:none;padding:0;margin:-6px 0 14px">'+pwChecks('').map(function(c){return '<li style="color:var(--muted);margin:2px 0"><span style="display:inline-block;width:18px">○</span>'+esc(c[0])+'</li>'}).join('')+'</ul>'}
+function pwWatch(input,list){input.addEventListener('input',function(){var cs=pwChecks(input.value);Array.prototype.forEach.call(list.children,function(li,i){var ok=cs[i][1];li.firstChild.textContent=ok?'✓':'○';li.style.color=ok?'var(--ink)':'var(--muted)';li.firstChild.style.color=ok?'var(--gold)':''})})}
 function $(sel,root){return (root||document).querySelector(sel)}
 function $all(sel,root){return Array.prototype.slice.call((root||document).querySelectorAll(sel))}
 function store(k,v){try{if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
@@ -550,11 +555,12 @@ function gate(){
   function showErr(m){err.textContent=m||'';err.style.display=m?'':'none'}
   if(A.mode==='setpw'){
     var P=BOOT.pwset||{};
-    c=gateCard('<h1 style="margin:12px 0 8px">'+(P.reset?'Choose a new password':'Set your password')+'</h1><p class="muted" style="margin:0 0 20px">'+(P.name?'Hi '+esc(P.name)+'. ':'')+'You will use this with your email to sign in from now on. At least 12 characters. A short sentence you will remember works well.</p><p class="err" style="margin:0 0 14px;display:none"></p><div class="field"><label for="un">Email</label><input id="un" type="email" autocomplete="username" value="'+esc(P.email||'')+'" readonly></div><div class="field"><label for="p1">New password</label><input id="p1" type="password" autocomplete="new-password" minlength="12" required></div><div class="field"><label for="p2">Type it again</label><input id="p2" type="password" autocomplete="new-password" required></div><label class="small" style="display:flex;gap:8px;align-items:center;margin:-4px 0 16px"><input type="checkbox" id="sh" style="width:auto"> Show passwords</label><button class="btn block" type="submit">'+(P.reset?'Save and sign in':'Set password and sign in')+'</button>');
+    c=gateCard('<h1 style="margin:12px 0 8px">'+(P.reset?'Choose a new password':'Set your password')+'</h1><p class="muted" style="margin:0 0 20px">'+(P.name?'Hi '+esc(P.name)+'. ':'')+'You will use this with your email to sign in from now on. A short sentence you will remember, with a capital, a number and a symbol, works well.</p><p class="err" style="margin:0 0 14px;display:none"></p><div class="field"><label for="un">Email</label><input id="un" type="email" autocomplete="username" value="'+esc(P.email||'')+'" readonly></div><div class="field"><label for="p1">New password</label><input id="p1" type="password" autocomplete="new-password" minlength="12" required></div>'+pwList()+'<div class="field"><label for="p2">Type it again</label><input id="p2" type="password" autocomplete="new-password" required></div><label class="small" style="display:flex;gap:8px;align-items:center;margin:-4px 0 16px"><input type="checkbox" id="sh" style="width:auto"> Show passwords</label><button class="btn block" type="submit">'+(P.reset?'Save and sign in':'Set password and sign in')+'</button>');
     f=$('form',c);err=$('.err',c);
     $('#sh',c).onchange=function(){var t=this.checked?'text':'password';$('#p1',c).type=t;$('#p2',c).type=t};
+    pwWatch($('#p1',c),$('.pwck',c));
     f.onsubmit=function(ev){ev.preventDefault();var a=$('#p1',c).value,b=$('#p2',c).value,btn=$('button',f);
-      if(a.length<12){showErr('Use at least 12 characters.');return}
+      var miss=pwMissing(a);if(miss.length){showErr('Your password still needs: '+miss.join(', ')+'.');return}
       if(a!==b){showErr('The two passwords do not match.');return}
       busy(btn,true,'Saving…');pre('setPassword',{token:P.token,password:a}).then(function(r){
         if(r.ok&&r.session){signedIn(r);return}
@@ -906,12 +912,12 @@ function settingsView(){
 }
 function securityPage(){
   var v=el('<div><h2>Password &amp; security</h2><p class="muted small" style="margin:4px 0 16px">Changing your password keeps this browser signed in and signs out every other one.</p>'+
-    '<form class="card" id="cp" novalidate><span class="k">Change password</span><input type="email" autocomplete="username" value="'+esc(S.data.me.email)+'" style="display:none" readonly><div class="field" style="margin-top:10px"><label for="cp0">Current password</label><input id="cp0" type="password" autocomplete="current-password"></div><div class="field"><label for="cp1">New password</label><input id="cp1" type="password" autocomplete="new-password"></div><div class="field"><label for="cp2">Type it again</label><input id="cp2" type="password" autocomplete="new-password"></div><p class="err small" style="margin:0 0 10px"></p><p class="ok small" style="margin:0 0 10px"></p><button class="btn sm" type="submit">Change password</button></form>'+
+    '<form class="card" id="cp" novalidate><span class="k">Change password</span><input type="email" autocomplete="username" value="'+esc(S.data.me.email)+'" style="display:none" readonly><div class="field" style="margin-top:10px"><label for="cp0">Current password</label><input id="cp0" type="password" autocomplete="current-password"></div><div class="field"><label for="cp1">New password</label><input id="cp1" type="password" autocomplete="new-password"></div>'+pwList()+'<div class="field"><label for="cp2">Type it again</label><input id="cp2" type="password" autocomplete="new-password"></div><p class="err small" style="margin:0 0 10px"></p><p class="ok small" style="margin:0 0 10px"></p><button class="btn sm" type="submit">Change password</button></form>'+
     '<div class="card" style="margin-top:14px"><span class="k">Remembered devices</span><p class="small muted" style="margin:6px 0 10px">Devices that passed the emailed code skip it for 30 days. Forget them all and the next sign-in anywhere asks for a code again.</p><button class="btn quiet sm" type="button" id="fd">Forget remembered devices</button></div>'+
     '<div class="card" style="margin-top:14px"><span class="k">Sign out everywhere</span><p class="small muted" style="margin:6px 0 10px">A shared computer, a lost phone? This signs every browser out, including this one.</p><button class="btn quiet sm" type="button" id="soe">Sign out everywhere</button></div></div>');
-  var f=$('#cp',v);
+  var f=$('#cp',v);pwWatch($('#cp1',v),$('.pwck',v));
   f.onsubmit=function(ev){ev.preventDefault();var a=$('#cp1',v).value,b=$('#cp2',v).value,btn=$('button',f);$('.ok',f).textContent='';
-    if(a.length<12){$('.err',f).textContent='Use at least 12 characters.';return}
+    var miss=pwMissing(a);if(miss.length){$('.err',f).textContent='Your new password still needs: '+miss.join(', ')+'.';return}
     if(a!==b){$('.err',f).textContent='The two new passwords do not match.';return}
     btn.disabled=true;call('changePassword',{current:$('#cp0',v).value,next:a}).then(function(){$('.err',f).textContent='';$('.ok',f).textContent='Password changed. Other browsers are signed out.';$all('input[type=password]',f).forEach(function(i){i.value=''});btn.disabled=false}).catch(function(x){$('.err',f).textContent=x.message;btn.disabled=false})};
   $('#fd',v).onclick=function(){var b=this;b.disabled=true;call('forgetDevices').then(function(){store('ic_dev',null);b.textContent='Forgotten'}).catch(function(x){b.disabled=false;alertErr(x)})};
