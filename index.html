@@ -579,7 +579,7 @@ function gate(){
     return c;
   }
   if(A.mode==='forgot'){
-    c=gateCard('<h1 style="margin:12px 0 8px">Set or reset your password</h1><p class="muted" style="margin:0 0 20px">Enter the email your coordinator has on file. We will send a link to choose your password.</p><p class="err" style="margin:0 0 14px;display:none"></p><div class="field"><label for="em">Email</label><input id="em" type="email" autocomplete="email" required value="'+esc(A.email||'')+'"></div><button class="btn block" type="submit">Email me a link</button><p id="gm" class="small muted" style="margin:14px 0 0"></p><p class="small" style="margin:14px 0 0"><a href="#" id="bk">Back to sign in</a></p>');
+    c=gateCard('<h1 style="margin:12px 0 8px">Reset your password</h1><p class="muted" style="margin:0 0 20px">Enter the email you sign in with. We’ll send you a link to choose a new password.</p><p class="err" style="margin:0 0 14px;display:none"></p><div class="field"><label for="em">Email</label><input id="em" type="email" autocomplete="email" required value="'+esc(A.email||'')+'"></div><button class="btn block" type="submit">Email me a link</button><p id="gm" class="small muted" style="margin:14px 0 0"></p><p class="small" style="margin:14px 0 0"><a href="#" id="bk">Back to sign in</a></p>');
     f=$('form',c);err=$('.err',c);showErr(A.msg||BOOT.error);
     $('#bk',c).onclick=function(ev){ev.preventDefault();S.auth={mode:'login',email:$('#em',c).value};BOOT.error=null;render()};
     f.onsubmit=function(ev){ev.preventDefault();var btn=$('button',f),em=$('#em',c).value.trim();
