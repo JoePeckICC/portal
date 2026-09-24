@@ -97,6 +97,11 @@ async function handle(req, res) {
 
   if (url.pathname.startsWith('/files/') && req.method === 'GET') return serveFile(req, res, url, info);
   if (url.pathname === '/stripe/webhook' && req.method === 'POST') return require('./webhook').handle(req, res, await readBody(req));
+  if (url.pathname === '/hooks/booking' && req.method === 'POST') {   // the booking note's Apps Script; see booking.js
+    let b; try { b = JSON.parse((await readBody(req)).toString('utf8') || '{}'); } catch (e) { return send(res, 400, { ok: false, error: 'Bad request' }); }
+    try { const [status, out] = await require('./booking').handle(req.headers, b); return send(res, status, out); }
+    catch (e) { console.error('booking hook', e); return send(res, 500, { ok: false, error: 'Something went wrong on our side.' }); }
+  }
   if (url.pathname.startsWith('/jobs/') && req.method === 'POST') {
     const key = process.env.JOBS_KEY || '';
     if (!key || !require('./util').safeEqual(String(req.headers['x-jobs-key'] || ''), key)) return send(res, 403, { ok: false, error: 'Not allowed' });
