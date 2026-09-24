@@ -11,6 +11,6 @@ H.SUPPORTER_OK = { bootstrap: 1, savePrefs: 1, changeEmail: 1, signOutEverywhere
 // A family's portal stays closed until their first payment is in. Consent and intake are always open.
 // Coordinator actions that are fine on an archived family (everything else is refused until reactivation).
 H.ARCHIVE_OK = { accessLog: 1, changePassword: 1, forgetDevices: 1, reactivateClient: 1, purgeClient: 1, exportClient: 1, savePrefs: 1, saveCoSettings: 1, newFamily: 1, saveResource: 1, signOutEverywhere: 1, changeEmail: 1 };
-H.OPEN_BEFORE_PAID = ['bootstrap', 'changePassword', 'forgetDevices', 'signConsent', 'saveIntake', 'submitIntake', 'planPdf', 'savePrefs', 'changeEmail'];
+H.OPEN_BEFORE_PAID = ['bootstrap', 'changePassword', 'forgetDevices', 'signConsent', 'saveIntake', 'submitIntake', 'planPdf', 'checkoutLink', 'savePrefs', 'changeEmail'];
 
 module.exports = H;
