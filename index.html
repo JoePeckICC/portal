@@ -47,7 +47,7 @@ label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
 .ic-cta--sm:hover{background:var(--gold);color:var(--ink)}
 
 /* welcome band + tiles */
-.hero{position:relative;background:var(--ink);padding:34px 20px 0;text-align:center;overflow:visible}
+.hero{position:relative;background:var(--ink);padding:34px 20px 0;text-align:center;overflow:visible;overflow-x:clip}
 .hero .curve{position:absolute;left:-10%;right:-10%;bottom:-120px;height:220px;border-radius:50%;background:var(--ground);pointer-events:none}
 .hero .hero-in{position:relative;min-height:96px}
 .hero .hello{font-family:'Fraunces',Georgia,serif;font-size:40px;font-weight:500;letter-spacing:-.01em;color:#fff;margin:8px 0 0}
@@ -127,7 +127,8 @@ label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
 .alt{padding:8px 12px;border:1px solid var(--line2);border-radius:3px;background:#fff;font-size:13px;cursor:pointer}
 .alt.on{border-color:var(--gold);background:var(--tint);font-weight:700}
 .detail{margin-top:10px}
-.notel{display:inline-block;margin-top:10px;font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline}
+.notel{display:inline-block;margin-top:0;font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline;background:none;border:0;padding:12px 0;min-height:44px;font-family:inherit}
+.qerr{margin-top:8px;font-size:14px;color:#9B2C2C;font-weight:600}
 .note-f{margin-top:10px}.note-f textarea{min-height:64px;font-size:14px}
 .q .err{margin-top:8px}
 .q.bad .qt{color:#9B2C2C}
@@ -1756,6 +1757,14 @@ function supporterPage(){
 function pipe(t){var d=S.data,ia=S.ia||{},pat=/person having surgery/.test((ia['0.1']||{}).a||''),n=first(d.client.patient_first_name)||'the patient';return t.replace(/{NAME_CAP}/g,pat?'Your':n+'’s').replace(/{NAME_OBJ}/g,pat?'you':n).replace(/{DOES}/g,pat?'Do you':'Does '+n).replace(/{IS}/g,pat?'are you':'is '+n)}
 function qVisible(q){if(!q.showIf)return true;var a=(S.ia[q.showIf.id]||{}).a||'';return q.showIf.is.indexOf(a)>=0}
 function qBlank(q){return !((S.ia[q.id]||{}).a||'').trim()}
+// What is wrong with one visible answer, in plain words, or ''. Required, a real phone number, a sensible surgery date.
+function qDay(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
+function qProblem(q){var v=((S.ia[q.id]||{}).a||'').trim(),alt=(q.alts||[]).indexOf(v)>=0;
+  if(!v)return q.req?'This one is needed.':'';
+  if(q.id==='A.phone'&&v.replace(/\D/g,'').length<10)return 'Please enter a 10-digit phone number, like (615) 555-0100.';
+  if(q.type==='date'&&!alt&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||v<qDay(-365)||v>qDay(1095)))return 'Please check this date. It should be within the past year or the next three years.';
+  return ''}
+var EMERGENCY_='This is an emergency, or it has already happened';
 function iaInit(){var d=S.data;if(S.ia&&S.iaFor===S.clientId)return;S.ia={};S.iaFor=S.clientId;Object.keys(d.intake.answers||{}).forEach(function(k){S.ia[k]={a:d.intake.answers[k].a,n:d.intake.answers[k].n}});var steps=d.intakeSpec.steps;if(S.step===null){S.step=steps.length;for(var i=0;i<steps.length;i++){if(steps[i].qs.some(function(q){return qVisible(q)&&q.req&&qBlank(q)})){S.step=i+1;break}}if(!d.intake.consent)S.step=0;if(isSub(d.intake))S.step='review'}}
 function intakeView(){
   var d=S.data;iaInit();
@@ -1776,33 +1785,39 @@ function questionStep(body,v,st){
   function draw(){body.innerHTML='';st.qs.forEach(function(q){if(qVisible(q))body.appendChild(questionEl(q,draw))})}
   draw();
   var last=S.step===S.data.intakeSpec.steps.length,wasSub=isSub(S.data.intake),lbl=last?(wasSub?'Save my changes':'Submit my intake'):'Next';
-  var nav=el('<div class="steps"><button class="btn quiet" type="button" '+(S.step<=1?'disabled':'')+'>Back</button><span class="err" id="se" style="margin:0"></span><button class="btn" type="button">'+lbl+'</button></div>');
+  var nav=el('<div class="steps"><button class="btn quiet" type="button" '+(S.step<=1?'disabled':'')+'>Back</button><span class="err" id="se" role="alert" style="margin:0"></span><button class="btn" type="button">'+lbl+'</button></div>');
   var bs=$all('button',nav);
   bs[0].onclick=function(){saveStep(st).then(function(){S.step--;render();window.scrollTo(0,0)}).catch(function(e){$('#se',nav).textContent=e.message})};
-  bs[1].onclick=function(){var bad=st.qs.filter(function(q){return qVisible(q)&&q.req&&qBlank(q)});$all('.q',body).forEach(function(x){x.classList.remove('bad')});if(bad.length){bad.forEach(function(q){var x=$('.q[data-id="'+q.id+'"]',body);if(x)x.classList.add('bad')});$('#se',nav).textContent='A couple of these we need before going on.';var f=$('.q.bad',body);if(f)f.scrollIntoView({behavior:'smooth',block:'center'});return}bs[1].disabled=true;bs[1].textContent='Saving…';saveStep(st).then(function(){if(!last){S.step++;render();window.scrollTo(0,0);return}return call('submitIntake',{}).then(function(r){S.data.intake=r.intake;return refresh()}).then(function(){S.step=wasSub?'review':'done';render();window.scrollTo(0,0)})}).catch(function(e){$('#se',nav).textContent=e.message;bs[1].disabled=false;bs[1].textContent=lbl})};
+  bs[1].onclick=function(){var bad=st.qs.filter(function(q){return qVisible(q)&&qProblem(q)});$all('.q',body).forEach(function(x){x.classList.remove('bad');var e=$('.qerr',x);if(e)e.remove()});if(bad.length){bad.forEach(function(q){var x=$('.q[data-id="'+q.id+'"]',body);if(x){x.classList.add('bad');var e=el('<div class="qerr"></div>');e.textContent=qProblem(q);$('.ctl',x).appendChild(e)}});$('#se',nav).textContent=bad.length===1?'One answer needs a look — it is marked in red above.':bad.length+' answers need a look — they are marked in red above.';var f=$('.q.bad',body);if(f)f.scrollIntoView({behavior:'smooth',block:'center'});return}bs[1].disabled=true;bs[1].textContent='Saving…';saveStep(st).then(function(){if(!last){S.step++;render();window.scrollTo(0,0);return}return call('submitIntake',{}).then(function(r){S.data.intake=r.intake;return refresh()}).then(function(){S.step=wasSub?'review':'done';render();window.scrollTo(0,0)})}).catch(function(e){$('#se',nav).textContent=e.message;bs[1].disabled=false;bs[1].textContent=lbl})};
   v.appendChild(nav);
 }
-function saveStep(st){var a={};st.qs.forEach(function(q){if(S.ia[q.id])a[q.id]=S.ia[q.id];if(S.ia[q.id+'d'])a[q.id+'d']=S.ia[q.id+'d']});return call('saveIntake',{answers:a}).then(function(r){S.data.intake=r.intake})}
+// A hidden question (its showIf no longer matches) and a detail box whose option is no longer picked are saved blank,
+// so an answer the family took back never reaches the plan. What they typed stays on screen until they leave the page.
+function saveStep(st){var a={},E={a:'',n:''};st.qs.forEach(function(q){var vis=qVisible(q),x=S.ia[q.id];if(x)a[q.id]=vis?x:E;var d=S.ia[q.id+'d'];if(d){var on=vis&&x&&(x.a||'').split('; ').indexOf(q.detailOn)>=0;a[q.id+'d']=on?d:E}});return call('saveIntake',{answers:a}).then(function(r){S.data.intake=r.intake})}
 function questionEl(q,redraw){
   var a=S.ia[q.id]||(S.ia[q.id]={a:'',n:''});
-  var w=el('<div class="q" data-id="'+esc(q.id)+'"><div class="qt">'+esc(pipe(q.q))+(q.req?' <span class="req">*</span>':'')+'</div>'+(q.why?'<div class="qw">'+esc(q.why)+'</div>':'')+'<div class="ctl"></div></div>');
+  var lid='qt-'+q.id.replace(/[^A-Za-z0-9]/g,'_');
+  var w=el('<div class="q" data-id="'+esc(q.id)+'"><div class="qt" id="'+lid+'">'+esc(pipe(q.q))+(q.req?' <span class="req">*</span>':'')+'</div>'+(q.why?'<div class="qw">'+esc(q.why)+'</div>':'')+'<div class="ctl"></div></div>');
   var c=$('.ctl',w);
   function set(val){a.a=val;S.ia[q.id]=a}
   if(q.type==='choice'||q.type==='multi'){
     var multi=q.type==='multi',sel=multi?a.a.split('; ').filter(Boolean):[a.a];
-    var o=el('<div class="opts"></div>');
-    q.opts.forEach(function(op){var b=el('<button type="button" class="opt '+(multi?'box':'')+' '+(sel.indexOf(op)>=0?'on':'')+'"><i></i><span>'+esc(op)+'</span></button>');b.onclick=function(){if(multi){if(op==='No')sel=['No'];else{sel=sel.filter(function(x){return x!=='No'});var k=sel.indexOf(op);if(k>=0)sel.splice(k,1);else sel.push(op)}set(sel.join('; '))}else set(op);redraw()};o.appendChild(b)});
+    var o=el('<div class="opts" role="group" aria-labelledby="'+lid+'"></div>');
+    q.opts.forEach(function(op){var b=el('<button type="button" aria-pressed="'+(sel.indexOf(op)>=0)+'" class="opt '+(multi?'box':'')+' '+(sel.indexOf(op)>=0?'on':'')+'"><i></i><span>'+esc(op)+'</span></button>');b.onclick=function(){if(multi){if(op==='No')sel=['No'];else{sel=sel.filter(function(x){return x!=='No'});var k=sel.indexOf(op);if(k>=0)sel.splice(k,1);else sel.push(op)}set(sel.join('; '))}else set(op);redraw()};o.appendChild(b)});
     c.appendChild(o);
-    if(q.detailOn&&sel.indexOf(q.detailOn)>=0){var dd=S.ia[q.id+'d']||(S.ia[q.id+'d']={a:'',n:''});var di=el('<div class="detail"><label>'+esc(q.detailLabel||'Detail')+'</label><input value="'+esc(dd.a)+'"></div>');$('input',di).oninput=function(){dd.a=this.value};c.appendChild(di)}
+    if(q.detailOn&&sel.indexOf(q.detailOn)>=0){var dd=S.ia[q.id+'d']||(S.ia[q.id+'d']={a:'',n:''});var di=el('<div class="detail"><label>'+esc(q.detailLabel||'Detail')+'</label><input aria-label="'+esc(q.detailLabel||'Detail')+'" value="'+esc(dd.a)+'"></div>');$('input',di).oninput=function(){dd.a=this.value};c.appendChild(di)}
   } else {
     var alts=q.alts||[],isAlt=alts.indexOf(a.a)>=0;
-    var inp=q.type==='date'?el('<input type="date" value="'+esc(isAlt?'':a.a)+'">'):(q.long?el('<textarea placeholder="'+esc(q.ph||'')+'">'+esc(isAlt?'':a.a)+'</textarea>'):el('<input placeholder="'+esc(q.ph||'')+'" value="'+esc(isAlt?'':a.a)+'">'));
-    inp.oninput=function(){set(this.value);$all('.alt',c).forEach(function(x){x.classList.remove('on')})};
+    var lab=' aria-labelledby="'+lid+'"',tel=q.id==='A.phone'?' type="tel" inputmode="tel" autocomplete="tel"':'';
+    var inp=q.type==='date'?el('<input type="date"'+lab+' min="'+qDay(-365)+'" max="'+qDay(1095)+'" value="'+esc(isAlt?'':a.a)+'">'):(q.long?el('<textarea'+lab+' placeholder="'+esc(q.ph||'')+'">'+esc(isAlt?'':a.a)+'</textarea>'):el('<input'+lab+tel+' placeholder="'+esc(q.ph||'')+'" value="'+esc(isAlt?'':a.a)+'">'));
+    inp.oninput=function(){set(this.value);$all('.alt',c).forEach(function(x){x.classList.remove('on');x.setAttribute('aria-pressed','false')})};
     c.appendChild(inp);
-    if(alts.length){var al=el('<div class="alts"></div>');alts.forEach(function(x){var b=el('<button type="button" class="alt '+(a.a===x?'on':'')+'">'+esc(x)+'</button>');b.onclick=function(){set(x);inp.value='';$all('.alt',c).forEach(function(y){y.classList.remove('on')});b.classList.add('on')};al.appendChild(b)});c.appendChild(al)}
+    // Picking an alternative never throws away what they typed: it moves into the note (a date is simply cleared).
+    if(alts.length){var al=el('<div class="alts"></div>');alts.forEach(function(x){var b=el('<button type="button" aria-pressed="'+(a.a===x)+'" class="alt '+(a.a===x?'on':'')+'">'+esc(x)+'</button>');b.onclick=function(){var typed=q.type!=='date'&&alts.indexOf(a.a)<0?(a.a||'').trim():'';if(typed&&(a.n||'').indexOf(typed)<0)a.n=(a.n?a.n+'\n':'')+typed;set(x);redraw()};al.appendChild(b)});c.appendChild(al)}
+    if(q.id==='G.6'&&a.a===EMERGENCY_)c.appendChild(el('<div class="note" role="alert" style="margin-top:12px"><b>If this is a medical emergency, call <a href="tel:911">911</a> now.</b> Otherwise, tell us where things stand below, and call us at <a href="tel:+16298003622">(629) 800-3622</a> if you need us sooner.</div>'))
   }
   var open=q.noteOpen||!!a.n;
-  var nl=el('<span class="notel">+ add a note</span>'),nf=el('<div class="note-f '+(open?'':'hidden')+'"><label>'+(q.noteOpen?'Anything to add? In your own words.':'Your note')+'</label><textarea>'+esc(a.n)+'</textarea></div>');
+  var nl=el('<button type="button" class="notel">+ add a note</button>'),nf=el('<div class="note-f '+(open?'':'hidden')+'"><label>'+(q.noteOpen?'Anything to add? In your own words.':'Your note')+'</label><textarea aria-label="'+(q.noteOpen?'Anything to add':'Your note')+'">'+esc(a.n)+'</textarea></div>');
   $('textarea',nf).oninput=function(){a.n=this.value};
   if(!open){nl.onclick=function(){nf.classList.remove('hidden');nl.remove();$('textarea',nf).focus()};c.appendChild(nl)}
   c.appendChild(nf);
@@ -1811,7 +1826,9 @@ function questionEl(q,redraw){
 function consentStep(body,v){
   var d=S.data,items=d.intakeSpec.consent,n=first(d.client.patient_first_name)||'the patient';
   var f=el('<form></form>');
-  items.forEach(function(it,i){f.appendChild(el('<div class="con"><input name="i'+i+'" maxlength="4" required placeholder="JP"><div class="t"><b>'+esc(it[0])+'</b> '+esc(it[1])+'</div></div>'))});
+  function tel(s){return s.replace(/\b(911|988)\b/g,'<a href="tel:$1">$1</a>')}
+  items.forEach(function(it,i){f.appendChild(el('<div class="con"><input name="i'+i+'" maxlength="4" required placeholder="Initials" aria-label="Your initials for: '+esc(it[0])+'"><div class="t"><b>'+tel(esc(it[0]))+'</b> '+tel(esc(it[1]))+'</div></div>'))});
+  f.appendChild(el('<p class="small muted" style="margin:14px 0 0">The full details: our <a href="'+SITE+'privacy.html" target="_blank" rel="noopener">Privacy Policy</a> and <a href="'+SITE+'health-data-policy.html" target="_blank" rel="noopener">Consumer Health Data Policy</a>.</p>'));
   f.appendChild(el('<p style="margin:20px 0 14px;font-weight:700">I have read the above and would like to proceed.</p><div class="field"><label>Full name (this is your signature)</label><input name="name" required></div><div class="field"><label>Relationship to '+esc(n)+'</label><input name="rel" required placeholder="Self, spouse, daughter, friend"></div><p class="small muted">Signed today, '+esc(new Date().toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'}))+'.</p>'));
   var nav=el('<div class="steps"><span></span><span class="err" id="se" style="margin:0"></span><button class="btn" type="submit">I agree — continue</button></div>');
   f.appendChild(nav);
@@ -1838,10 +1855,16 @@ function planReadyView(v){
   return v;
 }
 function openPdf(btn,err){btn.disabled=true;var t=btn.textContent;btn.textContent='Preparing…';call('planPdf').then(function(r){var a=document.createElement('a');a.href='data:application/pdf;base64,'+r.b64;a.download=r.name;a.target='_blank';document.body.appendChild(a);a.click();a.remove();btn.disabled=false;btn.textContent=t}).catch(function(e){if(err)err.textContent=e.message;btn.disabled=false;btn.textContent=t})}
+// A copy of the consent exactly as they signed it: each item with their initials, then the signature.
+function consentCopy(items,cs){var g=el('<div class="group" style="margin-top:22px"><span class="k">What you signed</span></div>');
+  items.forEach(function(x,i){g.appendChild(el('<div class="ans"><div class="qq"><b>'+esc(x[0])+'</b> '+esc(x[1])+'</div><div class="aa">Initialed: '+esc((cs.initials||[])[i]||'—')+'</div></div>'))});
+  g.appendChild(el('<div class="ans"><div class="aa">Signed by <b>'+esc(cs.name||'')+'</b>'+(cs.relationship?' ('+esc(cs.relationship)+')':'')+(cs.signed_at?', '+esc(new Date(cs.signed_at).toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'})):'')+'.</div></div>'));
+  return g}
 function intakeReview(v){
   var d=S.data,it=d.intake;
   v.appendChild(el('<div class="head"><div class="k">Your intake</div><h1>What you told us.</h1><div class="muted">Submitted '+esc(fmtDate(it.submitted_at))+'. You can change any answer; your coordinator sees the update.</div></div>'));
   v.appendChild(answersList(true));
+  if(it.consent)v.appendChild(consentCopy(d.intakeSpec.consent,it.consent));
   var b=el('<p style="margin-top:20px"><button class="btn quiet" type="button">Change an answer</button></p>');$('button',b).onclick=function(){S.step=1;render()};v.appendChild(b);
   return v;
 }
@@ -1849,8 +1872,8 @@ function answersList(mine){
   var d=S.data,spec=d.intakeSpec,ans=d.intake.answers||{},w=el('<div></div>');
   spec.steps.forEach(function(st){
     var g=el('<div class="group" style="margin-top:22px"><span class="k">'+esc(st.title)+'</span></div>');var any=false;
-    st.qs.forEach(function(q){var a=ans[q.id];if(!a||(!a.a&&!a.n))return;if(q.showIf){var p=ans[q.showIf.id];if(!p||q.showIf.is.indexOf(p.a)<0)return}any=true;var dk=a.a===spec.dk||a.a===spec.discuss;var det=ans[q.id+'d'];
-      g.appendChild(el('<div class="ans"><div class="qq">'+esc(mine?pipe(q.q):q.id+' · '+q.q.replace(/\{[A-Z_]+\}/g,'they'))+'</div><div class="aa '+(dk?'dk':'')+'">'+esc(a.a===spec.discuss&&!mine?'Declined — rather discuss in person. Do not raise it unless they open it.':(a.a||'—'))+(det&&det.a?' — '+esc(det.a):'')+'</div>'+(a.n?'<div class="nn">'+(mine?'':'<b>In their words</b>')+esc(a.n)+'</div>':'')+'</div>'))});
+    st.qs.forEach(function(q){var a=ans[q.id];if(!a||(!a.a&&!a.n))return;if(q.showIf){var p=ans[q.showIf.id];if(!p||q.showIf.is.indexOf(p.a)<0)return}any=true;var dk=a.a===spec.dk||a.a===spec.discuss;var det=ans[q.id+'d'];var shown=a.a;if(q.type==='date'){var dm=/^(\d{4})-(\d{2})-(\d{2})$/.exec(a.a||'');if(dm)shown=new Date(+dm[1],+dm[2]-1,+dm[3]).toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'})}
+      g.appendChild(el('<div class="ans"><div class="qq">'+esc(mine?pipe(q.q):q.id+' · '+q.q.replace(/\{[A-Z_]+\}/g,'they'))+'</div><div class="aa '+(dk?'dk':'')+'">'+esc(a.a===spec.discuss&&!mine?'Declined — rather discuss in person. Do not raise it unless they open it.':(shown||'—'))+(det&&det.a?' — '+esc(det.a):'')+'</div>'+(a.n?'<div class="nn">'+(mine?'':'<b>In their words</b>')+esc(a.n)+'</div>':'')+'</div>'))});
     if(any)w.appendChild(g);
   });
   return w;
