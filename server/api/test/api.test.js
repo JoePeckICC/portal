@@ -619,3 +619,49 @@ test('changes after submitting: one email to the coordinator, listing what chang
   assert.match(body, /Straight home" → "To rehab or a nursing facility first" \(note changed too\)/);
   assert.match(body, /What health insurance covers they\?: "—" → "Medicare; VA or TRICARE"/);
 });
+
+test('through the portal, sign-in lives in HttpOnly cookies, never in the page', async () => {
+  const srv = require('../src/app').createServer(); await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  const base = 'http://127.0.0.1:' + srv.address().port, jar = {};
+  const send = async (action, payload, proxied = true) => {
+    const h = { 'Content-Type': 'text/plain;charset=utf-8' };
+    if (proxied) { h['X-Portal-Proxy'] = '1'; h['X-Client-IP'] = '7.7.7.7'; }
+    const c = Object.keys(jar).map(k => k + '=' + encodeURIComponent(jar[k])).join('; '); if (c) h.Cookie = c;
+    const r = await fetch(base + '/api', { method: 'POST', headers: h, body: JSON.stringify({ action, payload }) });
+    const set = r.headers.getSetCookie();
+    set.forEach(line => {
+      assert.match(line, /^__Host-ic_[sd]=[^;]*; Path=\/; HttpOnly; Secure; SameSite=Strict; Max-Age=\d+$/);
+      const kv = line.split(';')[0], i = kv.indexOf('=');
+      if (/Max-Age=0$/.test(line)) delete jar[kv.slice(0, i)]; else jar[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1));
+    });
+    return Object.assign(await r.json(), { _set: set.length });
+  };
+  try {
+    await db.q(`delete from rate_limits`);
+    // A new browser: password, then the emailed code. Both tokens come back as cookies; the page only sees true.
+    let r = await send('login', { email: 'pat@example.com', password: PW });
+    assert.equal(r.needCode, true, r.error);
+    r = await send('verifyCode', { challenge: r.challenge, code: codeFrom(lastMail()) });
+    assert.equal(r.ok, true, r.error); assert.equal(r.session, true); assert.equal(r.device, true);
+    assert.ok(jar['__Host-ic_s'] && jar['__Host-ic_d'], 'session and remembered-device cookies set');
+    const sid = jar['__Host-ic_s'];
+    assert.equal((await db.one(`select ip from sessions where session_id=$1`, [sid])).ip, '7.7.7.7', 'the family\'s own address, passed by the worker');
+    // A fresh page load knows it is signed in, and calls work with no token in the page.
+    assert.equal((await send('hello', {})).boot.session, true);
+    assert.equal((await send('bootstrap', {})).ok, true);
+    // Sign out: cookie cleared, and the session is gone on the server too.
+    await send('signOut', {});
+    assert.equal(jar['__Host-ic_s'], undefined); assert.equal(await auth.userForSession(sid), null);
+    jar['__Host-ic_s'] = sid;
+    assert.equal((await send('bootstrap', {})).error, 'signed_out'); assert.equal(jar['__Host-ic_s'], undefined, 'a dead cookie is cleared');
+    assert.equal((await send('hello', {})).boot.session, null);
+    // Signing in again on this browser: the device cookie skips the code.
+    r = await send('login', { email: 'pat@example.com', password: PW });
+    assert.equal(r.session, true, 'remembered device goes straight in'); assert.ok(jar['__Host-ic_s']);
+    // An older page calling the API directly works as before: token in the body, no cookies.
+    const old = await send('login', { email: 'pat@example.com', password: PW, device: devices['pat@example.com'] }, false);
+    assert.equal(typeof old.session, 'string'); assert.equal(old._set, 0);
+    // Forget devices clears that cookie too.
+    await send('forgetDevices', {}); assert.equal(jar['__Host-ic_d'], undefined);
+  } finally { srv.close(); }
+});
