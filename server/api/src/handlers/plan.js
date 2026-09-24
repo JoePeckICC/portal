@@ -53,9 +53,6 @@ async function submitIntake(ctx, p, c) {
   if (cur.status === 'Submitted') return { intake: cur, drafts: 0 };
   await intake.writeIntake(ctx.clientId, { _status: { a: 'Submitted' }, _submitted_at: { a: new Date().toISOString() } }, ctx.email, c);
   const made = await intake.seedPlan(ctx.clientId, cur.answers, client, ctx.email, c);
-  // A family that has not paid goes straight to Billing: submitting starts it at the default amount
-  // (see money.autoStartBilling). A Stripe hiccup must not lose the intake, so it is logged, not thrown.
-  if (core.fam(ctx)) { try { await require('./money').autoStartBilling(ctx.clientId, c); } catch (e) { console.error('auto billing', ctx.clientId, e.message); } }
   const co = await core.coordinatorFor(client, c);
   const after = () => core.notifyCo(co, 'intake', famName(client.family_name) + ' finished their intake', (cur.answers['F.1'] ? 'First thing off their plate: ' + cur.answers['F.1'].a : 'Their intake is in.') + (made ? ' ' + made + ' draft plan items are waiting for your review.' : ''), '', 'Open the prep sheet');
   return { intake: await intake.readIntake(ctx.clientId, c), drafts: made, _after: after };
