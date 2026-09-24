@@ -25,6 +25,17 @@ async function startBilling(ctx, p, c) {
   else await core.autoMsg(ctx.clientId, 'Billing started: $' + amount.toFixed(2) + ' a month. Your first invoice is on its way by email; you can also pay it under Billing.', c);
   return pub(ctx, c);
 }
+// Started on its own when a family submits the intake (added 2026-09-24), so the Pay now button is
+// the next thing they see: the default monthly amount and the first invoice by email, the same as
+// the coordinator's Start billing. Skipped when Stripe is not connected, billing already exists,
+// or the family is already open. Change the amount afterward with changeAmount.
+async function autoStartBilling(clientId, c) {
+  if (!B.connected()) return false;
+  const cl = await core.clientById(clientId, c);
+  if (!cl || isTrue(cl.paid) || cl.stripe_customer_id) return false;
+  await startBilling({ role: 'coordinator', email: 'system', clientId }, { amount: C.DEFAULT_MONTHLY }, c);
+  return true;
+}
 async function changeAmount(ctx, p, c) {
   coOnly(ctx);
   const cl = await core.clientById(ctx.clientId, c); must(cl && cl.stripe_customer_id, 'Start billing first');
@@ -159,3 +170,5 @@ async function allBilling(ctx) {
 }
 
 module.exports = { startBilling, changeAmount, pauseBilling, billing, portalLink, cardSetupLink, payInvoice, setAutopay, chargeOnce, sendReminder, refundInvoice, addCredit, allBilling };
+// Not an action: handlers/index.js copies only enumerable exports into the action table, so this stays server-side.
+Object.defineProperty(module.exports, 'autoStartBilling', { value: autoStartBilling, enumerable: false });
