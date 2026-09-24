@@ -389,6 +389,29 @@ label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
 @media (max-width:480px){.ixh-logo svg{height:28px}}
 a.ixh-ghost{display:inline-block;background:#FFFFFF;color:#1C2A3A;font-weight:600;text-decoration:none;border:1.5px solid #CDD7E0;border-radius:3px;font-size:17px;padding:14px 28px;transition:border-color .18s}
 a.ixh-ghost:hover{border-color:#C09B36;color:#1C2A3A;text-decoration:none}
+/* Signed-out footer: the website's footer, copied from its index.html and brand.css (.ic-foot-top,
+   .ic-foot-link, .ic-social). The three social icons are drawn inline because the website gets them
+   from an icon font the portal does not load. Used by sitefooter(). Keep in step with the website. */
+.ixf{background:#1C2A3A;color:#C9D3DE;font-family:'Manrope',system-ui,sans-serif;line-height:1.6}
+.ixf-in{max-width:1120px;margin:0 auto;padding:34px 32px 30px}
+.ixf-top{display:grid;grid-template-columns:1fr auto 1fr;gap:36px;align-items:center}
+.ixf-tag{font-family:'Newsreader',Georgia,serif;font-size:21px;line-height:1.5;color:#9FAAB8}
+.ixf-name{font-family:'Newsreader',Georgia,serif;font-size:clamp(28px,4vw,38px);font-weight:700;letter-spacing:-.01em;color:#E6ECF3;white-space:nowrap}
+.ixf-right{text-align:right;font-size:16px;line-height:1.7;color:#C9D3DE}
+.ixf-right span{color:#9FAAB8}
+.ixf-rule{height:1px;background:#8A94A1;opacity:.35;margin:26px 0 20px}
+.ixf-policy{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 26px;font-size:15px}
+.ixf-policy span{color:#8A94A1}
+.ixf a.ixf-link{color:#C9D3DE;text-decoration:none}
+.ixf a.ixf-link:hover{color:#E6ECF3;text-decoration:underline}
+.ixf-note{margin:18px auto 0;max-width:74ch;text-align:center;font-size:14px;line-height:1.7;color:#9FAAB8}
+.ixf-note strong{color:#E6ECF3}
+.ixf-social{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:20px}
+.ixf a.ixf-soc{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;color:#C9D3DE;border:1px solid #3A4A5C;text-decoration:none}
+.ixf a.ixf-soc:hover{color:#E6ECF3;border-color:#C09B36}
+.ixf a.ixf-soc svg{width:24px;height:24px;fill:currentColor;stroke:none}
+.ixf-copy{margin:16px 0 0;text-align:center;font-size:14px;color:#8A94A1}
+@media (max-width:860px){.ixf-top{grid-template-columns:1fr;gap:30px;justify-items:center;text-align:center}.ixf-right{text-align:center}}
 </style>
 </head>
 <body>
@@ -446,6 +469,20 @@ function siteheader(){
     '<details class="ixh-burger"><summary aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></summary>'+
     '<div class="ixh-menu">'+links('ixh-link ixh-mlink')+'<a class="ixh-cta ixh-mcta" href="'+SITE+'#inquire">Get started</a></div></details>'+
     '</div></header>'}
+// The website's footer (see the .ixf rules above). Same content as the website's index.html.
+function sitefooter(){
+  var FB='<svg viewBox="0 0 24 24"><path d="M13.5 22v-8h2.7l.4-3.2h-3.1V8.8c0-.9.3-1.6 1.6-1.6h1.7V4.4c-.3 0-1.3-.1-2.5-.1-2.5 0-4.1 1.5-4.1 4.2v2.3H7.4V14h2.8v8z"/></svg>';
+  var LI='<svg viewBox="0 0 24 24"><path d="M6.9 8.5H3.6V20h3.3zM5.3 3.3a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8zM20.4 13.2c0-3.4-1.8-5-4.2-5-1.9 0-2.8 1-3.3 1.8V8.5H9.7V20H13v-5.7c0-1.5.3-3 2.1-3 1.8 0 1.8 1.7 1.8 3.1V20h3.4z"/></svg>';
+  var IG='<svg viewBox="0 0 24 24"><path d="M12 3.8c2.7 0 3 0 4 .1 2.7.1 4 1.4 4.1 4.1.1 1 .1 1.3.1 4s0 3-.1 4c-.1 2.7-1.4 4-4.1 4.1-1 .1-1.3.1-4 .1s-3 0-4-.1c-2.7-.1-4-1.4-4.1-4.1-.1-1-.1-1.3-.1-4s0-3 .1-4C4 5.3 5.3 4 8 3.9c1-.1 1.3-.1 4-.1zM12 2C9.3 2 8.9 2 7.9 2.1 4.2 2.2 2.2 4.2 2.1 7.9 2 8.9 2 9.3 2 12s0 3.1.1 4.1c.1 3.7 2.1 5.7 5.8 5.8 1 .1 1.4.1 4.1.1s3.1 0 4.1-.1c3.7-.1 5.7-2.1 5.8-5.8.1-1 .1-1.4.1-4.1s0-3.1-.1-4.1c-.1-3.7-2.1-5.7-5.8-5.8C15.1 2 14.7 2 12 2zm0 4.9a5.1 5.1 0 1 0 0 10.2 5.1 5.1 0 0 0 0-10.2zm0 8.4a3.3 3.3 0 1 1 0-6.6 3.3 3.3 0 0 1 0 6.6zm5.3-9.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z"/></svg>';
+  return '<footer class="ixf"><div class="ixf-in">'+
+    '<div class="ixf-top"><div class="ixf-tag">Before.<br>During.<br>After.</div><div class="ixf-name">InCadence Care</div>'+
+    '<div class="ixf-right"><a class="ixf-link" href="mailto:info@incadencecare.com">info@incadencecare.com</a><br><a class="ixf-link" href="tel:+16298003622">(629) 800-3622</a><br><span>6688 Nolensville Rd, Ste 108 #2321<br>Brentwood, TN 37027</span></div></div>'+
+    '<div class="ixf-rule"></div>'+
+    '<nav class="ixf-policy"><a class="ixf-link" href="'+SITE+'privacy.html">Privacy Policy</a><span>&middot;</span><a class="ixf-link" href="'+SITE+'terms.html">Terms of Service</a><span>&middot;</span><a class="ixf-link" href="'+SITE+'health-data-policy.html">Consumer Health Data Policy</a></nav>'+
+    '<p class="ixf-note">InCadence Care LLC is a nonclinical support service. We are not a healthcare provider and do not diagnose, treat, prescribe, or give medical advice. In an emergency, call <strong>911</strong>. For mental-health crisis support, call or text <strong>988</strong>.</p>'+
+    '<div class="ixf-social"><a class="ixf-soc" href="https://www.facebook.com/InCadenceCare/" target="_blank" rel="noopener" aria-label="Facebook" title="Facebook">'+FB+'</a><a class="ixf-soc" href="https://www.linkedin.com/company/incadence-care" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn">'+LI+'</a><a class="ixf-soc" href="https://www.instagram.com/incadence_care/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram">'+IG+'</a></div>'+
+    '<p class="ixf-copy">&copy; 2026 InCadence Care LLC. All rights reserved.</p>'+
+    '</div></footer>'}
 
 // ---------------------------------------------------------------- utilities
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -505,7 +542,7 @@ function render(){
 // setting a password the first time, or choosing a new one.
 function pre(action,payload){return new Promise(function(res){google.script.run.withSuccessHandler(function(r){res(r||{ok:false,error:'The portal did not answer. Try again in a moment.'})}).withFailureHandler(function(e){res({ok:false,error:(e&&e.message)||'Could not reach the portal. Try again in a moment.'})}).api(null,action,payload||{})})}
 function signedIn(r){S.session=r.session;store('ic_session',r.session);if(r.device)store('ic_dev',r.device);S.auth=null;BOOT.pwset=null;BOOT.error=null;S.data=null;render();refresh()}
-function gateCard(inner,top){var c=el('<div>'+siteheader()+'<div class="gate" style="min-height:calc(100vh - 60px)"><form class="card" novalidate>'+(top||'<div class="k">'+esc(BOOT.appName)+'</div>')+inner+'</form></div></div>');return c}
+function gateCard(inner,top){var c=el('<div style="min-height:100vh;display:flex;flex-direction:column">'+siteheader()+'<div class="gate" style="flex:1;min-height:0;padding:clamp(40px,7vw,80px) 24px 64px;align-items:flex-start"><form class="card" novalidate>'+(top||'<div class="k">'+esc(BOOT.appName)+'</div>')+inner+'</form></div>'+sitefooter()+'</div>');return c}
 function busy(b,on,label){b.disabled=on;if(label)b.textContent=label}
 function gate(){
   var A=S.auth||(BOOT.pwset?{mode:'setpw'}:{mode:'login'});S.auth=A;
