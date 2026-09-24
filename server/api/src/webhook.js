@@ -33,6 +33,10 @@ async function handle(req, res, rawBuf) {
         await core.autoMsg(c.client_id, 'A payment of $' + ((obj.amount_due || 0) / 100).toFixed(2) + ' did not go through. Please check the card under Billing → Payment method.');
         await core.notifyCo(await core.coordinatorFor(c), 'billing', 'Payment failed — ' + famName(c.family_name), 'Stripe could not collect $' + ((obj.amount_due || 0) / 100).toFixed(2) + '. Stripe will retry; you may want to reach out.', '', 'Open the portal');
       }
+    } else if (ev.type === 'checkout.session.completed' && obj.mode === 'subscription' && obj.customer && obj.subscription) {
+      // The family started their plan themselves (money.checkoutLink). Record it the way Start billing would.
+      const amount = Number(obj.amount_subtotal || obj.amount_total || 0) / 100;
+      await db.q(`update clients set stripe_subscription_id=$2, monthly_amount=coalesce(nullif($3,0), monthly_amount), billing_status='Active' where stripe_customer_id=$1 and stripe_subscription_id is null`, [obj.customer, String(obj.subscription), amount]);
     } else if (ev.type === 'checkout.session.completed' && obj.mode === 'setup' && obj.customer && obj.setup_intent) {
       try { const si = await billing.stripe('GET', '/v1/setup_intents/' + obj.setup_intent, {}); if (si.payment_method) await billing.stripe('POST', '/v1/customers/' + obj.customer, { 'invoice_settings[default_payment_method]': si.payment_method }); } catch {}
     }
