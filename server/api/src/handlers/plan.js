@@ -23,8 +23,18 @@ async function saveIntake(ctx, p, c) {
   const answers = p.answers || {}, ok = {};
   Object.keys(answers).forEach(qid => { if (/^[A-Z0-9][A-Za-z0-9.]{0,12}$/.test(qid)) ok[qid] = answers[qid]; });
   const cur = await intake.readIntake(ctx.clientId, c);
-  if (cur.status === 'Not started') ok._status = { a: 'In progress' };
-  else if (cur.status === 'Submitted') ok._status = { a: 'Updated after submitting' };
+  // After submitting, keep a running list of what changed (first value -> latest value), so the
+  // coordinator gets one email listing it all when they press "Save my changes" (submitIntake).
+  if (cur.status === 'Submitted' || cur.status === 'Updated after submitting') {
+    const ch = Object.assign({}, cur.changed);
+    Object.keys(ok).forEach(qid => {
+      const was = cur.answers[qid] || { a: '', n: '' }, now = ok[qid] || {};
+      const a0 = String(was.a || ''), a1 = clean(now.a, 4000), n0 = String(was.n || ''), n1 = clean(now.n, 4000);
+      if (a0 === a1 && n0 === n1) return;
+      ch[qid] = { from: ch[qid] ? ch[qid].from : a0, to: a1, note: n0 !== n1 };
+    });
+    if (JSON.stringify(ch) !== JSON.stringify(cur.changed)) { ok._changed = { a: JSON.stringify(ch) }; ok._status = { a: 'Updated after submitting' }; }
+  } else if (cur.status === 'Not started') ok._status = { a: 'In progress' };
   await intake.writeIntake(ctx.clientId, ok, ctx.email, c);
   return { intake: await intake.readIntake(ctx.clientId, c) };
 }
@@ -37,11 +47,30 @@ async function signConsent(ctx, p, c) {
   must(clean(cs.name, 120).trim(), 'Type your full name to sign');
   must(clean(cs.relationship, 120).trim(), 'Tell us who you are to the patient (or "Self")');
   const cur = await intake.readIntake(ctx.clientId, c);
-  const consent = { initials, name: clean(cs.name, 120), relationship: clean(cs.relationship, 120), signed_at: new Date(), by: ctx.email };
+  // The wording is kept with the signature, so their copy shows exactly what they signed even if it changes later.
+  const consent = { initials, name: clean(cs.name, 120), relationship: clean(cs.relationship, 120), signed_at: new Date(), by: ctx.email, items: CONSENT_ITEMS_ };
   const patch = { _consent: { a: JSON.stringify(consent) } };
   if (cur.status === 'Not started') patch._status = { a: 'In progress' };
   await intake.writeIntake(ctx.clientId, patch, ctx.email, c);
   return { intake: await intake.readIntake(ctx.clientId, c) };
+}
+// "Save my changes" after submitting: back to Submitted, any new draft plan items, and one email
+// to the coordinator listing what the family changed (not when the coordinator made the change).
+async function resubmitIntake(ctx, client, cur, c) {
+  await intake.writeIntake(ctx.clientId, { _status: { a: 'Submitted' }, _changed: { a: '{}' } }, ctx.email, c);
+  const made = await intake.seedPlan(ctx.clientId, cur.answers, client, ctx.email, c);
+  const byId = {};
+  intake.intakeSpec().steps.forEach(st => st.qs.forEach(q => { byId[q.id] = q.q.replace(/\{[A-Z_]+\}/g, 'they'); }));
+  const lines = Object.keys(cur.changed || {}).map(qid => {
+    const x = cur.changed[qid], base = qid.replace(/d$/, ''), label = byId[qid] || (byId[base] ? byId[base] + ' (details)' : qid);
+    return x.from === x.to ? label + ': note changed' : label + ': "' + (x.from || '—') + '" → "' + (x.to || '—') + '"' + (x.note ? ' (note changed too)' : '');
+  });
+  let after = null;
+  if (lines.length && ctx.role !== 'coordinator') {
+    const co = await core.coordinatorFor(client, c), who = (ctx.user && ctx.user.name) || 'The family';
+    after = () => core.notifyCo(co, 'intake', famName(client.family_name) + ' changed their intake answers', who + ' changed:', lines.join('\n') + (made ? '\n\n' + made + ' new draft plan item(s) are waiting for your review.' : ''), 'Open the prep sheet');
+  }
+  return { intake: await intake.readIntake(ctx.clientId, c), drafts: made, _after: after };
 }
 async function submitIntake(ctx, p, c) {
   clientOrCo(ctx); needFamily(ctx);
@@ -51,6 +80,7 @@ async function submitIntake(ctx, p, c) {
   const missing = intake.missingRequired(cur.answers);
   must(!missing.length, 'A few required answers are still blank: ' + missing.join(', '));
   if (cur.status === 'Submitted') return { intake: cur, drafts: 0 };
+  if (cur.status === 'Updated after submitting') return resubmitIntake(ctx, client, cur, c);
   await intake.writeIntake(ctx.clientId, { _status: { a: 'Submitted' }, _submitted_at: { a: new Date().toISOString() } }, ctx.email, c);
   const made = await intake.seedPlan(ctx.clientId, cur.answers, client, ctx.email, c);
   const co = await core.coordinatorFor(client, c);
