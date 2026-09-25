@@ -4,6 +4,11 @@
 const db = require('./db');
 
 const STEPS = [
+  // ---- updates as a timeline: what kind of moment, a longer note behind "More", a verse or quote (2026-09-25)
+  `alter table updates add column if not exists kind text not null default 'Family'`,
+  `alter table updates add column if not exists detail text not null default ''`,
+  `alter table updates add column if not exists quote text not null default ''`,
+  `alter table updates add column if not exists quote_ref text not null default ''`,
   // ---- the family email timeline (lifecycle.js), 2026-09-25
   `alter table clients add column if not exists paid_at timestamptz`,
   `alter table clients add column if not exists plan_ready_at timestamptz`,
