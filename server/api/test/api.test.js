@@ -354,7 +354,7 @@ test('intake: consent, answers, submit seeds the plan and pings the coordinator'
   const cs = await api(sam, 'signConsent', { consent: { initials: spec.consent.map(() => 'SS'), name: 'Sam Second', relationship: 'Self' } });
   assert.equal(cs.ok, true); assert.equal(cs.intake.status, 'In progress'); assert.equal(cs.intake.consent.name, 'Sam Second');
   const answers = {};
-  spec.steps.forEach(st => st.qs.forEach(q => { if (q.req && !q.showIf) answers[q.id] = { a: q.type === 'choice' ? q.opts[0] : q.type === 'date' ? '2026-11-03' : 'x' }; }));
+  spec.steps.forEach(st => st.qs.forEach(q => { if (q.req && !q.showIf) answers[q.id] = { a: q.type === 'choice' ? q.opts[0] : q.type === 'date' ? '2026-11-03' : q.id === 'A.phone' ? '(615) 555-0100' : 'x' }; }));
   answers['A.2'] = { a: 'Lives alone' }; answers['L.1'] = { a: "We haven't sorted that out yet" };
   const sv = await api(sam, 'saveIntake', { answers }); assert.equal(sv.ok, true);
   const n = mail.sent.length;
@@ -538,7 +538,7 @@ test('a booked family: intake, then Pay when ready (no invoice is sent), then th
   const spec = boot.intakeSpec;
   await api(olga, 'signConsent', { consent: { initials: spec.consent.map(() => 'OO'), name: 'Olga Oakes', relationship: 'Self' } });
   const answers = {};
-  spec.steps.forEach(st => st.qs.forEach(q => { if (q.req && !q.showIf) answers[q.id] = { a: q.type === 'choice' ? q.opts[0] : q.type === 'date' ? '2026-11-03' : 'x' }; }));
+  spec.steps.forEach(st => st.qs.forEach(q => { if (q.req && !q.showIf) answers[q.id] = { a: q.type === 'choice' ? q.opts[0] : q.type === 'date' ? '2026-11-03' : q.id === 'A.phone' ? '(615) 555-0100' : 'x' }; }));
   assert.equal((await api(olga, 'saveIntake', { answers })).ok, true);
   // Stripe, faked: record what is asked of it.
   const saved = { stripe: B.stripe, stripeProduct: B.stripeProduct, key: process.env.STRIPE_SECRET_KEY, wh: process.env.STRIPE_WEBHOOK_SECRET };
@@ -599,7 +599,7 @@ test('changes after submitting: one email to the coordinator, listing what chang
   const signed = await api(q, 'signConsent', { consent: { initials: spec.consent.map(() => 'QQ'), name: 'Quinn Quill', relationship: 'Self' } });
   assert.deepEqual(signed.intake.consent.items, spec.consent, 'the wording is kept with the signature');
   const answers = {};
-  spec.steps.forEach(st => st.qs.forEach(x => { if (x.req && !x.showIf) answers[x.id] = { a: x.type === 'choice' ? x.opts[0] : x.type === 'date' ? '2026-11-03' : 'x' }; }));
+  spec.steps.forEach(st => st.qs.forEach(x => { if (x.req && !x.showIf) answers[x.id] = { a: x.type === 'choice' ? x.opts[0] : x.type === 'date' ? '2026-11-03' : x.id === 'A.phone' ? '(615) 555-0100' : 'x' }; }));
   await api(q, 'saveIntake', { answers });
   assert.equal((await api(q, 'submitIntake', {})).intake.status, 'Submitted');
   // Saving a step with nothing changed (the Back button does this) is not a change.
@@ -664,4 +664,33 @@ test('through the portal, sign-in lives in HttpOnly cookies, never in the page',
     // Forget devices clears that cookie too.
     await send('forgetDevices', {}); assert.equal(jar['__Host-ic_d'], undefined);
   } finally { srv.close(); }
+});
+
+test('consent initials must match the signature; phones are checked and tidied; exclusive picks stay exclusive', async () => {
+  const booking = require('../src/booking');
+  const intake = require('../src/intake');
+  process.env.BOOKING_HOOK_KEY = 'hook-key-for-tests-0123456789';
+  await booking.handle({ 'x-hook-key': process.env.BOOKING_HOOK_KEY }, { email: 'rita@example.com', name: 'Rita Marie Rivera' });
+  delete process.env.BOOKING_HOOK_KEY;
+  const r = await signIn('rita@example.com');
+  const spec = (await api(r, 'bootstrap', {})).intakeSpec;
+  const sign = (ini, name) => api(r, 'signConsent', { consent: { initials: spec.consent.map(() => ini), name, relationship: 'Self' } });
+  assert.match((await sign('ZZZZ', 'Rita Marie Rivera')).error, /should match the name.*that is RR/);
+  assert.match((await sign('1234', 'Rita Marie Rivera')).error, /should match/);
+  assert.match((await sign('RR', 'Rita')).error, /first and last name/);
+  assert.equal((await sign('R.M.R.', 'Rita Marie Rivera')).ok, true, 'all initials, with periods');
+  assert.equal((await sign('rr', 'Rita Marie Rivera')).ok, true, 'first + last, any case');
+  // Phone: tidied on save, refused at submit when it is not a real number.
+  assert.equal(intake.phoneOk('615-555-0100'), '(615) 555-0100');
+  assert.equal(intake.phoneOk('+1 (615) 555-0100 ext. 22'), '(615) 555-0100 ext. 22');
+  assert.equal(intake.phoneOk('000-000-0000'), ''); assert.equal(intake.phoneOk('61555501001234'), ''); assert.equal(intake.phoneOk('(615) 555'), '');
+  let s = await api(r, 'saveIntake', { answers: { 'A.phone': { a: '6155550100 x22', n: '' }, 'G.11': { a: 'Medicare; None; I don\'t know; VA or TRICARE', n: '' }, 'M.4': { a: 'No; Dog', n: '' } } });
+  assert.equal(s.intake.answers['A.phone'].a, '(615) 555-0100 ext. 22');
+  assert.equal(s.intake.answers['G.11'].a, 'Medicare; VA or TRICARE');
+  assert.equal(s.intake.answers['M.4'].a, 'Dog');
+  const answers = {};
+  spec.steps.forEach(st => st.qs.forEach(q => { if (q.req && !q.showIf) answers[q.id] = { a: q.type === 'choice' ? q.opts[0] : q.type === 'date' ? '2026-11-03' : q.id === 'A.phone' ? '(615) 555-0100' : 'x' }; }));
+  answers['A.phone'] = { a: '000-000-0000' };
+  await api(r, 'saveIntake', { answers });
+  assert.match((await api(r, 'submitIntake', {})).error, /A.phone \(not a working number\)/);
 });
