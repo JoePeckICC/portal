@@ -68,7 +68,7 @@ async function bootstrap(ctx) {
   out.uploads = uploads.map(u => core.docPublic(u, ctx));
   if (ctx.role === 'family') { out.uploads = out.uploads.filter(u => u.shared); out.appointments.forEach(a => { if (!(a.extra && isTrue(a.extra.note_shared))) { a.visit_note = ''; a.note_hidden = true; } }); }
   out.referrals = referrals;
-  if (core.fam(ctx)) { try { out.recommended = await latestRec(cid); } catch { out.recommended = null; } }
+  if (core.fam(ctx) || ctx.role === 'coordinator') { try { out.recommended = await latestRec(cid); } catch { out.recommended = null; } }   // the coordinator's Implement page checks it too
   return out;
 }
 const pubCo = co => (co ? { email: co.email, name: co.name } : null);
