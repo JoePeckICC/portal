@@ -12,7 +12,7 @@ module.exports = {
   LOCK_AFTER: 5,            // wrong passwords in a row before the account pauses
   LOCK_MINUTES: 15,
   SESSION_DAYS: Number(env.SESSION_DAYS || 30),
-  IDLE_MINUTES: Number(env.IDLE_MINUTES || 0),           // 0 = no idle timeout (matches today); set to 30 for the healthcare norm
+  IDLE_MINUTES: env.IDLE_MINUTES === undefined ? 30 : Number(env.IDLE_MINUTES),   // 30 minutes of inactivity signs you out (2026-09-25); 0 turns it off
   STAGES: ['The diagnosis', 'Before surgery', 'The week of', 'Surgery day', 'The hospital stay', 'First weeks home', 'The long middle'],
   CATEGORIES: ['Care coordination', 'Understanding & advocacy', 'Family & ongoing support'],
   PLAN_STATUSES: ['Not started', 'In progress', 'Done'],
