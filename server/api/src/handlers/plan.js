@@ -127,7 +127,7 @@ async function approvePlanItem(ctx, p, c) {
 async function addPlanItem(ctx, p, c) {
   coOnly(ctx); needFamily(ctx);
   const item = clean(p.item, 300); must(item.trim(), 'Write the item');
-  const row = await db.insert('plan_items', { plan_id: id(), client_id: ctx.clientId, stage: pick(p.stage, C.STAGES, C.STAGES[0]), category: pick(p.category, C.CATEGORIES, C.CATEGORIES[0]), item, detail: clean(p.detail, 2000), owner: clean(p.owner, 80), status: pick(p.status, C.PLAN_STATUSES, 'Not started'), target_date: dateOnly(p.target_date), draft: false }, c);
+  const row = await db.insert('plan_items', { plan_id: id(), client_id: ctx.clientId, stage: pick(p.stage, C.STAGES, C.STAGES[0]), category: pick(p.category, C.CATEGORIES, C.CATEGORIES[0]), item, detail: clean(p.detail, 2000), owner: clean(p.owner, 80), status: pick(p.status, C.PLAN_STATUSES, 'Not started'), target_date: dateOnly(p.target_date), draft: false, extra: JSON.stringify(p.note ? { note: clean(p.note, 2000) } : {}) }, c);
   const after = () => core.notifyFamily(ctx.clientId, 'plan', 'Added to your plan', (ctx.user.name || 'Your coordinator') + ' added to the plan:', item, 'See the plan', ctx.email);
   return { item: row, _after: after };
 }
@@ -138,6 +138,8 @@ async function editPlanItem(ctx, p, c) {
   const item = clean(p.item === undefined ? row.item : p.item, 300); must(item.trim(), 'Write the item');
   await db.q(`update plan_items set item=$2, detail=$3, stage=$4, category=$5, owner=$6, target_date=$7, updated_at=now() where plan_id=$1`,
     [row.plan_id, item, clean(p.detail === undefined ? row.detail : p.detail, 2000), pick(p.stage, C.STAGES, row.stage), pick(p.category, C.CATEGORIES, row.category), clean(p.owner === undefined ? row.owner : p.owner, 80), /^\d{4}-\d{2}-\d{2}$/.test(String(p.target_date || '')) ? p.target_date : (p.target_date === '' ? null : row.target_date)], c);
+  // Your notes: the vendor, the in-depth version, what you will actually do. The family never sees these.
+  if (p.note !== undefined) await db.q(`update plan_items set extra = (extra - 'note') || $2::jsonb where plan_id=$1`, [row.plan_id, JSON.stringify(clean(p.note, 2000).trim() ? { note: clean(p.note, 2000) } : {})], c);
   return {};
 }
 async function setPlanStatus(ctx, p, c) {
