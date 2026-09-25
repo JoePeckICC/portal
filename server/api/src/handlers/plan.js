@@ -96,7 +96,7 @@ async function submitIntake(ctx, p, c) {
 async function setPlanReady(ctx, p, c) {
   coOnly(ctx);
   const cl = await core.clientById(ctx.clientId, c); must(cl, 'Not found');
-  await db.q(`update clients set plan_ready=$2 where client_id=$1`, [cl.client_id, !!p.ready], c);
+  await db.q(`update clients set plan_ready=$2, plan_ready_at=case when $2 then coalesce(plan_ready_at, now()) else plan_ready_at end where client_id=$1`, [cl.client_id, !!p.ready], c);
   if (p.ready) await core.autoMsg(ctx.clientId, 'Your Cadence Plan is ready. Open the Plan tile to read it.', c);
   const after = async () => {
     if (!p.ready) return;
@@ -108,7 +108,7 @@ async function setPlanReady(ctx, p, c) {
 async function setPaid(ctx, p, c) {
   coOnly(ctx);
   const cl = await core.clientById(ctx.clientId, c); must(cl, 'Not found');
-  await db.q(`update clients set paid=$2 where client_id=$1`, [cl.client_id, !!p.paid], c);
+  await db.q(`update clients set paid=$2, paid_at=case when $2 then coalesce(paid_at, now()) else paid_at end where client_id=$1`, [cl.client_id, !!p.paid], c);
   if (p.paid) await core.autoMsg(ctx.clientId, 'Your first payment is in and your portal is open.', c);
   const after = async () => {
     if (!p.paid) return;
@@ -130,6 +130,15 @@ async function addPlanItem(ctx, p, c) {
   const row = await db.insert('plan_items', { plan_id: id(), client_id: ctx.clientId, stage: pick(p.stage, C.STAGES, C.STAGES[0]), category: pick(p.category, C.CATEGORIES, C.CATEGORIES[0]), item, detail: clean(p.detail, 2000), owner: clean(p.owner, 80), status: pick(p.status, C.PLAN_STATUSES, 'Not started'), target_date: dateOnly(p.target_date), draft: false }, c);
   const after = () => core.notifyFamily(ctx.clientId, 'plan', 'Added to your plan', (ctx.user.name || 'Your coordinator') + ' added to the plan:', item, 'See the plan', ctx.email);
   return { item: row, _after: after };
+}
+// Edit an item's wording or placement, draft or live (added 2026-09-25 for the plan builder).
+async function editPlanItem(ctx, p, c) {
+  coOnly(ctx);
+  const row = await db.one(`select * from plan_items where client_id=$1 and plan_id=$2`, [ctx.clientId, String(p.planId || '')], c); must(row, 'Not found');
+  const item = clean(p.item === undefined ? row.item : p.item, 300); must(item.trim(), 'Write the item');
+  await db.q(`update plan_items set item=$2, detail=$3, stage=$4, category=$5, owner=$6, target_date=$7, updated_at=now() where plan_id=$1`,
+    [row.plan_id, item, clean(p.detail === undefined ? row.detail : p.detail, 2000), pick(p.stage, C.STAGES, row.stage), pick(p.category, C.CATEGORIES, row.category), clean(p.owner === undefined ? row.owner : p.owner, 80), /^\d{4}-\d{2}-\d{2}$/.test(String(p.target_date || '')) ? p.target_date : (p.target_date === '' ? null : row.target_date)], c);
+  return {};
 }
 async function setPlanStatus(ctx, p, c) {
   coOnly(ctx);
@@ -211,4 +220,4 @@ async function setGoalStatus(ctx, p, c) {
 
 // Only handlers are exported from this file: everything here becomes a callable action.
 module.exports = { saveIntake, signConsent, submitIntake, setPlanReady, setPaid, approvePlanItem, addPlanItem, setPlanStatus, addTask, setTaskStatus, addAppointment, cancelAppointment,
-  addCareTeam, removeCareTeam, addReferral, setReferralStatus, addGoal, setGoalStatus };
+  addCareTeam, removeCareTeam, addReferral, setReferralStatus, addGoal, setGoalStatus, editPlanItem };
