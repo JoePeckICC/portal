@@ -835,3 +835,32 @@ test('a finished intake shows "Plan ready to create" until the plan is sent; the
   assert.ok(!spec.consent.some(([h, t]) => /\bAI\b/.test(h + ' ' + t)), 'no AI in the consent');
   assert.ok(spec.consent.some(([h, t]) => /written by a person/.test(t)));
 });
+
+test('implementation: editTask, the Circle switch, and the In Basket row once a paid family has nothing booked', async () => {
+  const co = await signIn('joe@incadencecare.com');
+  const olga = await db.one(`select c.* from clients c join users u on u.client_id=c.client_id where u.email='olga@example.com'`);
+  const cid = olga.client_id;
+  await db.q(`update clients set plan_ready=true, paid=true, paid_at=now() where client_id=$1`, [cid]);
+  await db.q(`delete from appointments where client_id=$1`, [cid]);
+  let ib = await api(co, 'inbasket', {});
+  const need = ib.needs.find(n => n.client_id === cid && n.kind === 'Implement');
+  assert.ok(need, 'an Implement row'); assert.equal(need.go, 'run'); assert.match(need.text, /nothing booked/);
+  assert.equal((await api(co, 'addAppointment', { clientId: cid, title: 'Planning call with Joe', starts_at: '2026-12-01T10:00', location: 'Phone' })).ok, true);
+  ib = await api(co, 'inbasket', {});
+  assert.ok(!ib.needs.find(n => n.client_id === cid && n.kind === 'Implement'), 'gone once something is booked');
+  // tasks can be edited from the dates screen
+  const t = await api(co, 'addTask', { clientId: cid, title: 'Pet care for the hospital days', category: 'Family & ongoing support' });
+  assert.equal(t.ok, true, t.error);
+  assert.equal((await api(co, 'editTask', { clientId: cid, taskId: t.task.task_id, due_date: '2026-11-01', owner: 'Her brother' })).ok, true);
+  const row = await db.one(`select * from tasks where task_id=$1`, [t.task.task_id]);
+  assert.equal(String(row.due_date).slice(0, 10), '2026-11-01'); assert.equal(row.owner, 'Her brother'); assert.equal(row.title, 'Pet care for the hospital days');
+  assert.match((await api(co, 'editTask', { clientId: cid, taskId: t.task.task_id, title: ' ' })).error, /Write the task/);
+  // the Circle switch
+  assert.equal((await api(co, 'setCircle', { clientId: cid, on: true })).client.circle_enabled, true);
+  assert.equal((await api(co, 'setCircle', { clientId: cid, on: false })).client.circle_enabled, false);
+  const olgaS = await signIn('olga@example.com');
+  assert.match((await api(olgaS, 'setCircle', { on: true })).error, /Not allowed/);
+  // the coordinator's bootstrap carries the latest recommendation too
+  const boot = await api(co, 'bootstrap', { clientId: cid });
+  assert.ok('recommended' in boot);
+});
