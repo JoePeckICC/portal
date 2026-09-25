@@ -74,7 +74,8 @@ async function postUpdate(ctx, p, c) {
   const title = clean(p.title, 200), body = clean(p.body, 4000);
   must(title.trim(), 'Give it a title');
   const visible = !!p.visible && isTrue(client.circle_enabled);
-  const u = await db.insert('updates', { update_id: id(), client_id: ctx.clientId, posted_by: ctx.email, stage: pick(p.stage, C.STAGES, client.current_stage || ''), title, body, visible_to_circle: visible }, c);
+  const u = await db.insert('updates', { update_id: id(), client_id: ctx.clientId, posted_by: ctx.email, stage: pick(p.stage, C.STAGES, client.current_stage || ''), title, body, visible_to_circle: visible,
+    kind: pick(p.kind, C.UPDATE_KINDS, 'Family'), detail: clean(p.detail, 4000), quote: clean(p.quote, 600), quote_ref: clean(p.quote_ref, 120) }, c);
   const after = async () => {
     if (!visible) return;
     for (const s of await db.all(`select supporter_email from circle where client_id=$1 and status='Active'`, [ctx.clientId]))
