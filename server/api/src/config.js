@@ -38,6 +38,7 @@ module.exports = {
   ASSIST_STATUSES: ['Suggested', 'Coordinator is on it', 'Applied', 'Approved', 'Not a fit'],
   AVATARS: ['#1C2A3A', '#C09B36', '#2F6B3A', '#7A2E2E', '#3B5B8C'],
   RES_KINDS: ['Video', 'Article', 'Guide', 'Checklist'],
+  UPDATE_KINDS: ['Clinical', 'Faith', 'Family'],                 // the color of an update on the timeline
   RES_TRACKS: ['Open', 'Members'],
   TOPIC_KINDS: { question: 'Question for {CO}', plan: 'About the plan', billing: 'Billing', urgent: 'Something urgent today', other: 'Something else', auto: 'Automated messages' },
   MSG_KEEP: 150,
@@ -52,5 +53,5 @@ module.exports = {
 // What the page receives on first contact. Same shape as the Apps Script's bootConst_().
 module.exports.bootConst = function bootConst() {
   const c = module.exports;
-  return { appName: c.APP_NAME, stages: c.STAGES, categories: c.CATEGORIES, planStatuses: c.PLAN_STATUSES, taskStatuses: c.TASK_STATUSES, topicKinds: c.TOPIC_KINDS, bookKinds: c.BOOK_KINDS, bookHours: c.BOOK_HOURS, phone: c.INCADENCE_PHONE, referralStatuses: c.REFERRAL_STATUSES, defaultMonthly: c.DEFAULT_MONTHLY, assistStatuses: c.ASSIST_STATUSES, coKinds: c.CO_KINDS, session: null, error: null };
+  return { appName: c.APP_NAME, stages: c.STAGES, categories: c.CATEGORIES, planStatuses: c.PLAN_STATUSES, taskStatuses: c.TASK_STATUSES, topicKinds: c.TOPIC_KINDS, bookKinds: c.BOOK_KINDS, bookHours: c.BOOK_HOURS, phone: c.INCADENCE_PHONE, referralStatuses: c.REFERRAL_STATUSES, defaultMonthly: c.DEFAULT_MONTHLY, assistStatuses: c.ASSIST_STATUSES, coKinds: c.CO_KINDS, updateKinds: c.UPDATE_KINDS, session: null, error: null };
 };
