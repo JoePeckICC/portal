@@ -67,6 +67,7 @@ async function openResource(ctx, p, c) {
 async function coSettingsPublic(user) {
   const s = core.coSettings(user);
   s.fromEmail = C.FROM_EMAIL;
+  s.lifecycle = await require('../lifecycle').enabled();
   s.sigB64 = '';
   if (s.sigFileId) { try { const u = await db.one(`select * from uploads where upload_id=$1`, [s.sigFileId]); if (u && u.storage_key) s.sigB64 = 'data:' + (u.mime || 'image/png') + ';base64,' + (await storage.get(u.storage_key)).toString('base64'); else s.sigFileId = ''; } catch { s.sigFileId = ''; } }
   return s;
@@ -79,6 +80,7 @@ async function saveCoSettings(ctx, p, c) {
   if (p.digestHour !== undefined) { const h = Number(p.digestHour); if (h >= 0 && h <= 23) s.digestHour = h; }
   if (p.title !== undefined) s.title = clean(p.title, 80).trim();
   if (p.tagline !== undefined) s.tagline = clean(p.tagline, 120).trim();
+  if (p.lifecycle !== undefined) await require('../lifecycle').setEnabled(!!p.lifecycle, c);
   if (p.fromEmail !== undefined) { const fe = clean(p.fromEmail, 120).trim().toLowerCase(); must(!fe || EMAIL_RE.test(fe), 'That does not look like an email address'); await db.q(`insert into settings (key,value) values ('FROM_EMAIL',$1) on conflict (key) do update set value=excluded.value`, [fe], c); }
   if (p.sigB64) {
     const bytes = Buffer.from(String(p.sigB64), 'base64'); must(bytes.length <= 2 * 1024 * 1024, 'Keep the signature image under 2 MB');
@@ -132,7 +134,7 @@ async function inbasket(ctx) {
     db.all(`select * from medications where status='Pending review' and client_id = any($1)`, [ids]),
     db.all(`select m.client_id, m.topic_id, count(*)::int n, bool_or(m.urgent) urgent, max(m.sent_at) last_at, (array_agg(m.body order by m.sent_at desc))[1] body, t.title, t.kind
             from messages m left join topics t on t.topic_id=m.topic_id where m.sender_email<>'system' and m.read_by_coordinator=false and m.client_id = any($1) group by m.client_id, m.topic_id, t.title, t.kind`, [ids]),
-    db.all(`select client_id, answer status, (select answer from intake_answers s where s.client_id=i.client_id and s.question_id='_submitted_at') submitted_at from intake_answers i where question_id='_status' and answer like 'Updated%' and client_id = any($1)`, [ids]),
+    db.all(`select client_id, answer status, (select answer from intake_answers s where s.client_id=i.client_id and s.question_id='_submitted_at') submitted_at from intake_answers i where question_id='_status' and (answer like 'Updated%' or answer like 'Submitted%') and client_id = any($1)`, [ids]),
     db.all(`select * from assistance where status='Suggested' and client_id = any($1)`, [ids]),
     db.all(`select u.* from uploads u where u.kind='Discharge' and u.client_id = any($1) and u.uploaded_at > coalesce((select max(added_at) from medications m where m.client_id=u.client_id), '1970-01-01')
             and u.uploaded_at = (select max(uploaded_at) from uploads x where x.client_id=u.client_id and x.kind='Discharge')`, [ids]),
@@ -141,7 +143,11 @@ async function inbasket(ctx) {
   ]);
   meds.forEach(m => needs.push({ kind: 'Meds', client_id: m.client_id, family: fam(m.client_id), text: m.name + (m.dose ? ' ' + m.dose : '') + ' — pending review', when: m.updated_at || m.added_at || '', go: 'meds', pri: 1 }));
   unread.forEach(u => { const urg = u.kind === 'urgent' || u.urgent; needs.push({ kind: urg ? 'Urgent' : 'Message', client_id: u.client_id, family: fam(u.client_id), text: '“' + String(u.body).slice(0, 110) + (String(u.body).length > 110 ? '…' : '') + '” — ' + (u.title || 'Messages') + (u.n > 1 ? ' (' + u.n + ')' : ''), when: u.last_at, go: 'messages:' + u.topic_id, pri: urg ? 0 : 2 }); });
-  intakes.forEach(i => needs.push({ kind: 'Intake', client_id: i.client_id, family: fam(i.client_id), text: 'Changed answers after submitting — plan re-check', when: i.submitted_at || '', go: 'intake', pri: 3 }));
+  intakes.forEach(i => {
+    const cl = byId[i.client_id];
+    if (cl && !isTrue(cl.plan_ready)) needs.push({ kind: 'Plan', client_id: i.client_id, family: fam(i.client_id), text: 'Plan ready to create — the intake is in', when: i.submitted_at || '', go: 'build', pri: 1 });
+    else if (/^Updated/.test(String(i.status))) needs.push({ kind: 'Intake', client_id: i.client_id, family: fam(i.client_id), text: 'Changed answers after submitting — plan re-check', when: i.submitted_at || '', go: 'intake', pri: 3 });
+  });
   clients.forEach(cl => {
     if (cl.billing_status === 'Payment failed') needs.push({ kind: 'Billing', client_id: cl.client_id, family: fam(cl.client_id), text: 'Card declined · $' + (cl.monthly_amount == null ? '' : cl.monthly_amount) + ' · Stripe will retry', when: '', go: 'billing', pri: 3 });
     if (cl.stripe_customer_id && !isTrue(cl.paid) && cl.billing_status === 'Active') needs.push({ kind: 'Billing', client_id: cl.client_id, family: fam(cl.client_id), text: 'First invoice not paid yet — portal still locked', when: '', go: 'billing', pri: 4 });
