@@ -140,7 +140,8 @@ label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
 .q.bad .qt{color:#9B2C2C}
 .steps{display:flex;gap:12px;justify-content:space-between;align-items:center;margin-top:24px}
 .con{padding:14px 0;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:flex-start}
-.con input{width:64px;text-align:center;text-transform:uppercase;font-weight:700;flex-shrink:0}
+.con input{width:84px;text-align:center;text-transform:uppercase;font-weight:700;flex-shrink:0}.con input::placeholder{text-transform:none;font-weight:400;font-size:13px}.con input.bad{border-color:#9B2C2C;background:#FBF3F3}
+.qwarn{margin-top:8px;font-size:14px;color:#7A5A10;background:var(--tint);padding:10px 12px;border-radius:3px;line-height:1.45}
 .con .t{font-size:14px;line-height:1.5}
 .flag{padding:10px 14px;border-left:3px solid var(--gold);background:#fff;border-radius:0 3px 3px 0;margin-bottom:6px;font-size:14px}
 .flag.t1{border-color:#9B2C2C}
@@ -1774,9 +1775,14 @@ function qVisible(q){if(!q.showIf)return true;var a=(S.ia[q.showIf.id]||{}).a||'
 function qBlank(q){return !((S.ia[q.id]||{}).a||'').trim()}
 // What is wrong with one visible answer, in plain words, or ''. Required, a real phone number, a sensible surgery date.
 function qDay(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
+// A US phone number: 10 digits (a leading 1 is fine), a real area code, optional extension. Returns '' when it is not one.
+function phoneOk(v){var m=String(v||'').trim().match(/^([\s\S]*?)(?:\s*(?:ext\.?|extension|x)\s*#?\s*(\d{1,6}))?$/i),d=(m?m[1]:'').replace(/\D/g,'');if(d.length===11&&d[0]==='1')d=d.slice(1);if(d.length!==10||/^[01]/.test(d)||/^[01]/.test(d.slice(3))||/^(\d)\1{9}$/.test(d))return '';return '('+d.slice(0,3)+') '+d.slice(3,6)+'-'+d.slice(6)+(m&&m[2]?' ext. '+m[2]:'')}
+// Initials that match the signed name: first + last, or every word (Sarah Marie Rivera -> SR or SMR). Returns '' when fine.
+function initialsProblem(list,name){var w=String(name||'').trim().split(/\s+/).filter(Boolean);if(w.length<2)return 'Please sign with your first and last name.';var all=w.map(function(x){return x[0]}).join('').toUpperCase(),fl=(w[0][0]+w[w.length-1][0]).toUpperCase();for(var i=0;i<list.length;i++){var s=String(list[i]||'').replace(/\./g,'').toUpperCase();if(!/^[A-Z]{2,4}$/.test(s)||(s!==all&&s!==fl))return {i:i,msg:'Initials should match the name you sign with. For '+w[0]+' '+w[w.length-1]+', that is '+fl+'.'}}return ''}
+var RIDESHARE_=/\b(uber|lyft|taxi|cab|rideshare|ride share)\b/i;
 function qProblem(q){var v=((S.ia[q.id]||{}).a||'').trim(),alt=(q.alts||[]).indexOf(v)>=0;
   if(!v)return q.req?'This one is needed.':'';
-  if(q.id==='A.phone'&&v.replace(/\D/g,'').length<10)return 'Please enter a 10-digit phone number, like (615) 555-0100.';
+  if(q.id==='A.phone'&&!phoneOk(v))return 'Please enter a 10-digit US phone number, like (615) 555-0100. An extension is fine: 555-0100 ext. 22.';
   if(q.type==='date'&&!alt&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||v<qDay(-365)||v>qDay(1095)))return 'Please check this date. It should be within the past year or the next three years.';
   return ''}
 var EMERGENCY_='This is an emergency, or it has already happened';
@@ -1818,17 +1824,20 @@ function questionEl(q,redraw){
   if(q.type==='choice'||q.type==='multi'){
     var multi=q.type==='multi',sel=multi?a.a.split('; ').filter(Boolean):[a.a];
     var o=el('<div class="opts" role="group" aria-labelledby="'+lid+'"></div>');
-    q.opts.forEach(function(op){var b=el('<button type="button" aria-pressed="'+(sel.indexOf(op)>=0)+'" class="opt '+(multi?'box':'')+' '+(sel.indexOf(op)>=0?'on':'')+'"><i></i><span>'+esc(op)+'</span></button>');b.onclick=function(){if(multi){if(op==='No')sel=['No'];else{sel=sel.filter(function(x){return x!=='No'});var k=sel.indexOf(op);if(k>=0)sel.splice(k,1);else sel.push(op)}set(sel.join('; '))}else set(op);redraw()};o.appendChild(b)});
+    q.opts.forEach(function(op){var b=el('<button type="button" aria-pressed="'+(sel.indexOf(op)>=0)+'" class="opt '+(multi?'box':'')+' '+(sel.indexOf(op)>=0?'on':'')+'"><i></i><span>'+esc(op)+'</span></button>');b.onclick=function(){if(multi){var ex=function(x){return x==='No'||x==='None'||x===S.data.intakeSpec.dk};if(ex(op))sel=sel.indexOf(op)>=0?[]:[op];else{sel=sel.filter(function(x){return !ex(x)});var k=sel.indexOf(op);if(k>=0)sel.splice(k,1);else sel.push(op)}set(sel.join('; '))}else set(op);redraw()};o.appendChild(b)});
     c.appendChild(o);
     if(q.detailOn&&sel.indexOf(q.detailOn)>=0){var dd=S.ia[q.id+'d']||(S.ia[q.id+'d']={a:'',n:''});var di=el('<div class="detail"><label>'+esc(q.detailLabel||'Detail')+'</label><input aria-label="'+esc(q.detailLabel||'Detail')+'" value="'+esc(dd.a)+'"></div>');$('input',di).oninput=function(){dd.a=this.value};c.appendChild(di)}
   } else {
     var alts=q.alts||[],isAlt=alts.indexOf(a.a)>=0;
     var lab=' aria-labelledby="'+lid+'"',tel=q.id==='A.phone'?' type="tel" inputmode="tel" autocomplete="tel"':'';
     var inp=q.type==='date'?el('<input type="date"'+lab+' min="'+qDay(-365)+'" max="'+qDay(1095)+'" value="'+esc(isAlt?'':a.a)+'">'):(q.long?el('<textarea'+lab+' placeholder="'+esc(q.ph||'')+'">'+esc(isAlt?'':a.a)+'</textarea>'):el('<input'+lab+tel+' placeholder="'+esc(q.ph||'')+'" value="'+esc(isAlt?'':a.a)+'">'));
-    inp.oninput=function(){set(this.value);$all('.alt',c).forEach(function(x){x.classList.remove('on');x.setAttribute('aria-pressed','false')})};
+    inp.oninput=function(){set(this.value);$all('.alt',c).forEach(function(x){x.classList.remove('on');x.setAttribute('aria-pressed','false')});var had=!!$('.qwarn',c),want=(q.id==='G.6'&&/^\d{4}-\d{2}-\d{2}$/.test(a.a)&&a.a<qDay(0))||(q.id==='L.1'&&RIDESHARE_.test(a.a));if(had!==want){var at=this.selectionStart,tag=this.tagName;redraw();var n=$('.q[data-id="'+q.id+'"] '+tag);if(n){n.focus();try{n.setSelectionRange(at,at)}catch(e){}}}};
     c.appendChild(inp);
     // Picking an alternative never throws away what they typed: it moves into the note (a date is simply cleared).
     if(alts.length){var al=el('<div class="alts"></div>');alts.forEach(function(x){var b=el('<button type="button" aria-pressed="'+(a.a===x)+'" class="alt '+(a.a===x?'on':'')+'">'+esc(x)+'</button>');b.onclick=function(){var typed=q.type!=='date'&&alts.indexOf(a.a)<0?(a.a||'').trim():'';if(typed&&(a.n||'').indexOf(typed)<0)a.n=(a.n?a.n+'\n':'')+typed;set(x);redraw()};al.appendChild(b)});c.appendChild(al)}
+    // Soft hints (they never block): a past date, and a rideshare as the ride home.
+    if(q.id==='G.6'&&/^\d{4}-\d{2}-\d{2}$/.test(a.a)&&a.a<qDay(0))c.appendChild(el('<div class="qwarn">That date has passed. If the surgery already happened, choose “'+esc(EMERGENCY_)+'” above so we ask the right questions.</div>'));
+    if(q.id==='L.1'&&RIDESHARE_.test(a.a))c.appendChild(el('<div class="qwarn">Most hospitals will not release a patient to a taxi or rideshare after anesthesia. If you can, put a person here. If there is nobody yet, choose “We haven’t sorted this out yet” and we will help.</div>'));
     if(q.id==='G.6'&&a.a===EMERGENCY_)c.appendChild(el('<div class="note" role="alert" style="margin-top:12px"><b>If this is a medical emergency, call <a href="tel:911">911</a> now.</b> Otherwise, tell us where things stand below, and call us at <a href="tel:+16298003622">(629) 800-3622</a> if you need us sooner.</div>'))
   }
   var open=q.noteOpen||!!a.n;
@@ -1842,12 +1851,17 @@ function consentStep(body,v){
   var d=S.data,items=d.intakeSpec.consent,n=first(d.client.patient_first_name)||'the patient';
   var f=el('<form></form>');
   function tel(s){return s.replace(/\b(911|988)\b/g,'<a href="tel:$1">$1</a>')}
-  items.forEach(function(it,i){f.appendChild(el('<div class="con"><input name="i'+i+'" maxlength="4" required placeholder="Initials" aria-label="Your initials for: '+esc(it[0])+'"><div class="t"><b>'+tel(esc(it[0]))+'</b> '+tel(esc(it[1]))+'</div></div>'))});
+  items.forEach(function(it,i){f.appendChild(el('<div class="con"><input name="i'+i+'" maxlength="4" required placeholder="Initials" autocomplete="off" aria-label="Your initials for: '+esc(it[0])+'"><div class="t"><b>'+tel(esc(it[0]))+'</b> '+tel(esc(it[1]))+'</div></div>'))});
   f.appendChild(el('<p class="small muted" style="margin:14px 0 0">The full details: our <a href="'+SITE+'privacy.html" target="_blank" rel="noopener">Privacy Policy</a> and <a href="'+SITE+'health-data-policy.html" target="_blank" rel="noopener">Consumer Health Data Policy</a>.</p>'));
   f.appendChild(el('<p style="margin:20px 0 14px;font-weight:700">I have read the above and would like to proceed.</p><div class="field"><label>Full name (this is your signature)</label><input name="name" required></div><div class="field"><label>Relationship to '+esc(n)+'</label><input name="rel" required placeholder="Self, spouse, daughter, friend"></div><p class="small muted">Signed today, '+esc(new Date().toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'}))+'.</p>'));
   var nav=el('<div class="steps"><span></span><span class="err" id="se" style="margin:0"></span><button class="btn" type="submit">I agree — continue</button></div>');
   f.appendChild(nav);
-  f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f);var ini=items.map(function(_,i){return fd['i'+i]});var b=$('button',nav);b.disabled=true;b.textContent='Saving…';call('signConsent',{consent:{initials:ini,name:fd.name,relationship:fd.rel}}).then(function(r){S.data.intake=r.intake;S.step=1;render();window.scrollTo(0,0)}).catch(function(e){$('#se',nav).textContent=e.message;b.disabled=false;b.textContent='I agree — continue'})};
+  f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f);var ini=items.map(function(_,i){return fd['i'+i]});var b=$('button',nav);
+    $all('.con input',f).forEach(function(x){x.classList.remove('bad')});$('#se',nav).textContent='';
+    var blank=ini.findIndex(function(x){return !String(x||'').trim()});if(blank>=0){var bx=$('input[name=i'+blank+']',f);bx.classList.add('bad');bx.focus();bx.scrollIntoView({behavior:'smooth',block:'center'});$('#se',nav).textContent='Please initial item '+(blank+1)+'.';return}
+    if(!String(fd.name||'').trim()){$('input[name=name]',f).focus();$('#se',nav).textContent='Type your full name to sign.';return}
+    var ip=initialsProblem(ini,fd.name);if(ip){if(ip.i!==undefined){var ibx=$('input[name=i'+ip.i+']',f);ibx.classList.add('bad');ibx.focus();ibx.scrollIntoView({behavior:'smooth',block:'center'})}$('#se',nav).textContent=ip.msg||ip;return}
+    b.disabled=true;b.textContent='Saving…';call('signConsent',{consent:{initials:ini,name:fd.name,relationship:fd.rel}}).then(function(r){S.data.intake=r.intake;S.step=1;render();window.scrollTo(0,0)}).catch(function(e){$('#se',nav).textContent=e.message;b.disabled=false;b.textContent='I agree — continue'})};
   body.appendChild(f);
 }
 function waitingView(v,justDone){
