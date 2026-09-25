@@ -4,6 +4,17 @@
 const db = require('./db');
 
 const STEPS = [
+  // ---- the family email timeline (lifecycle.js), 2026-09-25
+  `alter table clients add column if not exists paid_at timestamptz`,
+  `alter table clients add column if not exists plan_ready_at timestamptz`,
+  `alter table clients add column if not exists cancelled_at timestamptz`,
+  `alter table clients add column if not exists cancel_reason text not null default ''`,
+  `create table if not exists lifecycle_sent (
+     client_id text not null references clients(client_id) on delete cascade,
+     key       text not null,
+     sent_at   timestamptz not null default now(),
+     primary key (client_id, key)
+   )`,
   // passwords
   `alter table users add column if not exists password_hash text`,
   `alter table users add column if not exists password_set_at timestamptz`,
