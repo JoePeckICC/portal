@@ -1279,7 +1279,7 @@ function coShell(){
   return s;
 }
 function loadInbasket(force){if(S.ib&&!force&&S.ibAt&&Date.now()-S.ibAt<45000)return Promise.resolve(S.ib);return call('inbasket').then(function(r){S.ib=r;S.ibAt=Date.now();return r})}
-function kindPill(k){var c={Meds:'red',Urgent:'red',Billing:'red',Message:'',Plan:'',Intake:'blue',Assistance:'blue',Papers:'blue'}[k]||'gray';return '<span class="wpill '+c+'">'+esc(k)+'</span>'}
+function kindPill(k){var c={Meds:'red',Urgent:'red',Billing:'red',Message:'',Plan:'',Implement:'',Intake:'blue',Assistance:'blue',Papers:'blue'}[k]||'gray';return '<span class="wpill '+c+'">'+esc(k)+'</span>'}
 function inbasketView(){
   var v=el('<div class="wspage ibx"><div class="ibl"></div><div class="ibc"><p class="muted">Loading your in basket…</p></div><div class="ibr"></div></div>');
   function draw(r){
@@ -1291,7 +1291,7 @@ function inbasketView(){
     var needs=(r.needs||[]).filter(function(n){return !S.ibk||n.kind===S.ibk});
     var N=el('<div class="pn"><div class="ph"><span>Needs you <span class="wpill red">'+needs.length+'</span></span><span class="muted small">Sorted by urgency · click a row to open it in the family’s chart</span></div><div class="wt"></div></div>');
     if(!needs.length)$('.wt',N).appendChild(el('<div class="wempty">Nothing waiting on you. Good.</div>'));
-    needs.forEach(function(n){var row=el('<a href="#" class="wr" style="grid-template-columns:110px 1fr 130px 90px"><div>'+kindPill(n.kind)+'</div><div><b>'+esc(n.family)+'</b> · '+esc(n.text)+'</div><div class="muted small">'+(n.when?esc(fmtDay(n.when)+(fmtDay(n.when)==='Today'||fmtDay(n.when)==='Yesterday'?' '+fmtTime(n.when):'')):'')+'</div><div style="text-align:right"><span class="btn sm'+(n.pri>1?' quiet':'')+'">'+({Meds:'Review',Message:'Reply',Urgent:'Reply',Plan:'Build',Intake:'Re-check',Billing:'Open',Assistance:'Open'}[n.kind]||'Open')+'</span></div></a>');row.onclick=function(ev){ev.preventDefault();openFamily(n.client_id,n.go)};$('.wt',N).appendChild(row)});
+    needs.forEach(function(n){var row=el('<a href="#" class="wr" style="grid-template-columns:110px 1fr 130px 90px"><div>'+kindPill(n.kind)+'</div><div><b>'+esc(n.family)+'</b> · '+esc(n.text)+'</div><div class="muted small">'+(n.when?esc(fmtDay(n.when)+(fmtDay(n.when)==='Today'||fmtDay(n.when)==='Yesterday'?' '+fmtTime(n.when):'')):'')+'</div><div style="text-align:right"><span class="btn sm'+(n.pri>1?' quiet':'')+'">'+({Meds:'Review',Message:'Reply',Urgent:'Reply',Plan:'Build',Implement:'Start',Intake:'Re-check',Billing:'Open',Assistance:'Open'}[n.kind]||'Open')+'</span></div></a>');row.onclick=function(ev){ev.preventDefault();openFamily(n.client_id,n.go)};$('.wt',N).appendChild(row)});
     C.appendChild(N);
     var F=el('<div class="pn"><div class="ph"><span>Families</span><span class="muted small">'+(r.families||[]).length+' active · sorted by surgery date</span></div><div class="wt"><div class="wh" style="grid-template-columns:90px 130px 120px 130px 1fr 120px"><div>Family</div><div>Patient</div><div>Stage</div><div>Surgery</div><div>Flags</div><div>Billing</div></div></div></div>');
     (r.families||[]).forEach(function(f){var dw=f.days===null?'':f.days===0?'<b>today</b>':f.days>0?'<b>'+f.days+' days</b>':'<b>day '+(-f.days)+'</b>';var row=el('<a href="#" class="wr" style="grid-template-columns:90px 130px 120px 130px 1fr 120px"><div><b>'+esc(f.family_name)+'</b></div><div>'+esc(f.patient)+'</div><div>'+esc(f.stage)+'</div><div>'+(f.surgery_date?esc(fmtShort(f.surgery_date).replace(/, \d{4}$/,''))+' · '+dw:'TBD')+'</div><div>'+f.flags.map(kindPill).join(' ')+(!f.paid&&f.billing?' <span class="wpill gray">Locked</span>':'')+'</div><div class="'+(f.billing==='Payment failed'?'red':'')+'">'+esc(f.billing||'—')+'</div></a>');row.onclick=function(ev){ev.preventDefault();openFamily(f.client_id)};$('.wt',F).appendChild(row)});
@@ -1325,19 +1325,20 @@ function scheduleView(){
 function chartView(){
   var d=S.data,c=d.client;
   if(!c)return el('<div class="wspage"><div class="pn" style="max-width:600px;margin:40px auto;padding:24px"><b>Pick a family.</b><p class="muted">Use Find a family at the top, or open one from the In Basket.</p></div></div>');
-  var tabs=[['chart','Chart'],['plan','Plan'],['build','Set up'],['tasks','Tasks'],['messages','Messages'],['meds','Pharmacy'],['find','Find Care'],['billing','Billing'],['record','Record'],['intake','Intake'],['updates','Updates'],['circle','Circle'],['settings','Settings']];
+  var tabs=[['chart','Chart'],['plan','Plan'],['build','Set up'],['run','Implement'],['tasks','Tasks'],['messages','Messages'],['meds','Pharmacy'],['find','Find Care'],['billing','Billing'],['record','Record'],['intake','Intake'],['updates','Updates'],['circle','Circle'],['settings','Settings']];
   var planDue=!!d.client&&isSub(d.intake)&&!d.client.plan_ready;
+  var runDue=!!d.client&&d.client.paid&&d.client.plan_ready&&!(d.appointments||[]).some(function(a){return toDate(a.starts_at)>=new Date()});
   if(['inbasket','schedule','home'].indexOf(S.view)>=0||!S.view)S.view='chart';
   var v=el('<div class="wschart"><aside class="wsside"></aside><div class="wsmain"><nav class="wstabs"></nav><div class="wsview"></div></div></div>');
   v.querySelector('.wsside').appendChild(chartSide());
   var nav=$('.wstabs',v),unread=d.topics?unreadTotal():0,pend=(d.meds||[]).filter(function(m){return m.status==='Pending review'}).length;
-  tabs.forEach(function(t){var pill=t[0]==='messages'&&unread?unread:t[0]==='meds'&&pend?pend:t[0]==='build'&&planDue?'!':'';var a=el('<a href="#" class="'+(S.view===t[0]?'on':'')+'">'+t[1]+(pill?' <span class="wpill red">'+pill+'</span>':'')+'</a>');a.onclick=function(ev){ev.preventDefault();S.touched=true;S.view=t[0];S.mopen=false;render()};nav.appendChild(a)});
+  tabs.forEach(function(t){var pill=t[0]==='messages'&&unread?unread:t[0]==='meds'&&pend?pend:t[0]==='build'&&planDue?'!':t[0]==='run'&&runDue?'!':'';var a=el('<a href="#" class="'+(S.view===t[0]?'on':'')+'">'+t[1]+(pill?' <span class="wpill red">'+pill+'</span>':'')+'</a>');a.onclick=function(ev){ev.preventDefault();S.touched=true;S.view=t[0];S.mopen=false;render()};nav.appendChild(a)});
   nav.appendChild(el('<span class="wsacts"></span>'));var acts=$('.wsacts',nav);
   [['find:book','+ Appt'],['tasks','+ Task']].forEach(function(x){var a=el('<a href="#" class="btn quiet sm">'+x[1]+'</a>');a.onclick=function(ev){ev.preventDefault();go(x[0])};acts.appendChild(a)});
   var rb=el('<a href="#" class="btn sm'+(S.recOpen?'':' quiet')+'">Recommend</a>');rb.onclick=function(ev){ev.preventDefault();S.recOpen=!S.recOpen;render()};acts.appendChild(rb);
   var view=$('.wsview',v);if(S.recOpen)view.appendChild(recPanel());
   if(S.view==='chart')view.appendChild(chartHome());
-  else{var w=el('<div class="wrap"></div>');w.appendChild({find:findView,settings:settingsView,meds:medsView,billing:billingView,plan:planView,tasks:tasksView,messages:messagesView,updates:updatesView,circle:circleView,record:recordView,resources:resourcesView,build:buildView,intake:(!S.coFill)?prepView:intakeView}[S.view]());view.appendChild(w)}
+  else{var w=el('<div class="wrap"></div>');w.appendChild({find:findView,settings:settingsView,meds:medsView,billing:billingView,plan:planView,tasks:tasksView,messages:messagesView,updates:updatesView,circle:circleView,record:recordView,resources:resourcesView,build:buildView,run:runView,intake:(!S.coFill)?prepView:intakeView}[S.view]());view.appendChild(w)}
   return v;
 }
 function chartSide(){
@@ -2131,6 +2132,132 @@ function suSend(){
   side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">Money</div><div class="small muted">'+(c.monthly_amount!==''&&c.monthly_amount!=null?'$'+esc(c.monthly_amount)+' a month.':'Starts at $'+esc(BOOT.defaultMonthly||599)+' a month.')+' Set it per family under Billing. The family pays when they are ready, after the plan is sent.</div></div>'));
   return w;
 }
+// ---------------------------------------------------------------- implement (coordinator)
+// After the plan is sent and the family has paid: put every item on a date, book the calls, line up
+// the providers, and switch on the pieces of the portal the family will use. The Set up screens make
+// the plan; this page makes it happen.
+function runView(){
+  var d=S.data,c=d.client,pf=first(c.patient_first_name)||c.family_name;
+  var v=el('<div></div>');
+  var live=(d.plan||[]).filter(function(p){return !isDraft(p)}),tasks=d.tasks||[],appts=d.appointments||[],refs=d.referrals||[];
+  var openP=live.filter(function(p){return p.status!=='Done'}),openT=tasks.filter(function(t){return t.status!=='Done'});
+  var sd=toDate(c.surgery_date),dts=null;if(sd){var t0=new Date();t0=new Date(t0.getFullYear(),t0.getMonth(),t0.getDate());dts=Math.round((new Date(sd.getFullYear(),sd.getMonth(),sd.getDate())-t0)/864e5)}
+  var status=!c.plan_ready?'<b style="color:#9B2C2C">Plan not sent yet</b>':!c.paid?'<b style="color:var(--gold)">Plan sent · waiting on payment</b>':'<b style="color:var(--gold)">Portal open</b>';
+  v.appendChild(el('<div class="head"><div class="k">Implementation</div><h1>Make '+esc(pf)+'’s plan happen.</h1><div class="muted">'+status+(c.current_stage?' · '+esc(c.current_stage):'')+(dts!==null?' · surgery '+(dts===0?'today':dts>0?'in '+dts+' days':dts+' days ago'):'')+' · '+(live.length-openP.length)+' of '+live.length+' plan items done · '+openT.length+' open task'+(openT.length===1?'':'s')+'</div></div>'));
+  if(!c.plan_ready){v.appendChild(el('<p class="muted">Send the plan first (Set up → Send it). Implementation starts once the family has it and has paid.</p>'));return v}
+  if(!c.paid)v.appendChild(el('<div class="note" style="margin-bottom:16px">The family has not paid yet, so their portal is still locked. You can line things up here now; they see the results the moment they pay.</div>'));
+  var SEC=[['setup','Switch on'],['calls','Calls with you'],['dates','Put it on dates'],['providers','Line up providers'],['progress','Progress']];
+  S.ru=S.ru||'setup';var idx=SEC.map(function(s){return s[0]}).indexOf(S.ru);if(idx<0){idx=0;S.ru='setup'}
+  var nav=el('<div class="card" style="margin:-6px 0 18px;padding:10px 16px"><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+SEC.map(function(s,i){return'<a href="#" data-s="'+s[0]+'" class="btn sm'+(i===idx?'':' quiet')+'">'+esc(s[1])+'</a>'}).join('')+'</div></div>');
+  $all('a',nav).forEach(function(a){a.onclick=function(ev){ev.preventDefault();S.ru=a.getAttribute('data-s');render();window.scrollTo(0,0)}});
+  v.appendChild(nav);
+  v.appendChild({setup:ruSetup,calls:ruCalls,dates:ruDates,providers:ruProviders,progress:ruProgress}[S.ru]());
+  var foot=el('<p style="margin:22px 0 0;display:flex;gap:8px;justify-content:space-between"><span>'+(idx>0?'<button class="btn quiet" type="button" id="bk">Back</button>':'')+'</span><span>'+(idx<SEC.length-1?'<button class="btn" type="button" id="nx">Next: '+esc(SEC[idx+1][1])+'</button>':'')+'</span></p>');
+  var bk=$('#bk',foot);if(bk)bk.onclick=function(){S.ru=SEC[idx-1][0];render();window.scrollTo(0,0)};
+  var nx=$('#nx',foot);if(nx)nx.onclick=function(){S.ru=SEC[idx+1][0];render();window.scrollTo(0,0)};
+  v.appendChild(foot);
+  return v;
+}
+// A row in a checklist: done mark, text, and an action (a button or a link into another page).
+function ruRow(done,text,sub,action){var r=el('<div style="display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="width:18px;font-weight:700;color:'+(done?'var(--gold)':'var(--muted)')+'">'+(done?'✓':'·')+'</span><div style="flex-grow:1"><div'+(done?' style="color:var(--muted)"':'')+'>'+esc(text)+'</div>'+(sub?'<div class="small muted">'+esc(sub)+'</div>':'')+'</div><div class="act" style="flex-shrink:0"></div></div>');if(action)$('.act',r).appendChild(action);return r}
+function ruGo(label,target,fn){var a=el('<a href="#" class="btn quiet sm">'+esc(label)+'</a>');a.onclick=function(ev){ev.preventDefault();if(fn)fn();else go(target)};return a}
+// 1. Switch on: the parts of the portal the family uses, and whether each is ready.
+function ruSetup(){
+  var d=S.data,c=d.client,b=d.billing||{},w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
+  var card=el('<div class="card"><div class="k" style="margin-bottom:6px">The portal, piece by piece</div><p class="small muted" style="margin:0 0 6px">What the family can use today, and what still needs a switch or a first entry.</p></div>');
+  card.appendChild(ruRow(!!c.paid,'Portal open',c.paid?'First payment in.':'Locked until the first payment. Nudge from Billing if it has been a while.',c.paid?null:ruGo('Billing','billing')));
+  var ct=el('<button class="btn quiet sm" type="button">'+(c.circle_enabled?'Turn off':'Turn on')+'</button>');ct.onclick=function(){ct.disabled=true;call('setCircle',{on:!c.circle_enabled}).then(refresh).catch(alertErr)};
+  card.appendChild(ruRow(!!c.circle_enabled,'The Circle (updates for the wider family)',c.circle_enabled?'On. The family can add supporters and post updates.':'Off. Turn it on once the family has agreed to share updates.',ct));
+  card.appendChild(ruRow((d.inner||[]).length>0,'Inner circle',(d.inner||[]).length?(d.inner||[]).map(function(u){return u.name||u.email}).join(', '):'Only the patient has a login.',ruGo('Add someone','build',function(){S.su='people';S.view='build';render();window.scrollTo(0,0)})));
+  card.appendChild(ruRow((d.careTeam||[]).length>0,'Care team',(d.careTeam||[]).length?(d.careTeam||[]).map(function(m){return m.name+(m.role?' ('+m.role+')':'')}).join(', '):'Surgeon, hospital, primary care.',ruGo('Care team','find')));
+  card.appendChild(ruRow((d.meds||[]).length>0,'Medication list',(d.meds||[]).length?(d.meds||[]).length+' on the list'+((d.meds||[]).some(function(m){return m.status==='Pending review'})?' · some pending your review':''):'Nothing yet. Build it from the discharge papers, or add what they take now.',ruGo('Pharmacy','meds:build')));
+  card.appendChild(ruRow(!!d.recommended,'A resource sent',d.recommended?'Last: '+(d.recommended.title||''):'Pick one from the library for where they are.',ruGo('Recommend','',function(){S.recOpen=true;render()})));
+  card.appendChild(ruRow(!!(b.autopay&&b.card),'Autopay',b.card?(b.autopay?'On · '+b.card:'Card on file, autopay off. The family can turn it on under Billing → Payment method.'):'No card on file yet.',ruGo('Billing','billing')));
+  left.appendChild(card);
+  side.appendChild(el('<div class="note">Nothing here sends the family anything. The switches change what they can do in the portal; the emails they get are the ones on the timeline (Coordinator settings → Family emails).</div>'));
+  return w;
+}
+// 2. Calls with you: the check-ins the timeline calls for, booked onto the calendar.
+function ruCalls(){
+  var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
+  var sd=toDate(c.surgery_date),appts=d.appointments||[],n=suNights();
+  var day=function(k){return sd?suDay(new Date(sd.getFullYear(),sd.getMonth(),sd.getDate()),k):''};
+  var t=new Date();var todayS=suDay(t,0),soon=suDay(t,3);
+  var sug=[
+    {key:'planning',title:'Planning call with Joe',date:soon,time:'10:00',why:'Walk the plan with them now that they have it.'},
+    {key:'daybefore',title:'Day-before call with Joe',date:day(-1),time:'16:00',why:'Report time, the ride, what to bring.'},
+    {key:'discharge',title:'Discharge-day check-in with Joe',date:day(n),time:'15:00',why:'What came home on paper; medications; the first night.'},
+    {key:'week',title:'First-week-home call with Joe',date:day(n+7),time:'10:00',why:'How the first week went; adjust the plan.'},
+    {key:'month',title:'Month-one review with Joe',date:day(n+30),time:'10:00',why:'The long middle: what stays, what stops.'}];
+  var have=appts.map(function(a){return String(a.title).toLowerCase()});
+  var card=el('<div class="card"><div class="k" style="margin-bottom:6px">Check-ins to book</div><p class="small muted" style="margin:0 0 6px">Dated from the surgery date and their expected stay. Change a date or time, then book. Already booked ones are ticked.</p></div>');
+  sug.forEach(function(s){var booked=have.indexOf(s.title.toLowerCase())>=0;var r=el('<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap"><span style="width:18px;font-weight:700;color:'+(booked?'var(--gold)':'var(--muted)')+'">'+(booked?'✓':'·')+'</span><div style="flex-grow:1;min-width:200px"><div'+(booked?' style="color:var(--muted)"':'')+'>'+esc(s.title)+'</div><div class="small muted">'+esc(s.why)+'</div></div>'+(booked?'':(s.date?'<input type="date" value="'+esc(s.date)+'" style="width:150px"><input type="time" value="'+esc(s.time)+'" style="width:110px"><button class="btn quiet sm" type="button">Book</button>':'<span class="small muted">Needs the surgery date</span>'))+'</div>');var bt=$('button',r);if(bt)bt.onclick=function(){var ins=$all('input',r);bt.disabled=true;call('addAppointment',{title:s.title,starts_at:ins[0].value+'T'+(ins[1].value||'10:00'),location:'Phone'}).then(refresh).catch(function(e){alertErr(e);bt.disabled=false})};card.appendChild(r)});
+  left.appendChild(card);
+  var up=appts.filter(function(a){return toDate(a.starts_at)>=new Date()}).slice(0,10);
+  side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">On the calendar</div>'+(up.length?up.map(function(a){return'<div class="small" style="padding:4px 0;border-bottom:1px solid var(--line)"><b>'+esc(a.title)+'</b><div class="muted">'+esc(fmtShort(a.starts_at))+' '+esc(fmtTime(a.starts_at))+(a.location?' · '+esc(a.location):'')+'</div></div>'}).join(''):'<p class="small muted" style="margin:0">Nothing upcoming.</p>')+'</div>'));
+  side.appendChild(el('<div class="note">Booking here puts it on the family’s calendar and yours. The family can also book you themselves under Find Care.</div>'));
+  return w;
+}
+// 3. Put it on dates: every open plan item and task gets a date and an owner, grouped by where it falls.
+function ruDates(){
+  var d=S.data,c=d.client,w=el('<div></div>');
+  var live=(d.plan||[]).filter(function(p){return !isDraft(p)&&p.status!=='Done'}),tasks=(d.tasks||[]).filter(function(t){return t.status!=='Done'});
+  var rows=live.map(function(p){return{kind:'plan',id:p.plan_id,title:p.item,sub:p.stage+' · '+p.category,date:p.target_date?String(p.target_date).slice(0,10):'',owner:p.owner||'',status:p.status,statuses:BOOT.planStatuses,detail:p.detail||''}})
+    .concat(tasks.map(function(t){return{kind:'task',id:t.task_id,title:t.title,sub:'Task · '+(t.category||''),date:t.due_date?String(t.due_date).slice(0,10):'',owner:t.owner||'',status:t.status,statuses:BOOT.taskStatuses,detail:t.notes||''}}));
+  var sd=toDate(c.surgery_date),sdS=sd?suDay(sd,0):'',wk=sd?suDay(sd,-7):'',today=suDay(new Date(),0),week=suDay(new Date(),7);
+  function bucket(r){if(!r.date)return 'No date yet';if(r.date<today)return 'Overdue';if(r.date<=week)return 'This week';if(sdS&&r.date<wk)return 'Before surgery week';if(sdS&&r.date<=sdS)return 'Surgery week';return sdS?'After surgery':'Later'}
+  var order=['Overdue','This week','Before surgery week','Surgery week','After surgery','Later','No date yet'],groups={};
+  rows.forEach(function(r){(groups[bucket(r)]=groups[bucket(r)]||[]).push(r)});
+  if(!rows.length){w.appendChild(el('<p class="muted">Everything is done or nothing is on the plan yet.</p>'));return w}
+  order.forEach(function(g){if(!groups[g])return;var card=el('<div class="card" style="margin-bottom:14px"><div class="k" style="margin-bottom:6px">'+esc(g)+' — '+groups[g].length+'</div></div>');
+    groups[g].sort(function(a,b){return String(a.date||'9')<String(b.date||'9')?-1:1}).forEach(function(r){
+      var row=el('<div style="display:grid;grid-template-columns:1fr 150px 130px 130px 70px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><div><div>'+esc(r.title)+'</div><div class="small muted">'+esc(r.sub)+(r.detail?' — '+esc(r.detail.slice(0,120)):'')+'</div></div><input type="date" value="'+esc(r.date)+'"><input placeholder="Who" value="'+esc(r.owner)+'"><select>'+r.statuses.map(function(s){return'<option'+(s===r.status?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select><button class="btn quiet sm" type="button">Save</button></div>');
+      var ins=$all('input',row),sel=$('select',row),bt=$('button',row);
+      bt.onclick=function(){bt.disabled=true;var p=r.kind==='plan'?call('editPlanItem',{planId:r.id,target_date:ins[0].value,owner:ins[1].value}).then(function(){return sel.value!==r.status?call('setPlanStatus',{planId:r.id,status:sel.value}):null}):call('editTask',{taskId:r.id,due_date:ins[0].value,owner:ins[1].value}).then(function(){return sel.value!==r.status?call('setTaskStatus',{taskId:r.id,status:sel.value}):null});p.then(refresh).catch(function(e){alertErr(e);bt.disabled=false})};
+      card.appendChild(row)});
+    w.appendChild(card)});
+  w.appendChild(el('<div class="note">Tip: a date on a plan item shows on the family’s Home page that day. An owner other than you tells them who is carrying it.</div>'));
+  return w;
+}
+// 4. Line up providers: the plan items that need someone outside, and the referrals in motion.
+function ruProviders(){
+  var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
+  var refs=d.referrals||[],live=(d.plan||[]).filter(function(p){return !isDraft(p)&&p.status!=='Done'});
+  var NEED=/\b(ride|drive|driver|transport|meal|food|grocer|clean|home health|nurse|aide|caregiver|sitter|pet|dog|cat|child|daycare|rehab|equipment|walker|shower chair|bed|pharmacy|deliver|lawn|yard)\b/i;
+  var need=live.filter(function(p){return NEED.test(p.item+' '+p.detail)});
+  var f=el('<form class="card"><div class="k" style="margin-bottom:12px">Refer a vendor</div><div class="two"><div class="field"><label>Vendor</label><input name="vendor" required placeholder="Name of the business or person"></div><div class="field"><label>Service</label><input name="service" placeholder="Rides, meals, home health…"></div></div><div class="field"><label>Contact</label><input name="contact" placeholder="Phone or email"></div><div class="field"><label>Note for the family</label><textarea name="note" style="min-height:56px"></textarea></div><button class="btn" type="submit">Add referral</button><p class="err"></p></form>');
+  f.onsubmit=function(ev){ev.preventDefault();var b=$('button',f);b.disabled=true;call('addReferral',formData(f)).then(refresh).catch(function(e){$('.err',f).textContent=e.message;b.disabled=false})};
+  var nd=el('<div class="card" style="margin-bottom:14px"><div class="k" style="margin-bottom:6px">Plan items that need someone outside — '+need.length+'</div><p class="small muted" style="margin:0 0 6px">Click one to start a referral for it.</p></div>');
+  if(!need.length)nd.appendChild(el('<p class="small muted" style="margin:0">Nothing on the open plan reads like an outside service.</p>'));
+  need.forEach(function(p){var r=el('<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><div style="flex-grow:1"><div>'+esc(p.item)+'</div><div class="small muted">'+esc(p.stage)+(p.target_date?' · by '+esc(fmtShort(p.target_date)):'')+'</div></div><a href="#" class="small">Refer</a></div>');$('a',r).onclick=function(ev){ev.preventDefault();$('input[name=service]',f).value=p.item.slice(0,120);$('textarea',f).value=p.detail?p.detail.slice(0,300):'';f.scrollIntoView({behavior:'smooth',block:'start'});$('input[name=vendor]',f).focus()};nd.appendChild(r)});
+  left.appendChild(nd);
+  var rf=el('<div class="card"><div class="k" style="margin-bottom:6px">Referrals — '+refs.length+'</div></div>');
+  if(!refs.length)rf.appendChild(el('<p class="small muted" style="margin:0">None yet.</p>'));
+  refs.forEach(function(x){var r=el('<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><div style="flex-grow:1"><b>'+esc(x.vendor)+'</b>'+(x.service?' <span class="small muted">· '+esc(x.service)+'</span>':'')+(x.contact?'<div class="small muted">'+esc(x.contact)+'</div>':'')+'</div><select style="width:auto">'+BOOT.referralStatuses.map(function(s){return'<option'+(s===x.status?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select></div>');$('select',r).onchange=function(){call('setReferralStatus',{referralId:x.referral_id,status:this.value}).then(refresh).catch(alertErr)};rf.appendChild(r)});
+  left.appendChild(rf);
+  side.appendChild(f);
+  side.appendChild(el('<div class="note">The family sees referrals under Find Care and pays the vendor directly. Vendor bills go under Billing → Vendors once you have a quote.</div>'));
+  return w;
+}
+// 5. Progress: where the plan stands, stage by stage, and the stage itself.
+function ruProgress(){
+  var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
+  var live=(d.plan||[]).filter(function(p){return !isDraft(p)}),T=suTimeline();
+  var card=el('<div class="card"><div class="k" style="margin-bottom:6px">The plan, stage by stage</div></div>');
+  BOOT.stages.forEach(function(stg){var rows=live.filter(function(p){return p.stage===stg});if(!rows.length)return;var done=rows.filter(function(p){return p.status==='Done'}).length,t=T.filter(function(x){return x.stage===stg})[0];
+    var g=el('<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:10px"><b'+(stg===c.current_stage?' style="color:var(--gold)"':'')+'>'+esc(stg)+'</b><span class="small muted">'+done+' of '+rows.length+' done'+(t&&t.from?' · '+esc(fmtShort(t.from))+(t.to&&t.to!==t.from?' → '+esc(fmtShort(t.to)):''):'')+'</span></div><div style="height:6px;background:var(--line);border-radius:3px;margin:8px 0 6px"><div style="height:6px;width:'+Math.round(100*done/rows.length)+'%;background:var(--gold);border-radius:3px"></div></div></div>');
+    rows.forEach(function(p){var r=el('<div class="small" style="display:flex;gap:8px;align-items:center;padding:3px 0"><span style="width:14px">'+(p.status==='Done'?'✓':p.status==='In progress'?'→':'·')+'</span><span style="flex-grow:1'+(p.status==='Done'?';color:var(--muted)':'')+'">'+esc(p.item)+(p.target_date?' <span class="muted">· '+esc(fmtShort(p.target_date))+'</span>':'')+'</span><select style="width:auto;padding:2px 6px;font-size:12px">'+BOOT.planStatuses.map(function(s){return'<option'+(s===p.status?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select></div>');$('select',r).onchange=function(){call('setPlanStatus',{planId:p.plan_id,status:this.value}).then(refresh).catch(alertErr)};g.appendChild(r)});
+    card.appendChild(g)});
+  if(!live.length)card.appendChild(el('<p class="small muted" style="margin:0">Nothing on the plan yet.</p>'));
+  left.appendChild(card);
+  var st=el('<div class="card"><div class="k" style="margin-bottom:8px">Stage today</div><select>'+BOOT.stages.map(function(s){return'<option'+(s===(c.current_stage||BOOT.stages[0])?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select><p class="small muted" style="margin:8px 0 0">Suggested from the dates: <b>'+esc(suStageGuess())+'</b>. The family’s Home page follows the stage.</p></div>');
+  $('select',st).onchange=function(){call('setStage',{stage:this.value}).then(refresh).catch(alertErr)};
+  side.appendChild(st);
+  var openT=(d.tasks||[]).filter(function(t){return t.status!=='Done'}),od=openT.filter(function(t){return t.due_date&&String(t.due_date).slice(0,10)<suDay(new Date(),0)});
+  side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">Tasks</div><div class="small muted">'+openT.length+' open'+(od.length?' · <b style="color:#9B2C2C">'+od.length+' overdue</b>':'')+'</div></div>'));
+  return w;
+}
+
 // ---------------------------------------------------------------- prep sheet (coordinator)
 function prepView(){
   var d=S.data,it=d.intake,c=d.client,flags=d.intakeFlags||[];
