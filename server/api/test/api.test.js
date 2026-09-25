@@ -864,3 +864,45 @@ test('implementation: editTask, the Circle switch, and the In Basket row once a 
   const boot = await api(co, 'bootstrap', { clientId: cid });
   assert.ok('recommended' in boot);
 });
+
+test("the coordinator's notes on a plan item never reach the family; the full PDF is the coordinator's alone; 30-minute idle sign-out", async () => {
+  const co = await signIn('joe@incadencecare.com');
+  const olga = await db.one(`select c.* from clients c join users u on u.client_id=c.client_id where u.email='olga@example.com'`);
+  const cid = olga.client_id;
+  const add = await api(co, 'addPlanItem', { clientId: cid, stage: 'Before surgery', category: 'Care coordination', item: 'Arrange the ride home', detail: 'A named adult, confirmed the week of.', note: 'Vendor: Franklin Rides, $45, ask for Dee. We book it; they think a neighbor is driving.' });
+  assert.equal(add.ok, true, add.error);
+  const pid = add.item.plan_id;
+  let row = await db.one(`select * from plan_items where plan_id=$1`, [pid]);
+  assert.match(row.extra.note, /Franklin Rides/);
+  // the coordinator sees the note; the family does not, on the page or in their PDF
+  const cb = await api(co, 'bootstrap', { clientId: cid });
+  assert.match(cb.plan.find(p => p.plan_id === pid).extra.note, /Franklin Rides/);
+  const olgaS = await signIn('olga@example.com');
+  const fb = await api(olgaS, 'bootstrap', {});
+  const mine = fb.plan.find(p => p.plan_id === pid);
+  assert.ok(mine, 'the family sees the item'); assert.equal(mine.extra.note, undefined, 'but not the note'); assert.equal(mine.detail, 'A named adult, confirmed the week of.');
+  assert.equal(JSON.stringify(fb).includes('Franklin Rides'), false, 'the note is nowhere in the family bootstrap');
+  // editing keeps or clears the note; a blank clears it
+  assert.equal((await api(co, 'editPlanItem', { clientId: cid, planId: pid, note: 'Vendor: Franklin Rides. Booked for 7 am.' })).ok, true);
+  row = await db.one(`select * from plan_items where plan_id=$1`, [pid]); assert.match(row.extra.note, /Booked for 7 am/);
+  assert.equal((await api(co, 'editPlanItem', { clientId: cid, planId: pid, owner: 'Joe' })).ok, true);
+  row = await db.one(`select * from plan_items where plan_id=$1`, [pid]); assert.match(row.extra.note, /Booked for 7 am/, 'an edit without note leaves it');
+  // the PDFs: the family version has no note; the full version (coordinator only) has it
+  const docs = require('../src/handlers/docs');
+  const co_ctx = { role: 'coordinator', clientId: cid, email: 'joe@incadencecare.com' };
+  const html = { fam: '', full: '' };
+  const pdf = require('../src/pdf'); const saved = pdf.render;
+  pdf.render = async h => { html.last = h; return Buffer.from('pdf'); };
+  try {
+    await docs.planPdf(co_ctx, {}); html.fam = html.last;
+    await docs.planPdf(co_ctx, { full: true }); html.full = html.last;
+    await docs.planPdf({ role: 'client', clientId: cid, email: 'olga@example.com' }, { full: true }); html.famFull = html.last;
+  } finally { pdf.render = saved; }
+  assert.ok(!/Franklin Rides/.test(html.fam)); assert.ok(/Franklin Rides/.test(html.full)); assert.ok(/FOR THE MEETING/.test(html.full));
+  assert.ok(!/Franklin Rides/.test(html.famFull), 'a family asking for full gets the family version');
+  // idle: a session untouched for 31 minutes is gone
+  const C = require('../src/config'); assert.equal(C.IDLE_MINUTES, 30);
+  await db.q(`update sessions set last_seen_at = now() - interval '31 minutes' where session_id=$1`, [olgaS]);
+  const r = await api(olgaS, 'bootstrap', {});
+  assert.equal(r.ok, false); assert.equal(r.error, 'signed_out');
+});
