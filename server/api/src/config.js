@@ -28,7 +28,7 @@ module.exports = {
   FROM_EMAIL: env.FROM_EMAIL || '',
   REFERRAL_STATUSES: ['Suggested', 'Contacted', 'In place', 'Not needed'],
   FIXED_ANSWERS: ['0.1', '0.1a', 'A.name', 'G.1', 'G.4'],
-  NOTIFY_KINDS: { message: 'Messages', plan: 'Plan changes', booking: 'Booking confirmations', meds: 'Medication reminders' },
+  NOTIFY_KINDS: { message: 'Messages', plan: 'Plan changes', booking: 'Booking confirmations', meds: 'Medication reminders', notes: 'Notes from Joe' },
   CO_KINDS: { urgent: 'Urgent messages', missed: 'Missed-dose check-ins', billing: 'Declined cards and payment problems', bookingSoon: 'Bookings for today or tomorrow', message: 'Messages', booking: 'Bookings further out', upload: 'Uploads', meds: 'Medications to review', intake: 'Intake finished or changed', assist: 'Assistance asks and payments in' },
   CO_DEFAULTS: { urgent: 'instant', missed: 'instant', billing: 'instant', bookingSoon: 'instant', message: 'digest', booking: 'digest', upload: 'digest', meds: 'digest', intake: 'digest', assist: 'digest' },
   MED_STATUSES: ['Pending review', 'Accepted', 'Stopped'],
