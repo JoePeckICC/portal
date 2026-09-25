@@ -19,6 +19,12 @@ input,textarea,select{width:100%;border:1px solid var(--line2);border-radius:3px
 textarea{resize:vertical;min-height:88px}
 label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
 .field{margin-bottom:14px}
+/* password fields: eye toggle, strength bar, requirement checklist (set-password page and Settings) */
+.pwwrap{position:relative}.pwwrap input{padding-right:46px}
+.pweye{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;background:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:3px}.pweye:hover{color:var(--ink);background:var(--panel)}.pweye svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.pwbar{display:flex;align-items:center;gap:10px;margin:-4px 0 12px}.pwbar .segs{display:flex;gap:4px;flex:1}.pwbar .segs b{flex:1;height:4px;border-radius:2px;background:var(--line);transition:background .15s}.pwbar .segs b.on{background:var(--gold)}.pwbar .lbl{font-size:12px;color:var(--muted);min-width:72px;text-align:right}
+.pwck{list-style:none;padding:0;margin:0 0 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px 12px}.pwck li{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);transition:color .15s}.pwck li i{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line2);flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;transition:all .15s}.pwck li i svg{width:9px;height:9px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0}.pwck li.ok{color:var(--ink)}.pwck li.ok i{background:var(--gold);border-color:var(--gold)}.pwck li.ok i svg{opacity:1}
+.pwmatch{font-size:13px;margin:-6px 0 16px;min-height:18px;color:var(--muted)}.pwmatch.ok{color:#2F6B3A}.pwmatch.bad{color:#9B2C2C}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:46px;padding:0 20px;border-radius:3px;border:0;background:var(--gold);color:#fff;font-weight:700;cursor:pointer;text-decoration:none}
 .btn:hover{background:#A98630;color:#fff}
 .btn.quiet{background:#fff;color:var(--ink);border:1px solid var(--line2);height:38px;padding:0 14px;font-size:13px}
@@ -491,8 +497,18 @@ function el(html){var t=document.createElement('template');t.innerHTML=html.trim
 // Password rules the server also enforces (server/api/src/password.js). Shown as a live checklist.
 function pwChecks(a){a=a||'';return [['At least 12 characters',a.length>=12],['A lowercase letter',/[a-z]/.test(a)],['A capital letter',/[A-Z]/.test(a)],['A number',/[0-9]/.test(a)],['A symbol, like ! or #',/[^A-Za-z0-9\s]/.test(a)]]}
 function pwMissing(a){return pwChecks(a).filter(function(c){return !c[1]}).map(function(c){return c[0].toLowerCase()})}
-function pwList(){return '<ul class="pwck small" style="list-style:none;padding:0;margin:-6px 0 14px">'+pwChecks('').map(function(c){return '<li style="color:var(--muted);margin:2px 0"><span style="display:inline-block;width:18px">○</span>'+esc(c[0])+'</li>'}).join('')+'</ul>'}
-function pwWatch(input,list){input.addEventListener('input',function(){var cs=pwChecks(input.value);Array.prototype.forEach.call(list.children,function(li,i){var ok=cs[i][1];li.firstChild.textContent=ok?'✓':'○';li.style.color=ok?'var(--ink)':'var(--muted)';li.firstChild.style.color=ok?'var(--gold)':''})})}
+var PW_EYE='<svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',PW_EYE_OFF='<svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 10.6A3 3 0 0 0 13.4 13.4M9.9 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4M6.6 6.6C4 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4.3-1"/></svg>';
+// A password field with a show/hide eye. pwList() is the requirement checklist with a strength bar; pwWatch() keeps both live.
+function pwField(id,label,ac,extra){return '<div class="field"'+(extra||'')+'><label for="'+id+'">'+esc(label)+'</label><div class="pwwrap"><input id="'+id+'" type="password" autocomplete="'+ac+'" required><button type="button" class="pweye" aria-label="Show password" aria-pressed="false">'+PW_EYE+'</button></div></div>'}
+function pwList(){return '<div class="pwbar" aria-hidden="true"><div class="segs"><b></b><b></b><b></b><b></b><b></b></div><span class="lbl"></span></div><ul class="pwck" aria-label="Password requirements">'+pwChecks('').map(function(c){return '<li><i><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></i>'+esc(c[0])+'</li>'}).join('')+'</ul>'}
+function pwWatch(root,p1,p2){
+  $all('.pweye',root).forEach(function(b){b.onclick=function(){var i=b.parentElement.querySelector('input'),show=i.type==='password';i.type=show?'text':'password';b.innerHTML=show?PW_EYE_OFF:PW_EYE;b.setAttribute('aria-pressed',show);b.setAttribute('aria-label',show?'Hide password':'Show password');i.focus()}});
+  var list=$('.pwck',root),bar=$('.pwbar',root),match=$('.pwmatch',root);
+  function upd(){var cs=pwChecks(p1.value),n=0;Array.prototype.forEach.call(list.children,function(li,i){var ok=cs[i][1];if(ok)n++;li.classList.toggle('ok',ok)});
+    if(bar){Array.prototype.forEach.call(bar.querySelectorAll('b'),function(s,i){s.classList.toggle('on',i<n)});$('.lbl',bar).textContent=!p1.value?'':n<3?'Weak':n<5?'Almost there':'Strong'}
+    if(match&&p2){var a=p1.value,b=p2.value;match.className='pwmatch'+(!b?'':a===b?' ok':' bad');match.textContent=!b?'':a===b?'Passwords match':'These do not match yet'}}
+  p1.addEventListener('input',upd);if(p2)p2.addEventListener('input',upd);
+}
 function $(sel,root){return (root||document).querySelector(sel)}
 function $all(sel,root){return Array.prototype.slice.call((root||document).querySelectorAll(sel))}
 function store(k,v){try{if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
@@ -556,10 +572,9 @@ function gate(){
   function showErr(m){err.textContent=m||'';err.style.display=m?'':'none'}
   if(A.mode==='setpw'){
     var P=BOOT.pwset||{};
-    c=gateCard('<h1 style="margin:12px 0 8px">'+(P.reset?'Choose a new password':'Set your password')+'</h1><p class="muted" style="margin:0 0 20px">'+(P.name?'Hi '+esc(P.name)+'. ':'')+'You will use this with your email to sign in from now on. A short sentence you will remember, with a capital, a number and a symbol, works well.</p><p class="err" style="margin:0 0 14px;display:none"></p><div class="field"><label for="un">Email</label><input id="un" type="email" autocomplete="username" value="'+esc(P.email||'')+'" readonly></div><div class="field"><label for="p1">New password</label><input id="p1" type="password" autocomplete="new-password" minlength="12" required></div>'+pwList()+'<div class="field"><label for="p2">Type it again</label><input id="p2" type="password" autocomplete="new-password" required></div><label class="small" style="display:flex;gap:8px;align-items:center;margin:-4px 0 16px"><input type="checkbox" id="sh" style="width:auto"> Show passwords</label><button class="btn block" type="submit">'+(P.reset?'Save and sign in':'Set password and sign in')+'</button>');
+    c=gateCard('<h1 style="margin:12px 0 8px">'+(P.reset?'Choose a new password':'Set your password')+'</h1><p class="muted" style="margin:0 0 20px">'+(P.name?'Hi '+esc(P.name)+'. ':'')+'You will use this with your email to sign in from now on. A short sentence you will remember, with a capital, a number and a symbol, works well.</p><p class="err" style="margin:0 0 14px;display:none"></p><div class="field"><label for="un">Email</label><input id="un" type="email" autocomplete="username" value="'+esc(P.email||'')+'" readonly></div>'+pwField('p1','New password','new-password')+pwList()+pwField('p2','Type it again','new-password')+'<div class="pwmatch"></div><button class="btn block" type="submit">'+(P.reset?'Save and sign in':'Set password and sign in')+'</button>');
     f=$('form',c);err=$('.err',c);
-    $('#sh',c).onchange=function(){var t=this.checked?'text':'password';$('#p1',c).type=t;$('#p2',c).type=t};
-    pwWatch($('#p1',c),$('.pwck',c));
+    pwWatch(c,$('#p1',c),$('#p2',c));
     f.onsubmit=function(ev){ev.preventDefault();var a=$('#p1',c).value,b=$('#p2',c).value,btn=$('button',f);
       var miss=pwMissing(a);if(miss.length){showErr('Your password still needs: '+miss.join(', ')+'.');return}
       if(a!==b){showErr('The two passwords do not match.');return}
@@ -913,10 +928,10 @@ function settingsView(){
 }
 function securityPage(){
   var v=el('<div><h2>Password &amp; security</h2><p class="muted small" style="margin:4px 0 16px">Changing your password keeps this browser signed in and signs out every other one.</p>'+
-    '<form class="card" id="cp" novalidate><span class="k">Change password</span><input type="email" autocomplete="username" value="'+esc(S.data.me.email)+'" style="display:none" readonly><div class="field" style="margin-top:10px"><label for="cp0">Current password</label><input id="cp0" type="password" autocomplete="current-password"></div><div class="field"><label for="cp1">New password</label><input id="cp1" type="password" autocomplete="new-password"></div>'+pwList()+'<div class="field"><label for="cp2">Type it again</label><input id="cp2" type="password" autocomplete="new-password"></div><p class="err small" style="margin:0 0 10px"></p><p class="ok small" style="margin:0 0 10px"></p><button class="btn sm" type="submit">Change password</button></form>'+
+    '<form class="card" id="cp" novalidate><span class="k">Change password</span><input type="email" autocomplete="username" value="'+esc(S.data.me.email)+'" style="display:none" readonly>'+pwField('cp0','Current password','current-password',' style="margin-top:10px"')+pwField('cp1','New password','new-password')+pwList()+pwField('cp2','Type it again','new-password')+'<div class="pwmatch"></div><p class="err small" style="margin:0 0 10px"></p><p class="ok small" style="margin:0 0 10px"></p><button class="btn sm" type="submit">Change password</button></form>'+
     '<div class="card" style="margin-top:14px"><span class="k">Remembered devices</span><p class="small muted" style="margin:6px 0 10px">Devices that passed the emailed code skip it for 30 days. Forget them all and the next sign-in anywhere asks for a code again.</p><button class="btn quiet sm" type="button" id="fd">Forget remembered devices</button></div>'+
     '<div class="card" style="margin-top:14px"><span class="k">Sign out everywhere</span><p class="small muted" style="margin:6px 0 10px">A shared computer, a lost phone? This signs every browser out, including this one.</p><button class="btn quiet sm" type="button" id="soe">Sign out everywhere</button></div></div>');
-  var f=$('#cp',v);pwWatch($('#cp1',v),$('.pwck',v));
+  var f=$('#cp',v);pwWatch(f,$('#cp1',v),$('#cp2',v));
   f.onsubmit=function(ev){ev.preventDefault();var a=$('#cp1',v).value,b=$('#cp2',v).value,btn=$('button',f);$('.ok',f).textContent='';
     var miss=pwMissing(a);if(miss.length){$('.err',f).textContent='Your new password still needs: '+miss.join(', ')+'.';return}
     if(a!==b){$('.err',f).textContent='The two new passwords do not match.';return}
