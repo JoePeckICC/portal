@@ -30,6 +30,40 @@ async function writeIntake(clientId, answers, by, c) {
   }
 }
 
+// A US phone number: 10 digits (a leading 1 is fine), a real area code, an optional extension. '' when it is not one.
+function phoneOk(v) {
+  const m = String(v || '').trim().match(/^([\s\S]*?)(?:\s*(?:ext\.?|extension|x)\s*#?\s*(\d{1,6}))?$/i);
+  let d = (m ? m[1] : '').replace(/\D/g, '');
+  if (d.length === 11 && d[0] === '1') d = d.slice(1);
+  if (d.length !== 10 || /^[01]/.test(d) || /^[01]/.test(d.slice(3)) || /^(\d)\1{9}$/.test(d)) return '';
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` + (m && m[2] ? ' ext. ' + m[2] : '');
+}
+// Initials that match the signed name: first + last, or every word (Sarah Marie Rivera -> SR or SMR). '' when fine.
+function initialsProblem(list, name) {
+  const w = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (w.length < 2) return 'Please sign with your first and last name.';
+  const all = w.map(x => x[0]).join('').toUpperCase(), fl = (w[0][0] + w[w.length - 1][0]).toUpperCase();
+  for (const x of list) {
+    const s = String(x || '').replace(/\./g, '').toUpperCase();
+    if (!/^[A-Z]{2,4}$/.test(s) || (s !== all && s !== fl)) return `Initials should match the name you sign with. For ${w[0]} ${w[w.length - 1]}, that is ${fl}.`;
+  }
+  return '';
+}
+// One saved answer, tidied: the phone in one format, and a multi-choice never mixes "No", "None" or
+// "I don't know" with real picks (the page prevents it; this covers anything else that calls the API).
+const EXCLUSIVE_ = new Set(['No', 'None', DK_]);
+function tidyAnswer(qid, v) {
+  v = v && typeof v === 'object' ? { a: v.a, n: v.n } : { a: '', n: '' };
+  const q = []; INTAKE_STEPS_.forEach(s => s.qs.forEach(x => { if (x.id === qid) q.push(x); }));
+  if (!q.length) return v;
+  if (qid === 'A.phone') { const p = phoneOk(v.a); if (p) v.a = p; }
+  if (q[0].type === 'multi' && v.a) {
+    const parts = String(v.a).split('; ').filter(Boolean);
+    if (parts.length > 1 && parts.some(p => EXCLUSIVE_.has(p))) v.a = parts.filter(p => !EXCLUSIVE_.has(p)).join('; ');
+  }
+  return v;
+}
+
 function visibleQs(answers) {
   const out = [];
   INTAKE_STEPS_.forEach(s => s.qs.forEach(q => {
@@ -38,7 +72,8 @@ function visibleQs(answers) {
   }));
   return out;
 }
-const missingRequired = answers => visibleQs(answers).filter(q => q.req && !(answers[q.id] && String(answers[q.id].a).trim())).map(q => q.id);
+const missingRequired = answers => visibleQs(answers).filter(q => q.req && !(answers[q.id] && String(answers[q.id].a).trim())).map(q => q.id)
+  .concat(answers['A.phone'] && String(answers['A.phone'].a).trim() && !phoneOk(answers['A.phone'].a) ? ['A.phone (not a working number)'] : []);
 const ans = (answers, qid) => (answers[qid] ? String(answers[qid].a || '') : '');
 const has = (answers, qid, v) => ans(answers, qid).split('; ').indexOf(v) >= 0;
 const isPatient = answers => /person having surgery/.test(ans(answers, '0.1'));
@@ -112,4 +147,4 @@ async function seedPlan(clientId, answers, client, by, c) {
   return made;
 }
 
-module.exports = { intakeSpec, readIntake, writeIntake, visibleQs, missingRequired, ans, has, isPatient, intakeFlags, seedPlan, DK_, DISCUSS_ };
+module.exports = { intakeSpec, readIntake, writeIntake, visibleQs, missingRequired, phoneOk, initialsProblem, tidyAnswer, ans, has, isPatient, intakeFlags, seedPlan, DK_, DISCUSS_ };
