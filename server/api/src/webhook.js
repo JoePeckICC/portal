@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const db = require('./db');
 const core = require('./core');
 const billing = require('./billing');
-const { safeEqual, famName } = require('./util');
+const { safeEqual, famName, isTrue } = require('./util');
 
 function verify(raw, header, secret) {
   if (!header || !secret) return false;
@@ -26,6 +26,12 @@ async function handle(req, res, rawBuf) {
     if (ev.type === 'invoice.paid' || ev.type === 'invoice.payment_succeeded') {
       await billing.markPaid(obj.customer, obj);
       await db.q(`update clients set billing_status='Active' where stripe_customer_id=$1 and billing_status='Payment failed'`, [obj.customer]);
+    } else if (ev.type === 'invoice.upcoming') {
+      const c = await db.one(`select * from clients where stripe_customer_id=$1`, [obj.customer]);
+      if (c && isTrue(c.paid)) await require('./lifecycle').renewal(c, obj);
+    } else if (ev.type === 'customer.subscription.deleted') {
+      const c = await db.one(`select * from clients where stripe_customer_id=$1`, [obj.customer]);
+      if (c) { await require('./lifecycle').ended(c, obj); await db.q(`update clients set stripe_subscription_id=null where client_id=$1 and stripe_subscription_id=$2`, [c.client_id, String(obj.id || '')]); }
     } else if (ev.type === 'invoice.payment_failed') {
       const c = await db.one(`select * from clients where stripe_customer_id=$1`, [obj.customer]);
       if (c) {
