@@ -102,6 +102,13 @@ async function savePrefs(ctx, p, c) {
   if (Object.keys(patch).length) await db.update('users', { email: ctx.email }, patch, c);
   return {};
 }
+// The Circle (updates for supporters) on or off for a family (added 2026-09-25 for the Implement page).
+async function setCircle(ctx, p, c) {
+  must(ctx.role === 'coordinator', 'Not allowed');
+  const cl = await core.clientById(ctx.clientId, c); must(cl, 'Not found');
+  await db.q(`update clients set circle_enabled=$2 where client_id=$1`, [cl.client_id, !!p.on], c);
+  return { client: core.publicClient(await core.clientById(ctx.clientId, c)) };
+}
 async function setStage(ctx, p, c) {
   must(ctx.role === 'coordinator', 'Not allowed');
   const cl = await core.clientById(ctx.clientId, c); must(cl, 'Not found');
@@ -109,4 +116,4 @@ async function setStage(ctx, p, c) {
   return {};
 }
 
-module.exports = { saveProfile, changeEmail, saveAnswers, addInner, removeInner, signOutEverywhere, changePassword, forgetDevices, savePrefs, setStage };
+module.exports = { saveProfile, changeEmail, saveAnswers, addInner, removeInner, signOutEverywhere, changePassword, forgetDevices, savePrefs, setStage, setCircle };
