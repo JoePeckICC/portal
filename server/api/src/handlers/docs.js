@@ -16,20 +16,20 @@ const famOrCo = ctx => must(core.fam(ctx) || ctx.role === 'coordinator', 'Not al
 const longDate = () => new Intl.DateTimeFormat('en-US', { timeZone: C.TZ, month: 'long', day: 'numeric', year: 'numeric' }).format(new Date());
 
 // ---- HTML builders (same markup as the Apps Script)
-function planHtml(c, items, co) {
+function planHtml(c, items, co, full) {
   const name = [c.patient_first_name, c.patient_last_name].join(' ').trim() || c.family_name;
   let h = '<html><head><meta charset="utf-8"><style>' +
     'body{font-family:Helvetica,Arial,sans-serif;color:#1C2A3A;font-size:11pt;line-height:1.5;margin:48px 56px}h1{font-family:Georgia,serif;font-weight:normal;font-size:26pt;margin:6px 0 4px}h2{font-family:Georgia,serif;font-weight:normal;font-size:16pt;margin:26px 0 2px;padding-top:14px;border-top:1px solid #E3DED3}' +
     '.k{font-size:8.5pt;letter-spacing:2px;text-transform:uppercase;color:#C09B36;font-weight:bold}.muted{color:#5B6470;font-size:10pt}.cat{font-size:8.5pt;letter-spacing:1.5px;text-transform:uppercase;color:#C09B36;font-weight:bold;margin:12px 0 2px}.it{margin:0 0 6px 0;padding-left:14px;text-indent:-14px}.d{color:#5B6470;font-size:9.5pt;padding-left:14px}.foot{margin-top:36px;padding-top:12px;border-top:1px solid #E3DED3;color:#5B6470;font-size:9pt}' +
     '</style></head><body>' +
-    '<div class="k">' + esc(C.APP_NAME) + ' &middot; The Cadence Plan</div>' +
+    '<div class="k">' + esc(C.APP_NAME) + ' &middot; The Cadence Plan' + (full ? ' &middot; FULL VERSION, FOR THE MEETING. NOT FOR THE FAMILY.' : '') + '</div>' +
     '<h1>' + esc(first(c.patient_first_name) || name) + '&rsquo;s road, written down.</h1>' +
     '<div class="muted">Prepared for ' + esc(famName(c.family_name)) + (c.surgery_date ? ' &middot; Surgery ' + esc(String(c.surgery_date).slice(0, 10)) : '') + ' &middot; ' + esc(longDate()) + (co ? ' &middot; Coordinator: ' + esc(co.name) : '') + '</div>';
   let any = false;
   C.STAGES.forEach(st => {
     const rows = items.filter(p => p.stage === st); if (!rows.length) return; any = true;
     h += '<h2>' + esc(st) + '</h2>';
-    C.CATEGORIES.forEach(cat => { const rs = rows.filter(p => p.category === cat); if (!rs.length) return; h += '<div class="cat">' + esc(cat) + '</div>'; rs.forEach(p => { h += '<div class="it">&#9675;&nbsp; ' + esc(p.item) + '</div>' + (p.detail ? '<div class="d">' + esc(p.detail) + '</div>' : ''); }); });
+    C.CATEGORIES.forEach(cat => { const rs = rows.filter(p => p.category === cat); if (!rs.length) return; h += '<div class="cat">' + esc(cat) + '</div>'; rs.forEach(p => { h += '<div class="it">&#9675;&nbsp; ' + esc(p.item) + '</div>' + (p.detail ? '<div class="d">' + esc(p.detail) + '</div>' : '') + (full && p.extra && p.extra.note ? '<div class="d" style="color:#8a6d1f;border-left:2px solid #C09B36;padding-left:8px"><b>Your notes:</b> ' + esc(p.extra.note) + '</div>' : ''); }); });
   });
   if (!any) h += '<p class="muted">The plan is being written. This page will fill in.</p>';
   h += '<div class="foot">' + esc(C.APP_NAME) + ' is a non-clinical support service. We coordinate; we do not diagnose, treat, or give medical advice. For anything medical, call your care team. In an emergency, call 911.</div></body></html>';
@@ -70,13 +70,15 @@ async function summaryHtml(c, clientId) {
 }
 
 // ---- actions
-async function planPdf(ctx) {
+// The family version by default. full (coordinator only) adds the coordinator's notes for the meeting.
+async function planPdf(ctx, p) {
   must(ctx.clientId, 'Pick a family first');
+  const full = !!(p && p.full) && ctx.role === 'coordinator';
   const c = await core.clientById(ctx.clientId); must(c, 'Not found');
   if (ctx.role === 'client') must(isTrue(c.plan_ready), 'Your plan is not ready yet.');
   const items = (await db.all(`select * from plan_items where client_id=$1 and draft=false order by updated_at`, [ctx.clientId])).filter(p => !(p.extra && p.extra.draft === 'Discarded'));
-  const bytes = await pdf.render(planHtml(c, items, await core.coordinatorFor(c)));
-  return { b64: bytes.toString('base64'), name: 'Cadence Plan - ' + (c.family_name || c.patient_last_name || 'family') + '.pdf' };
+  const bytes = await pdf.render(planHtml(c, items, await core.coordinatorFor(c), full));
+  return { b64: bytes.toString('base64'), name: 'Cadence Plan - ' + (c.family_name || c.patient_last_name || 'family') + (full ? ' - full, for the meeting' : '') + '.pdf' };
 }
 async function summaryPdf(ctx) {
   famOrCo(ctx);
