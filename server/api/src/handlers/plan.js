@@ -21,7 +21,7 @@ const dateOnly = s => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? s : null);
 async function saveIntake(ctx, p, c) {
   clientOrCo(ctx); needFamily(ctx);
   const answers = p.answers || {}, ok = {};
-  Object.keys(answers).forEach(qid => { if (/^[A-Z0-9][A-Za-z0-9.]{0,12}$/.test(qid)) ok[qid] = answers[qid]; });
+  Object.keys(answers).forEach(qid => { if (/^[A-Z0-9][A-Za-z0-9.]{0,12}$/.test(qid)) ok[qid] = intake.tidyAnswer(qid, answers[qid]); });
   const cur = await intake.readIntake(ctx.clientId, c);
   // After submitting, keep a running list of what changed (first value -> latest value), so the
   // coordinator gets one email listing it all when they press "Save my changes" (submitIntake).
@@ -44,8 +44,12 @@ async function signConsent(ctx, p, c) {
   const cs = p.consent || {};
   const initials = (cs.initials || []).map(x => clean(x, 6).trim());
   must(initials.length === CONSENT_ITEMS_.length && initials.every(Boolean), 'Please initial every item');
-  must(clean(cs.name, 120).trim(), 'Type your full name to sign');
+  const name = clean(cs.name, 120).trim();
+  must(name, 'Type your full name to sign');
   must(clean(cs.relationship, 120).trim(), 'Tell us who you are to the patient (or "Self")');
+  // Initials are part of the signature: letters only, and they must be the initials of the name signed with
+  // (first + last, or every word). Added 2026-09-25 after "ZZZZ" and "1234" went through.
+  const bad = intake.initialsProblem(initials, name); must(!bad, bad);
   const cur = await intake.readIntake(ctx.clientId, c);
   // The wording is kept with the signature, so their copy shows exactly what they signed even if it changes later.
   const consent = { initials, name: clean(cs.name, 120), relationship: clean(cs.relationship, 120), signed_at: new Date(), by: ctx.email, items: CONSENT_ITEMS_ };
