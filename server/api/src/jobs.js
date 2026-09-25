@@ -41,6 +41,7 @@ async function medReminders() {
 
 // Sends each coordinator one email at their digest hour with everything queued since the last one. Also the daily housekeeping.
 async function dailyDigest() {
+  let notes = { sent: 0 }; try { notes = await require('./lifecycle').timed(); } catch (e) { console.error('lifecycle', e.message); }
   await auth.pruneSessions();
   await auth.pruneLogin();
   await db.q(`delete from rate_limits where window_end < now() - interval '1 day'`);
@@ -63,7 +64,7 @@ async function dailyDigest() {
     s.lastDigest = today;
     await db.q(`update users set co_settings=$2 where email=$1`, [u.email, JSON.stringify(s)]);
   }
-  return { sent };
+  return { sent, notes: notes.sent };
 }
 
 // Archived families whose retention date has passed: emailed to the coordinator as a list. Nothing is deleted by a job.
