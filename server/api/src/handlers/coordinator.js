@@ -130,7 +130,7 @@ async function inbasket(ctx) {
   const day = s => { const { localToIso } = require('../time'); return new Date(localToIso(s)); };
   const t0 = day(today), t1 = new Date(t0.getTime() + 864e5), t7 = new Date(t0.getTime() + 7 * 864e5);
   const needs = [];
-  const [meds, unread, intakes, assist, papers, appts, tasks, booked] = await Promise.all([
+  const [meds, unread, intakes, assist, papers, appts, tasks, booked, uncoord] = await Promise.all([
     db.all(`select * from medications where status='Pending review' and client_id = any($1)`, [ids]),
     db.all(`select m.client_id, m.topic_id, count(*)::int n, bool_or(m.urgent) urgent, max(m.sent_at) last_at, (array_agg(m.body order by m.sent_at desc))[1] body, t.title, t.kind
             from messages m left join topics t on t.topic_id=m.topic_id where m.sender_email<>'system' and m.read_by_coordinator=false and m.client_id = any($1) group by m.client_id, m.topic_id, t.title, t.kind`, [ids]),
@@ -141,6 +141,7 @@ async function inbasket(ctx) {
     db.all(`select * from appointments where status<>'Cancelled' and client_id = any($1) and starts_at >= $2 and starts_at < $3 order by starts_at`, [ids, t0, t7]),
     db.all(`select * from tasks where status<>'Done' and client_id = any($1) and due_date is not null and due_date < $2`, [ids, ymd(t7, C.TZ)]),
     db.all(`select client_id, count(*)::int n from appointments where status<>'Cancelled' and starts_at > now() and client_id = any($1) group by client_id`, [ids]),
+    db.all(`select client_id, count(*)::int n from plan_items where client_id = any($1) and status<>'Done' and coalesce(extra->>'draft','') not in ('true','1') and coalesce(extra->>'coordinated','') not in ('true') group by client_id`, [ids]),
   ]);
   meds.forEach(m => needs.push({ kind: 'Meds', client_id: m.client_id, family: fam(m.client_id), text: m.name + (m.dose ? ' ' + m.dose : '') + ' — pending review', when: m.updated_at || m.added_at || '', go: 'meds', pri: 1 }));
   unread.forEach(u => { const urg = u.kind === 'urgent' || u.urgent; needs.push({ kind: urg ? 'Urgent' : 'Message', client_id: u.client_id, family: fam(u.client_id), text: '“' + String(u.body).slice(0, 110) + (String(u.body).length > 110 ? '…' : '') + '” — ' + (u.title || 'Messages') + (u.n > 1 ? ' (' + u.n + ')' : ''), when: u.last_at, go: 'messages:' + u.topic_id, pri: urg ? 0 : 2 }); });
@@ -151,6 +152,8 @@ async function inbasket(ctx) {
   });
   clients.forEach(cl => {
     if (isTrue(cl.paid) && isTrue(cl.plan_ready) && !booked.some(b => b.client_id === cl.client_id)) needs.push({ kind: 'Implement', client_id: cl.client_id, family: fam(cl.client_id), text: 'Portal open, nothing booked yet — set the plan in motion', when: cl.paid_at || '', go: 'run', pri: 2 });
+    const uc = uncoord.find(u => u.client_id === cl.client_id);   // paid, and the in-depth coordination behind the plan is not done
+    if (isTrue(cl.paid) && isTrue(cl.plan_ready) && uc && uc.n) needs.push({ kind: 'Coordinate', client_id: cl.client_id, family: fam(cl.client_id), text: 'Paid — ' + uc.n + ' plan item' + (uc.n === 1 ? '' : 's') + ' still to coordinate', when: cl.paid_at || '', go: 'run:coord', pri: 2 });
     if (cl.billing_status === 'Payment failed') needs.push({ kind: 'Billing', client_id: cl.client_id, family: fam(cl.client_id), text: 'Card declined · $' + (cl.monthly_amount == null ? '' : cl.monthly_amount) + ' · Stripe will retry', when: '', go: 'billing', pri: 3 });
     if (cl.stripe_customer_id && !isTrue(cl.paid) && cl.billing_status === 'Active') needs.push({ kind: 'Billing', client_id: cl.client_id, family: fam(cl.client_id), text: 'First invoice not paid yet — portal still locked', when: '', go: 'billing', pri: 4 });
   });
