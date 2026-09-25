@@ -117,7 +117,7 @@ function seedRules(a, client) {
   const f1 = ans(a, 'F.1');
   if (f1) add(CC, 'First thing off your plate: “' + f1.slice(0, 120) + (f1.length > 120 ? '…' : '') + '”', 'The one thing the family asked for first. In their words.');
   if (!ans(a, 'L.1') || /haven't sorted/.test(ans(a, 'L.1'))) add(CC, 'Name the adult who drives ' + name + ' home', 'The hospital will not discharge to a taxi or rideshare on its own; they need a named adult. Usually the first thing we solve.');
-  else add(CC, 'Confirm the ride home: ' + ans(a, 'L.1').slice(0, 80), 'Check the day and time once the report time is known.');
+  else add(CC, 'Confirm the ride home: ' + ans(a, 'L.1').slice(0, 80), 'Check the day and time once the report time is known.' + (a['L.1'] && a['L.1'].n ? ' They added: “' + String(a['L.1'].n).slice(0, 200) + '”' : ''));
   if (ans(a, 'A.2') === 'Lives alone') {
     if (ans(a, 'A.2a').indexOf('Yes') === 0) add(FS, 'Confirm who stays the first night or two', ans(a, 'A.2ad'));
     else add(FS, 'Someone with ' + name + ' the first night or two', 'Lives alone. Most procedures require someone present for the first stretch.');
