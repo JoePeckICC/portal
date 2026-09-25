@@ -52,6 +52,8 @@ async function bootstrap(ctx) {
   ]);
   // Plan items the coordinator discarded never show anywhere.
   out.plan = plan.filter(p => !(p.extra && p.extra.draft === 'Discarded'));
+  // The coordinator's notes on an item (the vendor, the in-depth version) are theirs alone.
+  if (ctx.role !== 'coordinator') out.plan = out.plan.map(p => { const e = { ...(p.extra || {}) }; delete e.note; return { ...p, extra: e }; });
   out.inner = inner; out.patientUser = patient ? patient.email : '';
   out.intake = await intake.readIntake(cid); out.intakeSpec = intake.intakeSpec();
   if (ctx.role === 'coordinator') out.intakeFlags = intake.intakeFlags(out.intake.answers);
