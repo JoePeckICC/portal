@@ -58,7 +58,7 @@ const CONSENT_ITEMS_ = [
   ['Medications.', "If we're helping with medication organization, we'll collect the medication list separately and only with your written permission. We build the schedule your care team prescribed. We never advise on what to take or how much."],
   ['Appointment recording.', "If we're joining appointments, we'll ask the clinician's permission before recording anything, every time."],
   ['Your information.', "We store what you've given us securely and use it only to arrange the support you've asked for. You may ask us to correct or delete it at any time."],
-  ['How we prepare your plan.', "We use secure software tools, including AI, to help organize your answers and draft your recovery plan. Every plan is reviewed and finalized by a person before you see it. We don't use your information to train anyone's AI systems."],
+  ['How we prepare your plan.', "Secure software keeps your answers organized. Your plan is written by a person, your coordinator, and reviewed before you see it. We never sell your information or use it to train software."],
   ['In an emergency, call 911.', 'For mental health crisis support, call or text 988.']
 ];
 
