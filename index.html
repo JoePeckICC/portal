@@ -40,6 +40,7 @@ label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
 
 /* site header — same as www.incadencecare.com */
 .sitebar{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #CDD7E0}
+input,select,textarea,button{scroll-margin-top:110px}
 .sitebar-in{padding:12px clamp(20px,4vw,56px);display:flex;align-items:center;justify-content:space-between;gap:20px}
 .lockup{display:flex;align-items:center;text-decoration:none}
 .lockup svg{height:35px;width:auto;display:block}
@@ -536,6 +537,8 @@ function pwWatch(root,p1,p2){
     if(bar){Array.prototype.forEach.call(bar.querySelectorAll('b'),function(s,i){s.classList.toggle('on',i<n)});$('.lbl',bar).textContent=!p1.value?'':n<3?'Weak':n<5?'Almost there':'Strong'}
     if(match&&p2){var a=p1.value,b=p2.value;match.className='pwmatch'+(!b?'':a===b?' ok':' bad');match.textContent=!b?'':a===b?'Passwords match':'These do not match yet'}}
   p1.addEventListener('input',upd);if(p2)p2.addEventListener('input',upd);
+  // The second box is a check that you can retype it: no copying out of the first, no pasting into the second.
+  if(p2){['copy','cut'].forEach(function(e){p1.addEventListener(e,function(ev){ev.preventDefault()})});['paste','drop'].forEach(function(e){p2.addEventListener(e,function(ev){ev.preventDefault();if(match){match.className='pwmatch bad';match.textContent='Please type it again rather than pasting it.'}})})}
 }
 function $(sel,root){return (root||document).querySelector(sel)}
 function $all(sel,root){return Array.prototype.slice.call((root||document).querySelectorAll(sel))}
@@ -1299,6 +1302,9 @@ function coShell(){
   fi.oninput=function(){var q=fi.value.trim().toLowerCase();dr.innerHTML='';if(!q){dr.classList.remove('open');return}var fams=(S.ib&&S.ib.families)||(d.families||[]).map(function(f){return{client_id:f.client_id,family:famName(f.family_name),patient:f.patient||''}});fams.filter(function(f){return (f.family+' '+(f.patient||'')+' '+(f.family_name||'')).toLowerCase().indexOf(q)>=0}).slice(0,8).forEach(function(f){var a=el('<a href="#"><b>'+esc(f.family)+'</b>'+(f.patient?' <span class="muted">· '+esc(f.patient)+'</span>':'')+'</a>');a.onclick=function(ev){ev.preventDefault();dr.classList.remove('open');openFamily(f.client_id)};dr.appendChild(a)});dr.classList.toggle('open',!!dr.children.length)};
   fi.onblur=function(){setTimeout(function(){dr.classList.remove('open')},200)};
   var body=$('.wsbody',s);
+  // Building a plan from the In Basket: only the setup screens, nothing else to wander into, until Leave setup.
+  if(S.focus&&d.client&&S.cv==='chart'&&(S.view==='build'||S.view==='meet')){nav.innerHTML='';nav.appendChild(el('<span style="color:#D8D2C4;font-weight:700">Client setup · '+esc(famName(d.client.family_name))+'</span>'));var lv=el('<a href="#">Leave setup</a>');lv.onclick=function(ev){ev.preventDefault();S.focus=false;S.cv='inbasket';S.ib=null;render()};nav.appendChild(lv);$('.wsfind',s).style.display='none';$('.wsneeds',s).style.display='none';var fw=el('<div class="wspage"><div class="wrap" style="max-width:1120px;margin:14px auto"></div></div>');$('.wrap',fw).appendChild(S.view==='meet'?meetView():buildView());body.appendChild(fw);return s}
+  if(S.focus&&!(S.view==='build'||S.view==='meet'))S.focus=false;
   if(S.cv==='inbasket')body.appendChild(inbasketView());
   else if(S.cv==='schedule')body.appendChild(scheduleView());
   else if(S.cv==='newfam')body.appendChild(newFamilyView());
@@ -1321,7 +1327,7 @@ function inbasketView(){
     var needs=(r.needs||[]).filter(function(n){return !S.ibk||n.kind===S.ibk});
     var N=el('<div class="pn"><div class="ph"><span>Needs you <span class="wpill red">'+needs.length+'</span></span><span class="muted small">Sorted by urgency · click a row to open it in the family’s chart</span></div><div class="wt"></div></div>');
     if(!needs.length)$('.wt',N).appendChild(el('<div class="wempty">Nothing waiting on you. Good.</div>'));
-    needs.forEach(function(n){var row=el('<a href="#" class="wr" style="grid-template-columns:110px 1fr 130px 90px"><div>'+kindPill(n.kind)+'</div><div><b>'+esc(n.family)+'</b> · '+esc(n.text)+'</div><div class="muted small">'+(n.when?esc(fmtDay(n.when)+(fmtDay(n.when)==='Today'||fmtDay(n.when)==='Yesterday'?' '+fmtTime(n.when):'')):'')+'</div><div style="text-align:right"><span class="btn sm'+(n.pri>1?' quiet':'')+'">'+({Meds:'Review',Message:'Reply',Urgent:'Reply',Plan:'Build',Implement:'Start',Coordinate:'Coordinate',Intake:'Re-check',Billing:'Open',Assistance:'Open'}[n.kind]||'Open')+'</span></div></a>');row.onclick=function(ev){ev.preventDefault();openFamily(n.client_id,n.go)};$('.wt',N).appendChild(row)});
+    needs.forEach(function(n){var row=el('<a href="#" class="wr" style="grid-template-columns:110px 1fr 130px 90px"><div>'+kindPill(n.kind)+'</div><div><b>'+esc(n.family)+'</b> · '+esc(n.text)+'</div><div class="muted small">'+(n.when?esc(fmtDay(n.when)+(fmtDay(n.when)==='Today'||fmtDay(n.when)==='Yesterday'?' '+fmtTime(n.when):'')):'')+'</div><div style="text-align:right"><span class="btn sm'+(n.pri>1?' quiet':'')+'">'+({Meds:'Review',Message:'Reply',Urgent:'Reply',Plan:'Build',Implement:'Start',Coordinate:'Coordinate',Intake:'Re-check',Billing:'Open',Assistance:'Open'}[n.kind]||'Open')+'</span></div></a>');row.onclick=function(ev){ev.preventDefault();S.focus=n.kind==='Plan';openFamily(n.client_id,n.go)};$('.wt',N).appendChild(row)});
     C.appendChild(N);
     var F=el('<div class="pn"><div class="ph"><span>Families</span><span class="muted small">'+(r.families||[]).length+' active · sorted by surgery date</span></div><div class="wt"><div class="wh" style="grid-template-columns:90px 130px 120px 130px 1fr 120px"><div>Family</div><div>Patient</div><div>Stage</div><div>Surgery</div><div>Flags</div><div>Billing</div></div></div></div>');
     (r.families||[]).forEach(function(f){var dw=f.days===null?'':f.days===0?'<b>today</b>':f.days>0?'<b>'+f.days+' days</b>':'<b>day '+(-f.days)+'</b>';var row=el('<a href="#" class="wr" style="grid-template-columns:90px 130px 120px 130px 1fr 120px"><div><b>'+esc(f.family_name)+'</b></div><div>'+esc(f.patient)+'</div><div>'+esc(f.stage)+'</div><div>'+(f.surgery_date?esc(fmtShort(f.surgery_date).replace(/, \d{4}$/,''))+' · '+dw:'TBD')+'</div><div>'+f.flags.map(kindPill).join(' ')+(!f.paid&&f.billing?' <span class="wpill gray">Locked</span>':'')+'</div><div class="'+(f.billing==='Payment failed'?'red':'')+'">'+esc(f.billing||'—')+'</div></a>');row.onclick=function(ev){ev.preventDefault();openFamily(f.client_id)};$('.wt',F).appendChild(row)});
@@ -1868,6 +1874,9 @@ function questionStep(body,v,st){
   var last=S.step===S.data.intakeSpec.steps.length,wasSub=isSub(S.data.intake),lbl=last?(wasSub?'Save my changes':'Submit my intake'):'Next';
   var nav=el('<div class="steps"><button class="btn quiet" type="button" '+(S.step<=1?'disabled':'')+'>Back</button><span class="err" id="se" role="alert" style="margin:0"></span><button class="btn" type="button">'+lbl+'</button></div>');
   var bs=$all('button',nav);
+  // As answers are fixed, the red mark and the "N answers need a look" line go away on their own.
+  function recheck(){var left=0;$all('.q.bad',body).forEach(function(x){var q=st.qs.filter(function(k){return k.id===x.getAttribute('data-id')})[0];if(q&&!qProblem(q)){x.classList.remove('bad');var e=$('.qerr',x);if(e)e.remove()}else left++});var se=$('#se',nav);if(se&&/need(s)? a look/.test(se.textContent))se.textContent=!left?'':left===1?'One answer needs a look — it is marked in red above.':left+' answers need a look — they are marked in red above.'}
+  body.addEventListener('input',recheck);body.addEventListener('click',function(){setTimeout(recheck,0)});
   bs[0].onclick=function(){saveStep(st).then(function(){S.step--;render();window.scrollTo(0,0)}).catch(function(e){$('#se',nav).textContent=e.message})};
   bs[1].onclick=function(){var bad=st.qs.filter(function(q){return qVisible(q)&&qProblem(q)});$all('.q',body).forEach(function(x){x.classList.remove('bad');var e=$('.qerr',x);if(e)e.remove()});if(bad.length){bad.forEach(function(q){var x=$('.q[data-id="'+q.id+'"]',body);if(x){x.classList.add('bad');var e=el('<div class="qerr"></div>');e.textContent=qProblem(q);$('.ctl',x).appendChild(e)}});$('#se',nav).textContent=bad.length===1?'One answer needs a look — it is marked in red above.':bad.length+' answers need a look — they are marked in red above.';var f=$('.q.bad',body);if(f)f.scrollIntoView({behavior:'smooth',block:'center'});return}bs[1].disabled=true;bs[1].textContent='Saving…';saveStep(st).then(function(){if(!last){S.step++;render();window.scrollTo(0,0);return}return call('submitIntake',{}).then(function(r){S.data.intake=r.intake;return refresh()}).then(function(){S.step=wasSub?'review':'done';render();window.scrollTo(0,0)})}).catch(function(e){$('#se',nav).textContent=e.message;bs[1].disabled=false;bs[1].textContent=lbl})};
   v.appendChild(nav);
@@ -1891,19 +1900,19 @@ function questionEl(q,redraw){
     var alts=q.alts||[],isAlt=alts.indexOf(a.a)>=0;
     var lab=' aria-labelledby="'+lid+'"',tel=q.id==='A.phone'?' type="tel" inputmode="tel" autocomplete="tel"':'';
     var inp=q.type==='date'?el('<input type="date"'+lab+' min="'+qDay(-365)+'" max="'+qDay(1095)+'" value="'+esc(isAlt?'':a.a)+'">'):(q.long?el('<textarea'+lab+' placeholder="'+esc(q.ph||'')+'">'+esc(isAlt?'':a.a)+'</textarea>'):el('<input'+lab+tel+' placeholder="'+esc(q.ph||'')+'" value="'+esc(isAlt?'':a.a)+'">'));
-    inp.oninput=function(){set(this.value);$all('.alt',c).forEach(function(x){x.classList.remove('on');x.setAttribute('aria-pressed','false')});var had=!!$('.qwarn',c),want=(q.id==='G.6'&&/^\d{4}-\d{2}-\d{2}$/.test(a.a)&&a.a<qDay(0))||(q.id==='L.1'&&RIDESHARE_.test(a.a));if(had!==want){var at=this.selectionStart,tag=this.tagName;redraw();var n=$('.q[data-id="'+q.id+'"] '+tag);if(n){n.focus();try{n.setSelectionRange(at,at)}catch(e){}}}};
+    inp.oninput=function(){set(this.value);$all('.alt',c).forEach(function(x){x.classList.remove('on');x.setAttribute('aria-pressed','false')});var had=!!$('.qwarn',c),want=(q.id==='G.6'&&/^\d{4}-\d{2}-\d{2}$/.test(a.a)&&a.a<qDay(0)&&a.a>=qDay(-365))||(q.id==='L.1'&&RIDESHARE_.test(a.a));if(had!==want){var at=this.selectionStart,tag=this.tagName;redraw();var n=$('.q[data-id="'+q.id+'"] '+tag);if(n){n.focus();try{n.setSelectionRange(at,at)}catch(e){}}}};
     c.appendChild(inp);
     // Picking an alternative never throws away what they typed: it moves into the note (a date is simply cleared).
     if(alts.length){var al=el('<div class="alts"></div>');alts.forEach(function(x){var b=el('<button type="button" aria-pressed="'+(a.a===x)+'" class="alt '+(a.a===x?'on':'')+'">'+esc(x)+'</button>');b.onclick=function(){var typed=q.type!=='date'&&alts.indexOf(a.a)<0?(a.a||'').trim():'';if(typed&&(a.n||'').indexOf(typed)<0)a.n=(a.n?a.n+'\n':'')+typed;set(x);redraw()};al.appendChild(b)});c.appendChild(al)}
     // Soft hints (they never block): a past date, and a rideshare as the ride home.
-    if(q.id==='G.6'&&/^\d{4}-\d{2}-\d{2}$/.test(a.a)&&a.a<qDay(0))c.appendChild(el('<div class="qwarn">That date has passed. If the surgery already happened, choose “'+esc(EMERGENCY_)+'” above so we ask the right questions.</div>'));
+    if(q.id==='G.6'&&/^\d{4}-\d{2}-\d{2}$/.test(a.a)&&a.a<qDay(0)&&a.a>=qDay(-365))c.appendChild(el('<div class="qwarn">That date has passed. If the surgery already happened, choose “'+esc(EMERGENCY_)+'” above so we ask the right questions.</div>'));
     if(q.id==='L.1'&&RIDESHARE_.test(a.a))c.appendChild(el('<div class="qwarn">Most hospitals will not release a patient to a taxi or rideshare after anesthesia. If you can, put a person here. If there is nobody yet, choose “We haven’t sorted this out yet” and we will help.</div>'));
     if(q.id==='G.6'&&a.a===EMERGENCY_)c.appendChild(el('<div class="note" role="alert" style="margin-top:12px"><b>If this is a medical emergency, call <a href="tel:911">911</a> now.</b> Otherwise, tell us where things stand below, and call us at <a href="tel:+16298003622">(629) 800-3622</a> if you need us sooner.</div>'))
   }
-  var open=q.noteOpen||!!a.n;
+  var open=q.noteOpen||!!a.n||!!a.no;
   var nl=el('<button type="button" class="notel">+ add a note</button>'),nf=el('<div class="note-f '+(open?'':'hidden')+'"><label>'+(q.noteOpen?'Anything to add? In your own words.':'Your note')+'</label><textarea aria-label="'+(q.noteOpen?'Anything to add':'Your note')+'">'+esc(a.n)+'</textarea></div>');
   $('textarea',nf).oninput=function(){a.n=this.value};
-  if(!open){nl.onclick=function(){nf.classList.remove('hidden');nl.remove();$('textarea',nf).focus()};c.appendChild(nl)}
+  if(!open){nl.onclick=function(){a.no=true;nf.classList.remove('hidden');nl.remove();$('textarea',nf).focus()};c.appendChild(nl)}
   c.appendChild(nf);
   return w;
 }
@@ -1911,7 +1920,7 @@ function consentStep(body,v){
   var d=S.data,items=d.intakeSpec.consent,n=first(d.client.patient_first_name)||'the patient';
   var f=el('<form></form>');
   function tel(s){return s.replace(/\b(911|988)\b/g,'<a href="tel:$1">$1</a>')}
-  items.forEach(function(it,i){f.appendChild(el('<div class="con"><input name="i'+i+'" maxlength="4" required placeholder="Initials" autocomplete="off" aria-label="Your initials for: '+esc(it[0])+'"><div class="t"><b>'+tel(esc(it[0]))+'</b> '+tel(esc(it[1]))+'</div></div>'))});
+  items.forEach(function(it,i){f.appendChild(el('<div class="con"><input name="i'+i+'" maxlength="4" required placeholder="Initials" autocomplete="off" aria-label="Your initials for: '+esc(it[0])+'"><div class="t"><b>'+tel(esc(it[0]))+'</b> '+tel(esc(it[1]))+'</div></div>'))});$all('.con a',f).forEach(function(a){a.tabIndex=-1});
   f.appendChild(el('<p class="small muted" style="margin:14px 0 0">The full details: our <a href="'+SITE+'privacy.html" target="_blank" rel="noopener">Privacy Policy</a> and <a href="'+SITE+'health-data-policy.html" target="_blank" rel="noopener">Consumer Health Data Policy</a>.</p>'));
   f.appendChild(el('<p style="margin:20px 0 14px;font-weight:700">I have read the above and would like to proceed.</p><div class="field"><label>Full name (this is your signature)</label><input name="name" required></div><div class="field"><label>Relationship to '+esc(n)+'</label><input name="rel" required placeholder="Self, spouse, daughter, friend"></div><p class="small muted">Signed today, '+esc(new Date().toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'}))+'.</p>'));
   var nav=el('<div class="steps"><span></span><span class="err" id="se" style="margin:0"></span><button class="btn" type="submit">I agree — continue</button></div>');
