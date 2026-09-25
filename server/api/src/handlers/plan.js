@@ -155,6 +155,15 @@ async function addTask(ctx, p, c) {
   const row = await db.insert('tasks', { task_id: id(), client_id: ctx.clientId, title, category: pick(p.category, C.CATEGORIES, C.CATEGORIES[0]), status: 'Not started', owner: clean(p.owner, 80), due_date: dateOnly(p.due_date), notes: clean(p.notes, 2000) }, c);
   return { task: row };
 }
+// Edit a task's wording, date, owner or notes (added 2026-09-25 for the Implement page).
+async function editTask(ctx, p, c) {
+  coOnly(ctx);
+  const row = await db.one(`select * from tasks where client_id=$1 and task_id=$2`, [ctx.clientId, String(p.taskId || '')], c); must(row, 'Not found');
+  const title = clean(p.title === undefined ? row.title : p.title, 300); must(title.trim(), 'Write the task');
+  await db.q(`update tasks set title=$2, due_date=$3, owner=$4, notes=$5, category=$6 where task_id=$1`,
+    [row.task_id, title, p.due_date === undefined ? row.due_date : dateOnly(p.due_date), clean(p.owner === undefined ? row.owner : p.owner, 80), clean(p.notes === undefined ? row.notes : p.notes, 2000), pick(p.category, C.CATEGORIES, row.category)], c);
+  return {};
+}
 async function setTaskStatus(ctx, p, c) {
   const row = await db.one(`select * from tasks where client_id=$1 and task_id=$2`, [ctx.clientId, String(p.taskId || '')], c); must(row, 'Not found');
   if (ctx.role !== 'coordinator') must(familyTask(row, await core.coordinatorFor(await core.clientById(ctx.clientId, c), c)) && ['Done', 'Not started'].indexOf(p.status) >= 0, 'Not allowed');
@@ -220,4 +229,4 @@ async function setGoalStatus(ctx, p, c) {
 
 // Only handlers are exported from this file: everything here becomes a callable action.
 module.exports = { saveIntake, signConsent, submitIntake, setPlanReady, setPaid, approvePlanItem, addPlanItem, setPlanStatus, addTask, setTaskStatus, addAppointment, cancelAppointment,
-  addCareTeam, removeCareTeam, addReferral, setReferralStatus, addGoal, setGoalStatus, editPlanItem };
+  addCareTeam, removeCareTeam, addReferral, setReferralStatus, addGoal, setGoalStatus, editPlanItem, editTask };
