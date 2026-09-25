@@ -103,6 +103,33 @@ label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
 .msg .m{font-size:12px;color:var(--faint);margin-top:6px}
 .msg.me .m{text-align:right}
 
+/* updates as a timeline (2026-09-25): day label, time column, spine, colored kind */
+.tl{--c:var(--gold);min-width:0;max-width:100%;overflow:hidden}.tl .clinical,.tle.clinical,.tlbar.clinical{--c:#4F7F98}.tl .faith,.tle.faith,.tlbar.faith{--c:#9B4F4F}.tl .family,.tle.family,.tlbar.family{--c:var(--gold)}
+.tlbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--line);border-radius:3px;background:#fff;margin-bottom:14px;min-width:0}
+.tlbar .tlk{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);white-space:nowrap}.tlbar .tlt{font-size:12px;color:var(--c);white-space:nowrap;font-variant-numeric:tabular-nums}.tlbar .dot{width:6px;height:6px;border-radius:50%;background:var(--c);flex-shrink:0}.tlbar .tlh{font-family:'Fraunces',Georgia,serif;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;max-width:60%}.tlbar .tlb{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tlleg{display:flex;gap:18px;margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}.tlleg span{display:flex;align-items:center;gap:6px}.tlleg i{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.tlday{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:26px 0 4px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.tle{display:grid;grid-template-columns:64px 12px 1fr;gap:0 16px;padding:18px 0;border-bottom:1px solid var(--line)}.tle:last-child{border-bottom:0}
+.tle .tm{text-align:right;color:var(--c);padding-top:4px;font-variant-numeric:tabular-nums;line-height:1.2}.tle .tm b{font-size:14px;font-weight:600}.tle .tm small{display:block;font-size:10px;letter-spacing:.12em;opacity:.7}
+.tle .sp{display:flex;flex-direction:column;align-items:center;padding-top:8px}.tle .dot{width:9px;height:9px;border-radius:50%;background:var(--c);flex-shrink:0}.tle .ln{width:1px;flex:1;margin-top:6px;background:var(--line)}
+.tle .ct{min-width:0}.tle .tag{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--c)}.tle .tag i{width:5px;height:5px;border-radius:50%;background:var(--c)}
+.tle h3{margin:5px 0 6px;font-size:21px;line-height:1.15}.tle .bd{white-space:pre-wrap;font-size:16px;line-height:1.6}
+.tle .qt{border-left:2px solid #9B4F4F;background:rgba(155,79,79,.06);padding:12px 16px;margin:12px 0 0;font-style:italic;line-height:1.55}.tle .qt small{display:block;font-style:normal;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9B4F4F;margin-top:6px}
+.tle .more{display:inline-block;margin-top:10px;font-size:13px;color:var(--c)}.tle .mx{display:none;white-space:pre-wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:15px;line-height:1.6;color:var(--muted)}.tle.open .mx{display:block}
+.tlpick{display:flex;gap:8px;flex-wrap:wrap}.tlpick label{display:flex;align-items:center;gap:7px;padding:8px 12px;border:1px solid var(--line);border-radius:3px;cursor:pointer;font-size:14px;margin:0}.tlpick input{position:absolute;opacity:0;width:0;height:0}.tlpick i{width:9px;height:9px;border-radius:50%;background:var(--c)}.tlpick label:has(input:checked){border-color:var(--c);background:var(--panel);font-weight:600}
+@media(max-width:640px){.tle{grid-template-columns:50px 10px 1fr;gap:0 10px}.tlbar{flex-wrap:wrap;gap:6px 10px}.tlbar .tlb{display:none}.tlbar .tlh{max-width:100%;white-space:normal;flex-basis:100%}}
+/* the meeting (2026-09-25): six big pages the coordinator walks through with the family */
+.meet{background:#fff;border:1px solid var(--line);border-radius:3px;padding:28px 36px 24px;min-height:70vh;display:flex;flex-direction:column}
+.mtbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.mtdots{display:flex;gap:8px}.mtdots i{width:9px;height:9px;border-radius:50%;background:var(--line2);cursor:pointer}.mtdots i.on{background:var(--gold)}.mtact{display:flex;gap:16px}
+.mtpage{flex-grow:1;padding:28px 0 20px}.mtc h1{font-size:40px;line-height:1.1;margin:8px 0 18px;max-width:900px}.mtlead{font-size:20px;line-height:1.5;max-width:820px;margin:0 0 14px}
+.mtnav{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:14px;border-top:1px solid var(--line)}
+.mtsn{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}.mtsx{font-size:15px;color:var(--muted);margin:0 0 10px}
+.mtroad{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}.mtst{background:#fff;padding:16px 18px;min-height:120px}.mtst.on{background:var(--panel);box-shadow:inset 0 -3px 0 var(--gold)}.mtst .mtsn{color:var(--ink);font-size:14px}.mtsd{font-size:14px;color:var(--gold);font-weight:600;margin-bottom:6px}
+.mtg{margin:0 0 20px}.mti{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);font-size:18px;line-height:1.4}.mti .muted{font-size:15px}.mtw{flex-shrink:0;font-size:15px;color:var(--muted);text-align:right;padding-top:3px;font-variant-numeric:tabular-nums}
+.mttwo{display:grid;grid-template-columns:1fr 1fr;gap:36px}.mtrel{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:28px;padding-top:18px;border-top:1px solid var(--line)}
+.wrap:fullscreen{background:var(--ground);overflow:auto;padding:24px}.wrap:fullscreen .meet{min-height:calc(100vh - 48px)}
+@media(max-width:760px){.meet{padding:18px}.mtc h1{font-size:28px}.mtlead{font-size:17px}.mttwo{grid-template-columns:1fr;gap:20px}.mti{font-size:16px;flex-direction:column;gap:2px}.mtw{text-align:left}}
 /* updates */
 .post{margin-bottom:20px}
 .post .tag{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);padding:5px 10px;border-radius:3px;background:var(--tint);margin-right:10px}
@@ -366,7 +393,7 @@ label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
   .bd h2{font-size:26px}
   .ib{width:34px;height:34px;margin-left:10px}
   h1{font-size:28px}
-  .cols{grid-template-columns:1fr;gap:20px}
+  .cols{grid-template-columns:minmax(0,1fr);gap:20px}
   .tl .lab{font-size:9px;letter-spacing:.04em}
   .top{padding:0 20px}
 }
@@ -894,7 +921,7 @@ function drawerEl(){
   $('.drawer-bg',w).onclick=$('.dx',w).onclick=function(ev){ev.preventDefault();S.drawer=false;render()};
   return w;
 }
-function setView(target){var p=String(target).split(':');S.touched=true;S.view=p[0];if(p[0]==='find')S.fc=p[1]||'book';if(p[0]==='settings')S.sp=p[1]||'hub';if(p[0]==='meds')S.mp=p[1]||'list';if(p[0]==='billing')S.bp=p[1]||'summary';if(p[0]==='record')S.rp=p[1]||'visits';if(p[0]==='resources')S.ro=p[1]||null;if(S.data&&S.data.me.role==='coordinator'&&p[0]!=='home')S.cv='chart';if(p[0]==='home'&&S.data&&S.data.me.role==='coordinator')S.cv='inbasket';S.mopen=false}
+function setView(target){var p=String(target).split(':');S.touched=true;S.view=p[0];if(p[0]==='find')S.fc=p[1]||'book';if(p[0]==='settings')S.sp=p[1]||'hub';if(p[0]==='meds')S.mp=p[1]||'list';if(p[0]==='billing')S.bp=p[1]||'summary';if(p[0]==='record')S.rp=p[1]||'visits';if(p[0]==='resources')S.ro=p[1]||null;if(p[0]==='run'&&p[1])S.ru=p[1];if(p[0]==='meet')S.mt=p[1]?+p[1]||0:0;if(p[0]==='build'&&p[1])S.su=p[1];if(S.data&&S.data.me.role==='coordinator'&&p[0]!=='home')S.cv='chart';if(p[0]==='home'&&S.data&&S.data.me.role==='coordinator')S.cv='inbasket';S.mopen=false}
 function go(target){setView(target);render();window.scrollTo(0,0)}
 function chipEl(){
   var d=S.data,me=d.me,co=me.role==='coordinator';
@@ -1282,7 +1309,7 @@ function coShell(){
   return s;
 }
 function loadInbasket(force){if(S.ib&&!force&&S.ibAt&&Date.now()-S.ibAt<45000)return Promise.resolve(S.ib);return call('inbasket').then(function(r){S.ib=r;S.ibAt=Date.now();return r})}
-function kindPill(k){var c={Meds:'red',Urgent:'red',Billing:'red',Message:'',Plan:'',Implement:'',Intake:'blue',Assistance:'blue',Papers:'blue'}[k]||'gray';return '<span class="wpill '+c+'">'+esc(k)+'</span>'}
+function kindPill(k){var c={Meds:'red',Urgent:'red',Billing:'red',Message:'',Plan:'',Implement:'',Coordinate:'',Intake:'blue',Assistance:'blue',Papers:'blue'}[k]||'gray';return '<span class="wpill '+c+'">'+esc(k)+'</span>'}
 function inbasketView(){
   var v=el('<div class="wspage ibx"><div class="ibl"></div><div class="ibc"><p class="muted">Loading your in basket…</p></div><div class="ibr"></div></div>');
   function draw(r){
@@ -1294,7 +1321,7 @@ function inbasketView(){
     var needs=(r.needs||[]).filter(function(n){return !S.ibk||n.kind===S.ibk});
     var N=el('<div class="pn"><div class="ph"><span>Needs you <span class="wpill red">'+needs.length+'</span></span><span class="muted small">Sorted by urgency · click a row to open it in the family’s chart</span></div><div class="wt"></div></div>');
     if(!needs.length)$('.wt',N).appendChild(el('<div class="wempty">Nothing waiting on you. Good.</div>'));
-    needs.forEach(function(n){var row=el('<a href="#" class="wr" style="grid-template-columns:110px 1fr 130px 90px"><div>'+kindPill(n.kind)+'</div><div><b>'+esc(n.family)+'</b> · '+esc(n.text)+'</div><div class="muted small">'+(n.when?esc(fmtDay(n.when)+(fmtDay(n.when)==='Today'||fmtDay(n.when)==='Yesterday'?' '+fmtTime(n.when):'')):'')+'</div><div style="text-align:right"><span class="btn sm'+(n.pri>1?' quiet':'')+'">'+({Meds:'Review',Message:'Reply',Urgent:'Reply',Plan:'Build',Implement:'Start',Intake:'Re-check',Billing:'Open',Assistance:'Open'}[n.kind]||'Open')+'</span></div></a>');row.onclick=function(ev){ev.preventDefault();openFamily(n.client_id,n.go)};$('.wt',N).appendChild(row)});
+    needs.forEach(function(n){var row=el('<a href="#" class="wr" style="grid-template-columns:110px 1fr 130px 90px"><div>'+kindPill(n.kind)+'</div><div><b>'+esc(n.family)+'</b> · '+esc(n.text)+'</div><div class="muted small">'+(n.when?esc(fmtDay(n.when)+(fmtDay(n.when)==='Today'||fmtDay(n.when)==='Yesterday'?' '+fmtTime(n.when):'')):'')+'</div><div style="text-align:right"><span class="btn sm'+(n.pri>1?' quiet':'')+'">'+({Meds:'Review',Message:'Reply',Urgent:'Reply',Plan:'Build',Implement:'Start',Coordinate:'Coordinate',Intake:'Re-check',Billing:'Open',Assistance:'Open'}[n.kind]||'Open')+'</span></div></a>');row.onclick=function(ev){ev.preventDefault();openFamily(n.client_id,n.go)};$('.wt',N).appendChild(row)});
     C.appendChild(N);
     var F=el('<div class="pn"><div class="ph"><span>Families</span><span class="muted small">'+(r.families||[]).length+' active · sorted by surgery date</span></div><div class="wt"><div class="wh" style="grid-template-columns:90px 130px 120px 130px 1fr 120px"><div>Family</div><div>Patient</div><div>Stage</div><div>Surgery</div><div>Flags</div><div>Billing</div></div></div></div>');
     (r.families||[]).forEach(function(f){var dw=f.days===null?'':f.days===0?'<b>today</b>':f.days>0?'<b>'+f.days+' days</b>':'<b>day '+(-f.days)+'</b>';var row=el('<a href="#" class="wr" style="grid-template-columns:90px 130px 120px 130px 1fr 120px"><div><b>'+esc(f.family_name)+'</b></div><div>'+esc(f.patient)+'</div><div>'+esc(f.stage)+'</div><div>'+(f.surgery_date?esc(fmtShort(f.surgery_date).replace(/, \d{4}$/,''))+' · '+dw:'TBD')+'</div><div>'+f.flags.map(kindPill).join(' ')+(!f.paid&&f.billing?' <span class="wpill gray">Locked</span>':'')+'</div><div class="'+(f.billing==='Payment failed'?'red':'')+'">'+esc(f.billing||'—')+'</div></a>');row.onclick=function(ev){ev.preventDefault();openFamily(f.client_id)};$('.wt',F).appendChild(row)});
@@ -1328,7 +1355,7 @@ function scheduleView(){
 function chartView(){
   var d=S.data,c=d.client;
   if(!c)return el('<div class="wspage"><div class="pn" style="max-width:600px;margin:40px auto;padding:24px"><b>Pick a family.</b><p class="muted">Use Find a family at the top, or open one from the In Basket.</p></div></div>');
-  var tabs=[['chart','Chart'],['plan','Plan'],['build','Set up'],['run','Implement'],['tasks','Tasks'],['messages','Messages'],['meds','Pharmacy'],['find','Find Care'],['billing','Billing'],['record','Record'],['intake','Intake'],['updates','Updates'],['circle','Circle'],['settings','Settings']];
+  var tabs=[['chart','Chart'],['plan','Plan'],['build','Set up'],['meet','Meeting'],['run','Implement'],['tasks','Tasks'],['messages','Messages'],['meds','Pharmacy'],['find','Find Care'],['billing','Billing'],['record','Record'],['intake','Intake'],['updates','Updates'],['circle','Circle'],['settings','Settings']];
   var planDue=!!d.client&&isSub(d.intake)&&!d.client.plan_ready;
   var runDue=!!d.client&&d.client.paid&&d.client.plan_ready&&!(d.appointments||[]).some(function(a){return toDate(a.starts_at)>=new Date()});
   if(['inbasket','schedule','home'].indexOf(S.view)>=0||!S.view)S.view='chart';
@@ -1341,7 +1368,7 @@ function chartView(){
   var rb=el('<a href="#" class="btn sm'+(S.recOpen?'':' quiet')+'">Recommend</a>');rb.onclick=function(ev){ev.preventDefault();S.recOpen=!S.recOpen;render()};acts.appendChild(rb);
   var view=$('.wsview',v);if(S.recOpen)view.appendChild(recPanel());
   if(S.view==='chart')view.appendChild(chartHome());
-  else{var w=el('<div class="wrap"></div>');w.appendChild({find:findView,settings:settingsView,meds:medsView,billing:billingView,plan:planView,tasks:tasksView,messages:messagesView,updates:updatesView,circle:circleView,record:recordView,resources:resourcesView,build:buildView,run:runView,intake:(!S.coFill)?prepView:intakeView}[S.view]());view.appendChild(w)}
+  else{var w=el('<div class="wrap"></div>');w.appendChild({find:findView,settings:settingsView,meds:medsView,billing:billingView,plan:planView,tasks:tasksView,messages:messagesView,updates:updatesView,circle:circleView,record:recordView,resources:resourcesView,build:buildView,meet:meetView,run:runView,intake:(!S.coFill)?prepView:intakeView}[S.view]());view.appendChild(w)}
   return v;
 }
 function chartSide(){
@@ -1749,14 +1776,33 @@ function topicUnread(t){var d=S.data,col=d.me.role!=='coordinator'?'read_by_clie
 function unreadTotal(){return (S.data.topics||[]).filter(function(t){return t.status!=='Archived'}).reduce(function(n,t){return n+topicUnread(t)},0)}
 function openTopic(t){S.topic=t.topic_id;S.mnew=false;S.mopen=true;S.view='messages';S.touched=true;if(S.data.msgTrimmed&&!S.fullT[t.topic_id]){S.fullT[t.topic_id]=1;call('topicMessages',{topicId:t.topic_id}).then(function(r){if(!S.data||!S.data.messages)return;var col=S.data.me.role!=='coordinator'?'read_by_client':'read_by_coordinator';var rest=S.data.messages.filter(function(m){return String(m.topic_id)!==String(t.topic_id)});(r.messages||[]).forEach(function(m){m[col]=true});S.data.messages=rest.concat(r.messages||[]).sort(function(a,b){return String(a.sent_at).localeCompare(String(b.sent_at))});render()}).catch(function(){})}if(topicUnread(t)){var d=S.data,col=d.me.role!=='coordinator'?'read_by_client':'read_by_coordinator';topicMsgs(t.topic_id).forEach(function(m){m[col]=true});call('readTopic',{topicId:t.topic_id}).catch(function(){})}render()}
 
+// ---------------------------------------------------------------- updates as a timeline (2026-09-25)
+// Modeled on the live surgery-day page the founder kept for his own surgery: a day label, a time column,
+// a spine of colored dots, a tag for what kind of moment it was (Clinical, Faith, Family), a headline,
+// a few sentences, and, when there is more to say, a "More" panel and a verse or quote.
+var TL_KIND={Clinical:'clinical',Faith:'faith',Family:'family'};
+function tlKind(u){return TL_KIND[u.kind]||'family'}
+// "Thursday, March 5 — Post-op day 7", from the surgery date when there is one.
+function tlDayLabel(d,c){var sd=toDate(c.surgery_date),rel='';if(sd){var n=Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate())-new Date(sd.getFullYear(),sd.getMonth(),sd.getDate()))/864e5);rel=n===0?'Surgery day':n>0?'Post-op day '+n:(-n)+' day'+(n===-1?'':'s')+' before surgery'}return fmtDate(d)+(d.getFullYear()!==new Date().getFullYear()?', '+d.getFullYear():'')+(rel?' — '+rel:'')}
+function tlTime(v){var d=toDate(v);if(!d)return'';var t=fmtTime(d),m=/^(.*?)\s*(AM|PM|am|pm)$/.exec(t);return m?'<b>'+esc(m[1])+'</b><small>'+esc(m[2].toUpperCase())+'</small>':'<b>'+esc(t)+'</b>'}
+// The feed itself. opts.mark adds "shared with the Circle / private" for the family and coordinator.
+function tlFeed(updates,c,opts){opts=opts||{};var wrap=el('<div class="tl"></div>');if(!updates||!updates.length){wrap.appendChild(el('<p class="muted" style="margin:0 0 24px">'+esc(opts.empty||'No updates yet.')+'</p>'));return wrap}
+  var last=updates[0];wrap.appendChild(el('<div class="tlbar '+tlKind(last)+'"><span class="tlk">Last update</span><span class="tlt">'+esc(fmtShort(toDate(last.posted_at)||new Date())+' · '+fmtTime(last.posted_at))+'</span><i class="dot"></i><span class="tlh">'+esc(last.title)+'</span>'+(last.body?'<span class="tlb">'+esc(String(last.body).split('\n')[0])+'</span>':'')+'</div>'));
+  wrap.appendChild(el('<div class="tlleg"><span class="clinical"><i></i>Clinical</span><span class="faith"><i></i>Faith</span><span class="family"><i></i>Family</span></div>'));
+  var day='';updates.forEach(function(u){var d=toDate(u.posted_at)||new Date(),key=d.toDateString();if(key!==day){day=key;wrap.appendChild(el('<div class="tlday">'+esc(tlDayLabel(d,c))+'</div>'))}
+    var shared=u.visible_to_circle===true||String(u.visible_to_circle)==='TRUE';
+    var e=el('<article class="tle '+tlKind(u)+'"><div class="tm">'+tlTime(u.posted_at)+'</div><div class="sp"><i class="dot"></i><i class="ln"></i></div><div class="ct"><div class="tag"><i></i>'+esc(u.kind||'Family')+(u.stage?'<span class="muted" style="letter-spacing:0;text-transform:none;font-weight:400"> · '+esc(u.stage)+'</span>':'')+(opts.mark?'<span class="muted" style="letter-spacing:0;text-transform:none;font-weight:400"> · '+(shared?'shared with the Circle':'private')+'</span>':'')+'</div><h3>'+esc(u.title)+'</h3>'+(u.body?'<div class="bd">'+esc(u.body)+'</div>':'')+(u.quote?'<div class="qt">'+esc(u.quote)+(u.quote_ref?'<small>— '+esc(u.quote_ref)+'</small>':'')+'</div>':'')+(u.detail?'<a href="#" class="more">More ›</a><div class="mx">'+esc(u.detail)+'</div>':'')+'</div></article>');
+    var m=$('.more',e);if(m)m.onclick=function(ev){ev.preventDefault();var on=e.classList.toggle('open');m.textContent=on?'Less ‹':'More ›'};
+    wrap.appendChild(e)});
+  return wrap}
+
 function updatesView(){
-  var d=S.data,c=d.client,co=d.me.role==='coordinator';
-  var v=el('<div><div class="head"><div class="k">Updates</div><h1>How '+esc(first(c.patient_first_name)||'things are')+' is doing.</h1><div class="muted">'+(c.circle_enabled?'Posts marked for the Circle go out by email to everyone on it. Unmarked posts stay between you and your coordinator.':'The Circle is not on yet, so posts stay between you and your coordinator. Once the sharing authorization is signed, you can share them.')+'</div></div></div>');
+  var d=S.data,c=d.client,co=d.me.role==='coordinator',pf=first(c.patient_first_name);
+  var v=el('<div><div class="head"><div class="k">Updates</div><h1>How '+esc(pf||'things are')+' is doing.</h1><div class="muted">'+(c.circle_enabled?'Posts marked for the Circle go out by email to everyone on it. Unmarked posts stay between you and your coordinator.':'The Circle is not on yet, so posts stay between you and your coordinator. Once the sharing authorization is signed, you can share them.')+'</div></div></div>');
   var cols=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>');var left=$('.left',cols);
-  (d.updates||[]).forEach(function(u){left.appendChild(el('<article class="card post"><div class="small muted"><span class="tag">'+esc(u.stage||'')+'</span>'+esc(fmtDate(u.posted_at))+' · '+(u.visible_to_circle===true||String(u.visible_to_circle)==='TRUE'?'shared with the Circle':'private')+'</div><h3 style="margin-top:12px">'+esc(u.title)+'</h3>'+(u.body?'<p>'+esc(u.body)+'</p>':'')+'</article>'))});
-  if(!d.updates||!d.updates.length)left.appendChild(el('<p class="muted">No updates yet.</p>'));
-  var f=el('<form class="card"><div class="k" style="margin-bottom:12px">Post an update</div><div class="field"><label>Title</label><input name="title" required placeholder="Home from the hospital"></div><div class="field"><label>What happened</label><textarea name="body"></textarea></div><div class="field"><label>Stop on the road</label><select name="stage">'+BOOT.stages.map(function(s){return'<option'+(s===c.current_stage?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select></div>'+(c.circle_enabled?'<div class="field" style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="visible" id="vis" style="width:auto" checked><label for="vis" style="margin:0">Share with the Circle</label></div>':'')+'<button class="btn block" type="submit">Post</button><p class="err"></p></form>');
-  f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f);fd.visible=!!$('#vis',f)&&$('#vis',f).checked;call('postUpdate',fd).then(refresh).catch(function(e){$('.err',f).textContent=e.message})};
+  left.appendChild(tlFeed(d.updates||[],c,{mark:true,empty:'No updates yet. The first one is usually short: where things stand today.'}));
+  var f=el('<form class="card"><div class="k" style="margin-bottom:12px">Post an update</div><div class="field"><label>What kind of moment</label><div class="tlpick">'+(BOOT.updateKinds||['Clinical','Faith','Family']).map(function(k){return'<label class="'+esc(TL_KIND[k]||'family')+'"><input type="radio" name="kind" value="'+esc(k)+'"'+(k==='Family'?' checked':'')+'><i></i>'+esc(k)+'</label>'}).join('')+'</div></div><div class="field"><label>Headline</label><input name="title" required placeholder="Home from the hospital."></div><div class="field"><label>What happened</label><textarea name="body" placeholder="Two or three sentences. What a friend would want to know."></textarea></div><div class="field"><label>More, for anyone who wants it (optional)</label><textarea name="detail" style="min-height:56px" placeholder="The longer version. It sits behind a More link."></textarea></div><div class="two"><div class="field"><label>A verse or a quote (optional)</label><input name="quote" placeholder="“Be strong and courageous.”"></div><div class="field"><label>Where it is from</label><input name="quote_ref" placeholder="Joshua 1:9"></div></div><div class="field"><label>Stop on the road</label><select name="stage">'+BOOT.stages.map(function(s){return'<option'+(s===c.current_stage?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select></div>'+(c.circle_enabled?'<div class="field" style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="visible" id="vis" style="width:auto" checked><label for="vis" style="margin:0">Share with the Circle</label></div>':'')+'<button class="btn block" type="submit">Post</button><p class="err"></p></form>');
+  f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f);fd.visible=!!$('#vis',f)&&$('#vis',f).checked;var k=$('input[name=kind]:checked',f);fd.kind=k?k.value:'Family';call('postUpdate',fd).then(refresh).catch(function(e){$('.err',f).textContent=e.message})};
   $('aside',cols).appendChild(f);v.appendChild(cols);return v;
 }
 
@@ -1779,9 +1825,7 @@ function supporterPage(){
   var p=el('<div>'+sitebar()+'<div class="center"><div class="head"><div class="k">'+esc(first(c.patient_first_name))+'’s Circle</div><h1>How '+esc(first(c.patient_first_name))+' is doing.</h1><div class="muted">The '+esc(c.family_name)+' family shares these with the people they chose. You are one of them.</div></div><div id="feed"></div><div class="note" style="border:1px dashed var(--line2);background:transparent;color:var(--muted)">There is no comment box here on purpose. Send love the old way — a text, a call, a meal. The family reads this page; they do not have to manage it.</div></div></div>');
   $('.whoami',p).innerHTML='<span class="em">'+esc(d.me.name||d.me.email)+'</span><button type="button" class="ic-cta--sm" id="so">Sign out</button>';
   $('#so',p).onclick=function(ev){ev.preventDefault();signOut()};
-  var feed=$('#feed',p);
-  (d.updates||[]).forEach(function(u){feed.appendChild(el('<article class="card post"><div class="small muted"><span class="tag">'+esc(u.stage||'')+'</span>'+esc(fmtDate(u.posted_at))+'</div><h3 style="margin-top:12px">'+esc(u.title)+'</h3>'+(u.body?'<p>'+esc(u.body)+'</p>':'')+'</article>'))});
-  if(!d.updates||!d.updates.length)feed.appendChild(el('<p class="muted" style="margin:0 0 24px">Nothing shared yet. You will get an email when there is.</p>'));
+  var feed=$('#feed',p);feed.appendChild(tlFeed(d.updates||[],c,{empty:'Nothing shared yet. You will get an email when there is.'}));feed.style.marginBottom='24px';
   return p;
 }
 
@@ -2069,8 +2113,8 @@ function suPlan(){
   var d=S.data,c=d.client,spec=d.intakeSpec,ans=(d.intake||{}).answers||{},flags=d.intakeFlags||[],pf=first(c.patient_first_name)||'the patient';
   var w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
   var plan=d.plan||[],drafts=plan.filter(isDraft),live=plan.filter(function(p){return !isDraft(p)});
-  var f=el('<form class="card"><div class="k" style="margin-bottom:12px">Add to the plan</div><div class="two"><div class="field"><label>Stop</label><select name="stage">'+BOOT.stages.map(function(s){return'<option'+(s===(c.current_stage||suStageGuess())?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select></div><div class="field"><label>Category</label><select name="category">'+BOOT.categories.map(function(s){return'<option>'+esc(s)+'</option>'}).join('')+'</select></div></div><div class="field"><label>Item</label><input name="item" required placeholder="Arrange a ride home on discharge day"></div><div class="field"><label>Detail the family sees (optional)</label><textarea name="detail" style="min-height:64px"></textarea></div><div class="field"><label>Your notes — the family never sees these</label><textarea name="note" style="min-height:56px;border-color:var(--gold)" placeholder="The vendor, the in-depth version, what you will actually do"></textarea></div><div class="two"><div class="field"><label>Who</label><input name="owner" placeholder="Coordinator"></div><div class="field"><label>By</label><input name="target_date" type="date"></div></div><input type="hidden" name="planId"><div style="display:flex;gap:8px;align-items:center"><button class="btn" type="submit">Add</button><a href="#" class="small muted cx" style="display:none">Cancel edit</a></div><p class="err"></p></form>');
-  function fill(o){$('input[name=item]',f).value=o.item||'';$('textarea[name=detail]',f).value=o.detail||'';$('textarea[name=note]',f).value=o.note||'';if(o.stage)$('select[name=stage]',f).value=o.stage;if(o.category)$('select[name=category]',f).value=o.category;$('input[name=owner]',f).value=o.owner||'';$('input[name=target_date]',f).value=o.target_date?String(o.target_date).slice(0,10):'';$('input[name=planId]',f).value=o.planId||'';$('button',f).textContent=o.planId?'Save':'Add';$('.cx',f).style.display=o.planId?'':'none';f.scrollIntoView({behavior:'smooth',block:'start'});$('input[name=item]',f).focus()}
+  var f=el('<form class="card"><div class="k" style="margin-bottom:6px">Add to the plan</div><p class="small muted" style="margin:0 0 12px">The outline only: the task, the date, who. Enough to walk them through in the meeting. The vendor and the in-depth version wait until they pay — Implement → Coordinate.</p><div class="two"><div class="field"><label>Stop</label><select name="stage">'+BOOT.stages.map(function(s){return'<option'+(s===(c.current_stage||suStageGuess())?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select></div><div class="field"><label>Category</label><select name="category">'+BOOT.categories.map(function(s){return'<option>'+esc(s)+'</option>'}).join('')+'</select></div></div><div class="field"><label>Item</label><input name="item" required placeholder="Arrange a ride home on discharge day"></div><div class="field"><label>Detail the family sees (optional)</label><textarea name="detail" style="min-height:64px"></textarea></div><div class="two"><div class="field"><label>Who</label><input name="owner" placeholder="Coordinator"></div><div class="field"><label>By</label><input name="target_date" type="date"></div></div><input type="hidden" name="planId"><div style="display:flex;gap:8px;align-items:center"><button class="btn" type="submit">Add</button><a href="#" class="small muted cx" style="display:none">Cancel edit</a></div><p class="err"></p></form>');
+  function fill(o){$('input[name=item]',f).value=o.item||'';$('textarea[name=detail]',f).value=o.detail||'';if(o.stage)$('select[name=stage]',f).value=o.stage;if(o.category)$('select[name=category]',f).value=o.category;$('input[name=owner]',f).value=o.owner||'';$('input[name=target_date]',f).value=o.target_date?String(o.target_date).slice(0,10):'';$('input[name=planId]',f).value=o.planId||'';$('button',f).textContent=o.planId?'Save':'Add';$('.cx',f).style.display=o.planId?'':'none';f.scrollIntoView({behavior:'smooth',block:'start'});$('input[name=item]',f).focus()}
   $('.cx',f).onclick=function(ev){ev.preventDefault();fill({})};
   f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f),b=$('button',f);b.disabled=true;call(fd.planId?'editPlanItem':'addPlanItem',fd).then(refresh).catch(function(e){$('.err',f).textContent=e.message;b.disabled=false})};
   // drafts
@@ -2127,7 +2171,8 @@ function suSend(){
   var cl=el('<div class="card"><div class="k" style="margin-bottom:12px">Ready?</div></div>');
   checks.forEach(function(x){var r=el('<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)"><span style="width:18px">'+(x[1]?'✓':'·')+'</span><span style="flex-grow:1'+(x[1]?';color:var(--muted)':'')+'">'+esc(x[0])+'</span>'+(x[1]?'':'<a href="#" class="small">Go</a>')+'</div>');var a=$('a',r);if(a)a.onclick=function(ev){ev.preventDefault();S.su=x[2];render();window.scrollTo(0,0)};cl.appendChild(r)});
   left.appendChild(cl);
-  var fin=el('<div class="card" style="margin-top:14px"><div class="k" style="margin-bottom:10px">When it reads right</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn quiet" type="button" id="pv">Preview: family version</button><button class="btn quiet" type="button" id="pf">Preview: full, for the meeting</button><button class="btn'+(c.plan_ready?' quiet':'')+'" type="button" id="pr">'+(c.plan_ready?'Released — take it back':'Release the plan to their portal')+'</button></div><p class="small muted" style="margin:10px 0 0">'+(c.plan_ready?'Released. The family version of the PDF is in their portal and they were emailed. Your notes stayed with you. Paying opens the rest of the portal.':'Releasing puts the family version of the PDF in their portal (the task, the date, who — never your notes) and emails them that it is ready. Do it after the meeting, once you have walked them through the full version. Drafts are left out until approved.')+'</p><p class="err" style="margin:6px 0 0"></p></div>');
+  var fin=el('<div class="card" style="margin-top:14px"><div class="k" style="margin-bottom:10px">When it reads right</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="mt">Open the meeting view</button><button class="btn quiet" type="button" id="pv">Preview: family version</button><button class="btn quiet" type="button" id="pf">Preview: full, for the meeting</button><button class="btn'+(c.plan_ready?' quiet':'')+'" type="button" id="pr">'+(c.plan_ready?'Released — take it back':'Release the plan to their portal')+'</button></div><p class="small muted" style="margin:10px 0 0">'+(c.plan_ready?'Released. The family version of the PDF is in their portal and they were emailed. Your notes stayed with you. Paying opens the rest of the portal.':'Releasing puts the family version of the PDF in their portal (the task, the date, who — never your notes) and emails them that it is ready. Do it after the meeting, once you have walked them through the full version. Drafts are left out until approved.')+'</p><p class="err" style="margin:6px 0 0"></p></div>');
+  $('#mt',fin).onclick=function(){go('meet:0')};
   $('#pv',fin).onclick=function(){openPdf(this,$('.err',fin))};
   $('#pf',fin).onclick=function(){openPdf(this,$('.err',fin),true)};
   $('#pr',fin).onclick=function(){if(!c.plan_ready&&drafts.length&&!confirm(drafts.length+' draft'+(drafts.length===1?' is':'s are')+' still unreviewed and will be left out. Send anyway?'))return;if(!c.plan_ready&&!confirm('Release the plan? The family gets an email and the family version of the PDF appears in their portal.'))return;call('setPlanReady',{ready:!c.plan_ready}).then(refresh).catch(alertErr)};
@@ -2135,6 +2180,35 @@ function suSend(){
   side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">The plan</div><div class="small muted">'+live.length+' item'+(live.length===1?'':'s')+' · '+drafts.length+' draft'+(drafts.length===1?'':'s')+' · '+(d.tasks||[]).filter(function(t){return t.status!=='Done'}).length+' open tasks · '+(d.appointments||[]).length+' appointment'+((d.appointments||[]).length===1?'':'s')+'</div></div>'));
   side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">Money</div><div class="small muted">'+(c.monthly_amount!==''&&c.monthly_amount!=null?'$'+esc(c.monthly_amount)+' a month.':'Starts at $'+esc(BOOT.defaultMonthly||599)+' a month.')+' Set it per family under Billing. The family pays when they are ready, after the plan is sent.</div></div>'));
   return w;
+}
+// ---------------------------------------------------------------- the meeting (coordinator)
+// The screen you put in front of the family once the plan is created: six big pages you walk through
+// together. Arrow keys or the buttons move between them. Nothing here is the in-depth version; it shows
+// what we will deliver, the same way the family version of the PDF does. Release from the last page.
+function meetView(){
+  var d=S.data,c=d.client,pf=first(c.patient_first_name)||c.family_name,co=first(d.me.name)||'your coordinator';
+  var live=(d.plan||[]).filter(function(p){return !isDraft(p)}),T=suTimeline(),stage=c.current_stage||suStageGuess();
+  var sd=toDate(c.surgery_date),dts=null;if(sd){var t0=new Date();t0=new Date(t0.getFullYear(),t0.getMonth(),t0.getDate());dts=Math.round((new Date(sd.getFullYear(),sd.getMonth(),sd.getDate())-t0)/864e5)}
+  var PAGES=[['open','Welcome'],['road','The road'],['plan','The plan'],['who','Who does what'],['people','The people'],['next','What happens next']];
+  S.mt=Math.min(Math.max(S.mt||0,0),PAGES.length-1);var i=S.mt;
+  var v=el('<div class="meet"><div class="mtbar"><span class="k">The meeting · '+esc(famName(c.family_name))+'</span><span class="mtdots">'+PAGES.map(function(p,k){return'<i'+(k===i?' class="on"':'')+' title="'+esc(p[1])+'"></i>'}).join('')+'</span><span class="mtact"><a href="#" class="small" id="fs">Full screen</a><a href="#" class="small" id="ex">Back to Set up</a></span></div><div class="mtpage"></div><div class="mtnav"><span>'+(i>0?'<button class="btn quiet" type="button" id="pv">‹ '+esc(PAGES[i-1][1])+'</button>':'')+'</span><span class="small muted">'+(i+1)+' of '+PAGES.length+' · arrow keys work</span><span>'+(i<PAGES.length-1?'<button class="btn" type="button" id="nx">'+esc(PAGES[i+1][1])+' ›</button>':'')+'</span></div></div>');
+  var pg=$('.mtpage',v),k=PAGES[i][0];
+  if(k==='open'){pg.appendChild(el('<div class="mtc"><div class="k">'+esc(famName(c.family_name))+'</div><h1>'+esc(pf)+'’s road, written down.</h1><p class="mtlead">'+(sd?'Surgery is '+esc(fmtDate(sd))+(dts!==null?' — '+(dts===0?'today':dts>0?dts+' day'+(dts===1?'':'s')+' from now':(-dts)+' day'+(dts===-1?'':'s')+' ago'):'')+'.':/emergency/.test(suAns('G.6'))?'This started in the hospital, not on a calendar.':'No surgery date yet. The plan holds the dated parts until there is one.')+' You are in <b>'+esc(stage)+'</b>.</p><p class="mtlead muted">This hour is the plan, start to finish: the road ahead, what needs to happen, who does each piece, and the people around '+esc(pf)+'. When we are done and you are ready, it lands in your portal.</p></div>'))}
+  else if(k==='road'){var r=el('<div class="mtc"><div class="k">The road</div><h1>Where '+esc(pf)+' is, and what comes next.</h1><div class="mtroad"></div></div>');T.forEach(function(t){var on=t.stage===stage;r.querySelector('.mtroad').appendChild(el('<div class="mtst'+(on?' on':'')+'"><div class="mtsn">'+esc(t.stage)+(on?' <span class="k" style="font-size:11px">Now</span>':'')+'</div><div class="mtsd">'+esc(t.from?fmtShort(t.from)+(t.to&&t.to!==t.from?' → '+fmtShort(t.to):t.to?'':' onward'):'')+'</div>'+(t.note?'<div class="mtsx">'+esc(t.note)+'</div>':'')+'</div>'))});pg.appendChild(r)}
+  else if(k==='plan'){var r2=el('<div class="mtc"><div class="k">The plan</div><h1>'+live.length+' thing'+(live.length===1?'':'s')+', each with a date and a name on it.</h1><div class="mtplan"></div></div>'),box=$('.mtplan',r2);if(!live.length)box.appendChild(el('<p class="muted">Nothing on the plan yet. Add items on Set up → The plan.</p>'));BOOT.stages.forEach(function(stg){var rows=live.filter(function(p){return p.stage===stg});if(!rows.length)return;var g=el('<div class="mtg"><div class="mtsn">'+esc(stg)+'</div></div>');rows.forEach(function(p){g.appendChild(el('<div class="mti"><div><b>'+esc(p.item)+'</b>'+(p.detail?'<div class="muted">'+esc(p.detail)+'</div>':'')+'</div><div class="mtw">'+esc([p.target_date?fmtShort(p.target_date):'',p.owner||''].filter(Boolean).join(' · ')||'date and owner to set')+'</div></div>'))});box.appendChild(g)});pg.appendChild(r2)}
+  else if(k==='who'){var us=function(o){o=String(o||'').toLowerCase();return !o||/coordinator|incadence|\bus\b|\bwe\b/.test(o)||(co&&o.indexOf(co.toLowerCase())>=0)};var ours=live.filter(function(p){return us(p.owner)}),theirs=live.filter(function(p){return !us(p.owner)});var r3=el('<div class="mtc"><div class="k">Who does what</div><h1>We carry the coordinating. You carry '+esc(pf)+'.</h1><div class="mttwo"><div><div class="mtsn">'+esc(co)+' handles — '+ours.length+'</div></div><div><div class="mtsn">Your side — '+theirs.length+'</div></div></div></div>'),cols=$all('.mttwo > div',r3);[ours,theirs].forEach(function(list,n){if(!list.length)cols[n].appendChild(el('<p class="muted">Nothing here yet.</p>'));list.forEach(function(p){cols[n].appendChild(el('<div class="mti"><div><b>'+esc(p.item)+'</b></div><div class="mtw">'+esc([p.target_date?fmtShort(p.target_date):'',n?p.owner:''].filter(Boolean).join(' · '))+'</div></div>'))})});pg.appendChild(r3)}
+  else if(k==='people'){var inner=d.inner||[],circle=d.circle||[],team=d.careTeam||[];var r4=el('<div class="mtc"><div class="k">The people</div><h1>Nobody does this alone.</h1><div class="mttwo"><div><div class="mtsn">Inner circle</div><div class="mtsx">They sign in, see the plan, and can message us.</div><div class="mtl"></div></div><div><div class="mtsn">The Circle</div><div class="mtsx">'+(c.circle_enabled?'Friends and wider family who get updates by email, and nothing else.':'Off for now. It turns on when you say so, once the sharing form is signed.')+'</div><div class="mtl"></div></div></div><div style="margin-top:22px"><div class="mtsn">Care team</div><div class="mtl team"></div></div></div>'),ls=$all('.mtl',r4);if(!inner.length)ls[0].appendChild(el('<p class="muted">No one yet.</p>'));inner.forEach(function(u){ls[0].appendChild(el('<div class="mti"><div><b>'+esc(u.name)+'</b></div><div class="mtw">'+esc(u.relationship||'')+'</div></div>'))});if(!circle.length)ls[1].appendChild(el('<p class="muted">No one yet.</p>'));circle.forEach(function(m){ls[1].appendChild(el('<div class="mti"><div><b>'+esc(m.supporter_name)+'</b></div><div class="mtw">'+esc(m.relationship||'')+'</div></div>'))});if(!team.length)ls[2].appendChild(el('<p class="muted">Surgeon and hospital to add.</p>'));team.forEach(function(m){ls[2].appendChild(el('<div class="mti"><div><b>'+esc(m.name)+'</b></div><div class="mtw">'+esc([m.role,m.org].filter(Boolean).join(' · '))+'</div></div>'))});pg.appendChild(r4)}
+  else{var amt=c.monthly_amount!==''&&c.monthly_amount!=null?money(c.monthly_amount).replace(/\.00$/,''):'$'+(BOOT.defaultMonthly||599);var r5=el('<div class="mtc"><div class="k">What happens next</div><h1>The plan, kept current, with a person behind it.</h1><div class="mttwo"><div><div class="mtsn">What you have</div><div class="mti"><div>The plan in your portal, updated as things change</div></div><div class="mti"><div>Messages with '+esc(co)+', answered by a person</div></div><div class="mti"><div>'+esc(pf)+'’s medication list, with reminders if you want them</div></div><div class="mti"><div>Letters for work, school and insurance when you need one</div></div><div class="mti"><div>The Circle, so people stop calling you for updates</div></div></div><div><div class="mtsn">The money</div><p class="mtlead"><b>'+esc(amt)+' a month</b>, month to month. Pause or stop it yourself under Billing, no call needed.</p><p class="mtlead muted">When we finish today, I release the plan into your portal and you get an email. Paying opens the rest.</p></div></div><div class="mtrel"><button class="btn quiet" type="button" id="pvp">Preview: family version</button><button class="btn'+(c.plan_ready?' quiet':'')+'" type="button" id="rel">'+(c.plan_ready?'Released — take it back':'Release the plan to their portal')+'</button><span class="err" style="margin:0"></span></div></div>');
+    $('#pvp',r5).onclick=function(){openPdf(this,$('.err',r5))};
+    $('#rel',r5).onclick=function(){if(!c.plan_ready&&!confirm('Release the plan? The family gets an email and the family version of the PDF appears in their portal.'))return;call('setPlanReady',{ready:!c.plan_ready}).then(refresh).catch(alertErr)};
+    pg.appendChild(r5)}
+  var go_=function(n){S.mt=n;render();window.scrollTo(0,0)};
+  var pvb=$('#pv',v);if(pvb)pvb.onclick=function(){go_(i-1)};var nxb=$('#nx',v);if(nxb)nxb.onclick=function(){go_(i+1)};
+  $all('.mtdots i',v).forEach(function(dot,n){dot.onclick=function(){go_(n)}});
+  $('#ex',v).onclick=function(ev){ev.preventDefault();go('build:send')};
+  $('#fs',v).onclick=function(ev){ev.preventDefault();var w=v.closest('.wrap')||v;if(document.fullscreenElement)document.exitFullscreen();else if(w.requestFullscreen)w.requestFullscreen()};
+  if(!window.__mtKeys){window.__mtKeys=true;window.addEventListener('keydown',function(ev){if(S.view!=='meet'||/input|textarea|select/i.test(ev.target.tagName))return;if(ev.key==='ArrowRight'||ev.key==='PageDown'){if(S.mt<5){S.mt++;render()}}else if(ev.key==='ArrowLeft'||ev.key==='PageUp'){if(S.mt>0){S.mt--;render()}}})}
+  return v;
 }
 // ---------------------------------------------------------------- implement (coordinator)
 // After the plan is sent and the family has paid: put every item on a date, book the calls, line up
@@ -2147,15 +2221,15 @@ function runView(){
   var openP=live.filter(function(p){return p.status!=='Done'}),openT=tasks.filter(function(t){return t.status!=='Done'});
   var sd=toDate(c.surgery_date),dts=null;if(sd){var t0=new Date();t0=new Date(t0.getFullYear(),t0.getMonth(),t0.getDate());dts=Math.round((new Date(sd.getFullYear(),sd.getMonth(),sd.getDate())-t0)/864e5)}
   var status=!c.plan_ready?'<b style="color:#9B2C2C">Plan not sent yet</b>':!c.paid?'<b style="color:var(--gold)">Plan sent · waiting on payment</b>':'<b style="color:var(--gold)">Portal open</b>';
-  v.appendChild(el('<div class="head"><div class="k">Implementation</div><h1>Make '+esc(pf)+'’s plan happen.</h1><div class="muted">'+status+(c.current_stage?' · '+esc(c.current_stage):'')+(dts!==null?' · surgery '+(dts===0?'today':dts>0?'in '+dts+' days':dts+' days ago'):'')+' · '+(live.length-openP.length)+' of '+live.length+' plan items done · '+openT.length+' open task'+(openT.length===1?'':'s')+'</div></div>'));
+  v.appendChild(el('<div class="head"><div class="k">Implementation</div><h1>Make '+esc(pf)+'’s plan happen.</h1><div class="muted">'+status+(c.current_stage?' · '+esc(c.current_stage):'')+(dts!==null?' · surgery '+(dts===0?'today':dts>0?'in '+dts+' days':(-dts)+' days ago'):'')+' · '+(live.length-openP.length)+' of '+live.length+' plan items done · '+live.filter(function(p){return p.extra&&p.extra.coordinated}).length+' coordinated · '+openT.length+' open task'+(openT.length===1?'':'s')+'</div></div>'));
   if(!c.plan_ready){v.appendChild(el('<p class="muted">Send the plan first (Set up → Send it). Implementation starts once the family has it and has paid.</p>'));return v}
   if(!c.paid)v.appendChild(el('<div class="note" style="margin-bottom:16px">The family has not paid yet, so their portal is still locked. You can line things up here now; they see the results the moment they pay.</div>'));
-  var SEC=[['setup','Switch on'],['calls','Calls with you'],['dates','Put it on dates'],['providers','Line up providers'],['progress','Progress']];
+  var SEC=[['setup','Switch on'],['coord','Coordinate'],['calls','Calls with you'],['dates','Put it on dates'],['providers','Line up providers'],['progress','Progress']];
   S.ru=S.ru||'setup';var idx=SEC.map(function(s){return s[0]}).indexOf(S.ru);if(idx<0){idx=0;S.ru='setup'}
   var nav=el('<div class="card" style="margin:-6px 0 18px;padding:10px 16px"><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+SEC.map(function(s,i){return'<a href="#" data-s="'+s[0]+'" class="btn sm'+(i===idx?'':' quiet')+'">'+esc(s[1])+'</a>'}).join('')+'</div></div>');
   $all('a',nav).forEach(function(a){a.onclick=function(ev){ev.preventDefault();S.ru=a.getAttribute('data-s');render();window.scrollTo(0,0)}});
   v.appendChild(nav);
-  v.appendChild({setup:ruSetup,calls:ruCalls,dates:ruDates,providers:ruProviders,progress:ruProgress}[S.ru]());
+  v.appendChild({setup:ruSetup,coord:ruCoord,calls:ruCalls,dates:ruDates,providers:ruProviders,progress:ruProgress}[S.ru]());
   var foot=el('<p style="margin:22px 0 0;display:flex;gap:8px;justify-content:space-between"><span>'+(idx>0?'<button class="btn quiet" type="button" id="bk">Back</button>':'')+'</span><span>'+(idx<SEC.length-1?'<button class="btn" type="button" id="nx">Next: '+esc(SEC[idx+1][1])+'</button>':'')+'</span></p>');
   var bk=$('#bk',foot);if(bk)bk.onclick=function(){S.ru=SEC[idx-1][0];render();window.scrollTo(0,0)};
   var nx=$('#nx',foot);if(nx)nx.onclick=function(){S.ru=SEC[idx+1][0];render();window.scrollTo(0,0)};
@@ -2181,7 +2255,26 @@ function ruSetup(){
   side.appendChild(el('<div class="note">Nothing here sends the family anything. The switches change what they can do in the portal; the emails they get are the ones on the timeline (Coordinator settings → Family emails).</div>'));
   return w;
 }
-// 2. Calls with you: the check-ins the timeline calls for, booked onto the calendar.
+// 2. Coordinate: the in-depth work behind each plan item, done after the family pays. Before that, the plan is only
+// the outline (task, date, who), so nobody builds the whole thing for a family that does not buy.
+function ruCoord(){
+  var d=S.data,c=d.client,w=el('<div></div>');
+  var live=(d.plan||[]).filter(function(p){return !isDraft(p)}),done=live.filter(function(p){return p.extra&&p.extra.coordinated}),left=live.filter(function(p){return !(p.extra&&p.extra.coordinated)});
+  w.appendChild(el('<div class="card" style="margin-bottom:14px"><div class="k">The in-depth coordination</div><p style="margin:8px 0 0">They have paid, so now the plan gets its second layer: for each item, who you will actually use, what you will do, and when. Write it in your notes and mark the item coordinated. The family keeps seeing the task, the date and who — never these notes.</p><p class="small muted" style="margin:8px 0 0">'+done.length+' of '+live.length+' coordinated'+(left.length?' · '+left.length+' to go':' · all done')+'</p></div>'));
+  if(!live.length){w.appendChild(el('<p class="muted">No plan items yet. Add them on Set up → The plan.</p>'));return w}
+  var tog=el('<p class="small" style="margin:0 0 10px"><a href="#">'+(S.rcAll?'Hide the coordinated ones':'Show the coordinated ones too')+'</a></p>');$('a',tog).onclick=function(ev){ev.preventDefault();S.rcAll=!S.rcAll;render()};w.appendChild(tog);
+  var show=S.rcAll?live:left;if(!show.length){w.appendChild(el('<p class="muted">Everything is coordinated.</p>'));return w}
+  BOOT.stages.forEach(function(stg){var rows=show.filter(function(p){return p.stage===stg});if(!rows.length)return;
+    var card=el('<div class="card" style="margin-bottom:14px"><div class="k" style="margin-bottom:4px">'+esc(stg)+'</div></div>');
+    rows.forEach(function(p){var cd=!!(p.extra&&p.extra.coordinated);
+      var r=el('<div style="padding:12px 0;border-bottom:1px solid var(--line)'+(cd?';opacity:.7':'')+'"><div style="display:flex;gap:10px;align-items:flex-start"><div style="flex-grow:1"><b>'+esc(p.item)+'</b><div class="small muted">'+esc([p.category,p.target_date?'by '+fmtShort(p.target_date):'no date yet',p.owner||'no owner yet'].join(' · '))+(p.detail?'<br>Family sees: '+esc(p.detail):'')+'</div></div>'+(cd?'<span class="small" style="color:var(--gold);font-weight:700;flex-shrink:0">✓ Coordinated</span>':'')+'</div><div class="field" style="margin:8px 0 0"><textarea name="note" style="min-height:56px;border-color:var(--gold)" placeholder="The vendor, the in-depth version, what you will actually do">'+esc(p.extra&&p.extra.note||'')+'</textarea></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label style="display:flex;gap:8px;align-items:center;margin:0;font-size:14px"><input type="checkbox" name="cd" style="width:auto"'+(cd?' checked':'')+'>Coordinated</label><button class="btn quiet sm" type="button">Save</button><a href="#" class="small muted ed">Edit the item</a><span class="err" style="margin:0"></span></div></div>');
+      $('button',r).onclick=function(){var b=this;b.disabled=true;call('editPlanItem',{planId:p.plan_id,note:$('textarea',r).value,coordinated:$('input[name=cd]',r).checked}).then(refresh).catch(function(e){$('.err',r).textContent=e.message;b.disabled=false})};
+      $('.ed',r).onclick=function(ev){ev.preventDefault();go('build:plan')};
+      card.appendChild(r)});
+    w.appendChild(card)});
+  return w;
+}
+// 3. Calls with you: the check-ins the timeline calls for, booked onto the calendar.
 function ruCalls(){
   var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
   var sd=toDate(c.surgery_date),appts=d.appointments||[],n=suNights();
@@ -2202,7 +2295,7 @@ function ruCalls(){
   side.appendChild(el('<div class="note">Booking here puts it on the family’s calendar and yours. The family can also book you themselves under Find Care.</div>'));
   return w;
 }
-// 3. Put it on dates: every open plan item and task gets a date and an owner, grouped by where it falls.
+// 4. Put it on dates: every open plan item and task gets a date and an owner, grouped by where it falls.
 function ruDates(){
   var d=S.data,c=d.client,w=el('<div></div>');
   var live=(d.plan||[]).filter(function(p){return !isDraft(p)&&p.status!=='Done'}),tasks=(d.tasks||[]).filter(function(t){return t.status!=='Done'});
@@ -2223,7 +2316,7 @@ function ruDates(){
   w.appendChild(el('<div class="note">Tip: a date on a plan item shows on the family’s Home page that day. An owner other than you tells them who is carrying it.</div>'));
   return w;
 }
-// 4. Line up providers: the plan items that need someone outside, and the referrals in motion.
+// 5. Line up providers: the plan items that need someone outside, and the referrals in motion.
 function ruProviders(){
   var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
   var refs=d.referrals||[],live=(d.plan||[]).filter(function(p){return !isDraft(p)&&p.status!=='Done'});
@@ -2243,7 +2336,7 @@ function ruProviders(){
   side.appendChild(el('<div class="note">The family sees referrals under Find Care and pays the vendor directly. Vendor bills go under Billing → Vendors once you have a quote.</div>'));
   return w;
 }
-// 5. Progress: where the plan stands, stage by stage, and the stage itself.
+// 6. Progress: where the plan stands, stage by stage, and the stage itself.
 function ruProgress(){
   var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
   var live=(d.plan||[]).filter(function(p){return !isDraft(p)}),T=suTimeline();
