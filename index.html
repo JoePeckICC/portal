@@ -529,8 +529,9 @@ function signOut(){google.script.run.api(null,'signOut',{});S.session=null;S.dat
 
 // ---------------------------------------------------------------- boot
 (function(){
-  var q=new URLSearchParams(location.search),t=q.get('t')||'',e=q.get('e')||'',card=q.get('card')||'';
-  if(t||e||card)history.replaceState(null,'',location.pathname);
+  var q=new URLSearchParams(location.search),t=q.get('t')||'',e=q.get('e')||'',card=q.get('card')||'',why=q.get('why')||'',go=q.get('go')||'';
+  if(t||e||card||why||go)history.replaceState(null,'',location.pathname);
+  if(why)S.why=why;if(go==='billing'){S.view='billing';S.bp='summary';S.touched=true}
   $('#app').innerHTML='<div class="gate"><div class="muted">Opening the portal&hellip;</div></div>';
   google.script.run.withSuccessHandler(function(r){
     if(r&&r.ok&&r.boot)Object.keys(r.boot).forEach(function(k){BOOT[k]=r.boot[k]});
@@ -541,6 +542,7 @@ function signOut(){google.script.run.api(null,'signOut',{});S.session=null;S.dat
     if(card==='saved'){S.view='billing';S.bp='method';S.touched=true;S.cardSaved=true}
     render();
     if(S.session)refresh();
+    if(S.session&&S.why){var w=S.why;S.why='';call('leaveReason',{why:w}).then(function(){S.view='billing';S.bp='summary';S.touched=true;S.thanks='Thank you for telling us.';render()}).catch(function(){})}
   }).withFailureHandler(function(err){
     $('#app').innerHTML='<div class="gate"><div class="card"><div class="k">'+esc(BOOT.appName)+'</div><h1 style="margin:12px 0">Could not reach the portal.</h1><p class="muted">'+esc(err&&err.message||err)+'</p><p><button class="btn" onclick="location.reload()">Try again</button></p></div></div>';
   }).api(null,'hello',{t:t,e:e});
@@ -681,7 +683,7 @@ function planView(){
   v.appendChild(timeline(stage));
   var cols=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>');
   var left=$('.left',cols);
-  if(co){var dr=(d.plan||[]).filter(isDraft);if(dr.length){var db=el('<div class="group"><span class="k">Drafts from the intake — '+dr.length+' to review</span><p class="small muted" style="margin:0 0 10px">The family does not see these until you approve them.</p></div>');dr.forEach(function(p){var r=el('<div class="draft"><div class="t"><b>'+esc(p.item)+'</b><div class="d">'+esc(p.stage)+' · '+esc(p.category)+(p.detail?' — '+esc(p.detail):'')+'</div></div><div class="bs"><button class="btn quiet" type="button">Approve</button><button class="btn quiet" type="button" style="color:var(--muted)">Discard</button></div></div>');var bs=$all('button',r);bs[0].onclick=function(){call('approvePlanItem',{planId:p.plan_id}).then(refresh).catch(alertErr)};bs[1].onclick=function(){call('approvePlanItem',{planId:p.plan_id,discard:true}).then(refresh).catch(alertErr)};db.appendChild(r)});left.appendChild(db)}}
+  if(co){var dr=(d.plan||[]).filter(isDraft);if(dr.length){var db=el('<div class="group"><span class="k">Drafts from the intake — '+dr.length+' to review</span><p class="small muted" style="margin:0 0 10px">Starting points from fixed rules in the intake. The family does not see these until you approve them. <a href="#" class="tob">Set up</a> walks through them with the answers alongside.</p></div>');$('.tob',db).onclick=function(ev){ev.preventDefault();S.view='build';render();window.scrollTo(0,0)};dr.forEach(function(p){var r=el('<div class="draft"><div class="t"><b>'+esc(p.item)+'</b><div class="d">'+esc(p.stage)+' · '+esc(p.category)+(p.detail?' — '+esc(p.detail):'')+'</div></div><div class="bs"><button class="btn quiet" type="button">Approve</button><button class="btn quiet" type="button" style="color:var(--muted)">Discard</button></div></div>');var bs=$all('button',r);bs[0].onclick=function(){call('approvePlanItem',{planId:p.plan_id}).then(refresh).catch(alertErr)};bs[1].onclick=function(){call('approvePlanItem',{planId:p.plan_id,discard:true}).then(refresh).catch(alertErr)};db.appendChild(r)});left.appendChild(db)}}
   var items=(d.plan||[]).filter(function(p){return p.stage===stage&&!isDraft(p)});
   var done=items.filter(function(p){return p.status==='Done'}).length;
   left.appendChild(el('<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px"><h2>'+esc(stage)+'</h2><span class="small muted">'+(items.length?done+' of '+items.length+' done':'Nothing here yet')+'</span></div>'));
@@ -984,7 +986,7 @@ function innerPage(){
   return v;
 }
 function notifyPage(){
-  var d=S.data,me=d.me,K=d.notifyKinds||{},desc={message:'The moment a message is sent to you.',plan:'When something is added to the plan or marked done.',booking:'Calendar invites and booking confirmations.'};
+  var d=S.data,me=d.me,K=d.notifyKinds||{},desc={message:'The moment a message is sent to you.',plan:'When something is added to the plan or marked done.',booking:'Calendar invites and booking confirmations.',notes:'Short notes from Joe in your first weeks, and a check-in every couple of months. Billing emails always come.'};
   var v=el('<div><h2>Notifications</h2><p class="muted small" style="margin:4px 0 14px">Emails go to <b>'+esc(me.email)+'</b>. Texts are coming.</p><div class="card nlist"></div></div>');
   Object.keys(K).forEach(function(k){var on=!!(me.prefs||{})[k];var r=el('<div class="nrow"><div style="flex-grow:1"><div>'+esc(K[k])+'</div><div class="small muted">'+esc(desc[k]||'')+'</div></div><button type="button" class="tog'+(on?' on':'')+'" aria-label="'+esc(K[k])+'"><i></i></button></div>');$('.tog',r).onclick=function(){var b=this,now=!b.classList.contains('on');b.classList.toggle('on',now);var p={};p[k]=now;call('savePrefs',{prefs:p}).then(function(){me.prefs=me.prefs||{};me.prefs[k]=now}).catch(function(e){b.classList.toggle('on',!now);alertErr(e)})};$('.nlist',v).appendChild(r)});
   return v;
@@ -1003,6 +1005,10 @@ function coSettingsPage(){
   $('.dh',nt).onchange=function(){call('saveCoSettings',{digestHour:this.value}).then(function(r){d.coSettings=r.coSettings}).catch(alertErr)};
   Object.keys(K).forEach(function(k){var cur=(s.notify||{})[k]||'digest';var r=el('<div class="nrow"><div style="flex-grow:1">'+esc(K[k])+'</div><div class="seg">'+['instant','digest','off'].map(function(m){return'<a href="#" data-m="'+m+'" class="'+(m===cur?'on':'')+'">'+(m==='instant'?'Instant':m==='digest'?'Digest':'Off')+'</a>'}).join('')+'</div></div>');$all('a',r).forEach(function(a){a.onclick=function(ev){ev.preventDefault();var p={};p[k]=a.getAttribute('data-m');$all('a',r).forEach(function(x){x.classList.remove('on')});a.classList.add('on');call('saveCoSettings',{notify:p}).then(function(rr){d.coSettings=rr.coSettings}).catch(alertErr)}});$('.ntl',nt).appendChild(r)});
   v.appendChild(nt);
+  // the family email timeline
+  var lc=el('<div class="card" style="margin-bottom:14px"><span class="k">Family emails</span><p class="small muted" style="margin:6px 0 10px">Short notes from Joe in a family’s first ten days and at months two, four and six; a reminder three days before each charge; a receipt each month; and a note when billing is paused or a membership ends. Each goes once per family. Families can turn the notes off under Notifications; the billing ones always go.</p><div class="nrow"><div style="flex-grow:1">Send the family emails</div><button type="button" class="tog'+(s.lifecycle!==false?' on':'')+'" aria-label="Send the family emails"><i></i></button></div></div>');
+  $('.tog',lc).onclick=function(){var b=this,now=!b.classList.contains('on');b.classList.toggle('on',now);call('saveCoSettings',{lifecycle:now}).then(function(r){d.coSettings=r.coSettings}).catch(alertErr)};
+  v.appendChild(lc);
   // sending address
   var fr=el('<form class="card" style="margin-bottom:14px"><span class="k">Automated mail</span><p class="small muted" style="margin:6px 0 10px">Reminders, confirmations and the digest go out from this address. It has to be one this Google account can send as (Gmail → Settings → Accounts → “Send mail as”), and <b>authorizeMail</b> has to be run once in the script editor. Leave blank to send from the account itself. Letters and your replies always come from you.</p><div style="display:flex;gap:8px;align-items:center"><input name="fromEmail" type="email" placeholder="messages@incadencecare.com" value="'+esc(s.fromEmail||'')+'" style="max-width:320px"><button class="btn quiet sm" type="submit">Save</button></div><p class="err"></p><p class="ok"></p></form>');
   fr.onsubmit=function(ev){ev.preventDefault();call('saveCoSettings',{fromEmail:$('input',fr).value}).then(function(r){d.coSettings=r.coSettings;$('.ok',fr).textContent='Saved.'}).catch(function(e){$('.err',fr).textContent=e.message})};
@@ -1139,6 +1145,7 @@ function billingView(){
 function billSummary(){
   var d=S.data,c=d.client,co=d.me.role==='coordinator',b=d.billing||{},cf=first(d.coordinator&&d.coordinator.name)||'your coordinator';
   var v=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>');var left=$('.left',v),side=$('aside',v);
+  if(S.thanks){left.appendChild(el('<div class="card" style="margin-bottom:14px;border-color:var(--gold)"><b>'+esc(S.thanks)+'</b></div>'));S.thanks=''}
   if(!b.connected){left.appendChild(el('<div class="card"><span class="k">Not connected yet</span><p class="muted" style="margin:8px 0 0">'+(co?'Add STRIPE_SECRET_KEY under Project Settings → Script properties, then reload.':'Billing is being set up. Nothing is due yet.')+'</p></div>'));if(!co)return v}
   else if(!c.stripe_customer_id){left.appendChild(el('<div class="card"><span class="k">Nothing yet</span><p class="muted" style="margin:8px 0 0">'+(co?'Start billing on the right.':'Billing has not started. Nothing is due.')+'</p></div>'))}
   else{
@@ -1175,6 +1182,10 @@ function billSummary(){
     var ov=el('<div class="card"><span class="k">Manual override</span><p class="small muted" style="margin:6px 0 10px">If they paid another way, open the portal by hand.</p><button class="btn quiet" type="button">'+(c.paid?'Lock the portal':'Mark as paid')+'</button></div>');$('button',ov).onclick=function(){if(c.paid&&!confirm('Lock the portal for this family?'))return;call('setPaid',{paid:!c.paid}).then(refresh).catch(alertErr)};side.appendChild(ov);
   } else {
     if(c.stripe_customer_id){var yc=el('<div class="card"><span class="k">Your card</span><p style="margin:8px 0 10px">'+(b.card?esc(b.card)+' on file. '+(b.autopay?'Autopay is on — the monthly amount is charged on the billing date.':'Autopay is off — you pay each invoice yourself.'):'No card on file yet. Add one and paying takes one click; turn on autopay and it is handled for you.')+'</p><a href="#" class="btn sm'+(b.card?' quiet':'')+'">'+(b.card?'Manage':'Add a card')+'</a></div>');$('a',yc).onclick=function(ev){ev.preventDefault();S.bp='method';render()};side.appendChild(yc)}
+    if(c.stripe_subscription_id&&c.paid){var paused=c.billing_status==='Paused';var nb=el('<div class="card"><span class="k">'+(paused?'Paused':'Need a break?')+'</span><p class="small muted" style="margin:8px 0 10px">'+(paused?'Billing is paused. Nothing is charged, and the plan, messages and record all stay where they are.':'Pause billing for a while. Nothing is charged until you resume, and nothing is lost: the plan, the messages and '+(c.patient_first_name?esc(c.patient_first_name)+'’s':'the')+' record all stay where they are.')+'</p><button class="btn sm'+(paused?'':' quiet')+'" type="button">'+(paused?'Resume billing':'Pause billing')+'</button><p class="err"></p>'+(paused?'':'<p class="small muted" style="margin:12px 0 0">Want to stop altogether? <a href="#" class="stop">Manage your membership</a> — your record stays, and you can come back any time.</p>')+'</div>');
+      var nbb=$('button',nb);nbb.onclick=function(){if(!paused&&!confirm('Pause billing? Nothing is charged until you resume it.'))return;nbb.disabled=true;call('pauseBilling',{resume:paused}).then(refresh).catch(function(e){$('.err',nb).textContent=e.message;nbb.disabled=false})};
+      var st=$('.stop',nb);if(st)st.onclick=function(ev){ev.preventDefault();st.textContent='Opening…';call('portalLink').then(function(r){window.open(r.url,'_blank');st.textContent='Manage your membership'}).catch(function(e){$('.err',nb).textContent=e.message;st.textContent='Manage your membership'})};
+      side.appendChild(nb)}
     side.appendChild(el('<div class="card"><span class="k">How billing works</span><p class="small muted" style="margin:8px 0 0">'+esc(BOOT.appName)+' bills monthly. Invoices come by email and show here; pay by card on Stripe’s secure page. If money is a worry, say so under Financial assistance — '+esc(cf)+' can adjust it.</p></div>'));
   }
   return v;
@@ -1268,7 +1279,7 @@ function coShell(){
   return s;
 }
 function loadInbasket(force){if(S.ib&&!force&&S.ibAt&&Date.now()-S.ibAt<45000)return Promise.resolve(S.ib);return call('inbasket').then(function(r){S.ib=r;S.ibAt=Date.now();return r})}
-function kindPill(k){var c={Meds:'red',Urgent:'red',Billing:'red',Message:'',Intake:'blue',Assistance:'blue',Papers:'blue'}[k]||'gray';return '<span class="wpill '+c+'">'+esc(k)+'</span>'}
+function kindPill(k){var c={Meds:'red',Urgent:'red',Billing:'red',Message:'',Plan:'',Intake:'blue',Assistance:'blue',Papers:'blue'}[k]||'gray';return '<span class="wpill '+c+'">'+esc(k)+'</span>'}
 function inbasketView(){
   var v=el('<div class="wspage ibx"><div class="ibl"></div><div class="ibc"><p class="muted">Loading your in basket…</p></div><div class="ibr"></div></div>');
   function draw(r){
@@ -1280,7 +1291,7 @@ function inbasketView(){
     var needs=(r.needs||[]).filter(function(n){return !S.ibk||n.kind===S.ibk});
     var N=el('<div class="pn"><div class="ph"><span>Needs you <span class="wpill red">'+needs.length+'</span></span><span class="muted small">Sorted by urgency · click a row to open it in the family’s chart</span></div><div class="wt"></div></div>');
     if(!needs.length)$('.wt',N).appendChild(el('<div class="wempty">Nothing waiting on you. Good.</div>'));
-    needs.forEach(function(n){var row=el('<a href="#" class="wr" style="grid-template-columns:110px 1fr 130px 90px"><div>'+kindPill(n.kind)+'</div><div><b>'+esc(n.family)+'</b> · '+esc(n.text)+'</div><div class="muted small">'+(n.when?esc(fmtDay(n.when)+(fmtDay(n.when)==='Today'||fmtDay(n.when)==='Yesterday'?' '+fmtTime(n.when):'')):'')+'</div><div style="text-align:right"><span class="btn sm'+(n.pri>1?' quiet':'')+'">'+({Meds:'Review',Message:'Reply',Urgent:'Reply',Intake:'Re-check',Billing:'Open',Assistance:'Open'}[n.kind]||'Open')+'</span></div></a>');row.onclick=function(ev){ev.preventDefault();openFamily(n.client_id,n.go)};$('.wt',N).appendChild(row)});
+    needs.forEach(function(n){var row=el('<a href="#" class="wr" style="grid-template-columns:110px 1fr 130px 90px"><div>'+kindPill(n.kind)+'</div><div><b>'+esc(n.family)+'</b> · '+esc(n.text)+'</div><div class="muted small">'+(n.when?esc(fmtDay(n.when)+(fmtDay(n.when)==='Today'||fmtDay(n.when)==='Yesterday'?' '+fmtTime(n.when):'')):'')+'</div><div style="text-align:right"><span class="btn sm'+(n.pri>1?' quiet':'')+'">'+({Meds:'Review',Message:'Reply',Urgent:'Reply',Plan:'Build',Intake:'Re-check',Billing:'Open',Assistance:'Open'}[n.kind]||'Open')+'</span></div></a>');row.onclick=function(ev){ev.preventDefault();openFamily(n.client_id,n.go)};$('.wt',N).appendChild(row)});
     C.appendChild(N);
     var F=el('<div class="pn"><div class="ph"><span>Families</span><span class="muted small">'+(r.families||[]).length+' active · sorted by surgery date</span></div><div class="wt"><div class="wh" style="grid-template-columns:90px 130px 120px 130px 1fr 120px"><div>Family</div><div>Patient</div><div>Stage</div><div>Surgery</div><div>Flags</div><div>Billing</div></div></div></div>');
     (r.families||[]).forEach(function(f){var dw=f.days===null?'':f.days===0?'<b>today</b>':f.days>0?'<b>'+f.days+' days</b>':'<b>day '+(-f.days)+'</b>';var row=el('<a href="#" class="wr" style="grid-template-columns:90px 130px 120px 130px 1fr 120px"><div><b>'+esc(f.family_name)+'</b></div><div>'+esc(f.patient)+'</div><div>'+esc(f.stage)+'</div><div>'+(f.surgery_date?esc(fmtShort(f.surgery_date).replace(/, \d{4}$/,''))+' · '+dw:'TBD')+'</div><div>'+f.flags.map(kindPill).join(' ')+(!f.paid&&f.billing?' <span class="wpill gray">Locked</span>':'')+'</div><div class="'+(f.billing==='Payment failed'?'red':'')+'">'+esc(f.billing||'—')+'</div></a>');row.onclick=function(ev){ev.preventDefault();openFamily(f.client_id)};$('.wt',F).appendChild(row)});
@@ -1314,18 +1325,19 @@ function scheduleView(){
 function chartView(){
   var d=S.data,c=d.client;
   if(!c)return el('<div class="wspage"><div class="pn" style="max-width:600px;margin:40px auto;padding:24px"><b>Pick a family.</b><p class="muted">Use Find a family at the top, or open one from the In Basket.</p></div></div>');
-  var tabs=[['chart','Chart'],['plan','Plan'],['tasks','Tasks'],['messages','Messages'],['meds','Pharmacy'],['find','Find Care'],['billing','Billing'],['record','Record'],['intake','Intake'],['updates','Updates'],['circle','Circle'],['settings','Settings']];
+  var tabs=[['chart','Chart'],['plan','Plan'],['build','Set up'],['tasks','Tasks'],['messages','Messages'],['meds','Pharmacy'],['find','Find Care'],['billing','Billing'],['record','Record'],['intake','Intake'],['updates','Updates'],['circle','Circle'],['settings','Settings']];
+  var planDue=!!d.client&&isSub(d.intake)&&!d.client.plan_ready;
   if(['inbasket','schedule','home'].indexOf(S.view)>=0||!S.view)S.view='chart';
   var v=el('<div class="wschart"><aside class="wsside"></aside><div class="wsmain"><nav class="wstabs"></nav><div class="wsview"></div></div></div>');
   v.querySelector('.wsside').appendChild(chartSide());
   var nav=$('.wstabs',v),unread=d.topics?unreadTotal():0,pend=(d.meds||[]).filter(function(m){return m.status==='Pending review'}).length;
-  tabs.forEach(function(t){var pill=t[0]==='messages'&&unread?unread:t[0]==='meds'&&pend?pend:'';var a=el('<a href="#" class="'+(S.view===t[0]?'on':'')+'">'+t[1]+(pill?' <span class="wpill red">'+pill+'</span>':'')+'</a>');a.onclick=function(ev){ev.preventDefault();S.touched=true;S.view=t[0];S.mopen=false;render()};nav.appendChild(a)});
+  tabs.forEach(function(t){var pill=t[0]==='messages'&&unread?unread:t[0]==='meds'&&pend?pend:t[0]==='build'&&planDue?'!':'';var a=el('<a href="#" class="'+(S.view===t[0]?'on':'')+'">'+t[1]+(pill?' <span class="wpill red">'+pill+'</span>':'')+'</a>');a.onclick=function(ev){ev.preventDefault();S.touched=true;S.view=t[0];S.mopen=false;render()};nav.appendChild(a)});
   nav.appendChild(el('<span class="wsacts"></span>'));var acts=$('.wsacts',nav);
   [['find:book','+ Appt'],['tasks','+ Task']].forEach(function(x){var a=el('<a href="#" class="btn quiet sm">'+x[1]+'</a>');a.onclick=function(ev){ev.preventDefault();go(x[0])};acts.appendChild(a)});
   var rb=el('<a href="#" class="btn sm'+(S.recOpen?'':' quiet')+'">Recommend</a>');rb.onclick=function(ev){ev.preventDefault();S.recOpen=!S.recOpen;render()};acts.appendChild(rb);
   var view=$('.wsview',v);if(S.recOpen)view.appendChild(recPanel());
   if(S.view==='chart')view.appendChild(chartHome());
-  else{var w=el('<div class="wrap"></div>');w.appendChild({find:findView,settings:settingsView,meds:medsView,billing:billingView,plan:planView,tasks:tasksView,messages:messagesView,updates:updatesView,circle:circleView,record:recordView,resources:resourcesView,intake:(!S.coFill)?prepView:intakeView}[S.view]());view.appendChild(w)}
+  else{var w=el('<div class="wrap"></div>');w.appendChild({find:findView,settings:settingsView,meds:medsView,billing:billingView,plan:planView,tasks:tasksView,messages:messagesView,updates:updatesView,circle:circleView,record:recordView,resources:resourcesView,build:buildView,intake:(!S.coFill)?prepView:intakeView}[S.view]());view.appendChild(w)}
   return v;
 }
 function chartSide(){
@@ -1333,7 +1345,7 @@ function chartSide(){
   var sd=toDate(c.surgery_date),t0=new Date();t0=new Date(t0.getFullYear(),t0.getMonth(),t0.getDate());var dts=sd?Math.round((new Date(sd.getFullYear(),sd.getMonth(),sd.getDate())-t0)/864e5):null;
   var pend=(d.meds||[]).filter(function(m){return m.status==='Pending review'}).length,unread=d.topics?unreadTotal():0,open=(d.tasks||[]).filter(function(t){return t.status!=='Done'}).length;
   var team=(d.careTeam||[]).slice(0,3),inner=d.inner||[];
-  var s=el('<div><div class="wsid"><div class="av" style="background:'+esc(c.avatar||'#1C2A3A')+'">'+esc(initial(pf))+'</div><div><div class="nm">'+esc(pf)+'</div><div class="muted small">'+esc(famName(c.family_name))+'</div></div></div><div class="small muted" style="margin-top:8px">'+esc([age?age+' yrs':'',c.address?String(c.address).split(',').slice(-2).join(',').trim():''].filter(Boolean).join(' · '))+'<br>'+esc([c.phone,d.patientUser].filter(Boolean).join(' · '))+'</div>'+(pend?'<div class="wsalert">Medication pending review</div>':'')+(!c.paid?'<div class="wsalert gray">Portal locked — first invoice unpaid</div>':'')+'<div class="wsk">Stage</div><div>'+esc(c.current_stage||BOOT.stages[0])+' · <a href="#" class="stg">change</a></div><div class="wsk">Surgery</div><div>'+(c.surgery_date?esc(fmtShort(c.surgery_date))+(dts!==null?' · <b>'+(dts===0?'today':dts>0?dts+' days':'day '+(-dts))+'</b>':''):'Not scheduled')+'</div><div class="wsk">Inner circle</div><div>'+(inner.length?inner.map(function(u){return esc(u.name)+(u.relationship?' ('+esc(u.relationship)+')':'')}).join('<br>'):'<span class="muted">None yet</span>')+'<div class="small muted">Circle: '+(d.circle||[]).length+' supporter'+((d.circle||[]).length===1?'':'s')+'</div></div><div class="wsk">Care team</div><div>'+(team.length?team.map(function(m){return esc(m.name)+' · '+esc(m.role||m.org||'')}).join('<br>'):'<span class="muted">None yet</span>')+'</div><div class="wsk">Allergies</div><div>'+esc(c.allergies||'None listed')+'</div><div class="wsk">Billing</div><div>'+(c.monthly_amount!==''?money(c.monthly_amount)+' / mo · ':'')+esc(c.billing_status||(c.stripe_customer_id?'Active':'Not started'))+(c.autopay?' · autopay':'')+'</div><div class="wsk">Open items</div><div>'+open+' task'+(open===1?'':'s')+' · '+unread+' unread · '+pend+' med review</div></div>');
+  var s=el('<div><div class="wsid"><div class="av" style="background:'+esc(c.avatar||'#1C2A3A')+'">'+esc(initial(pf))+'</div><div><div class="nm">'+esc(pf)+'</div><div class="muted small">'+esc(famName(c.family_name))+'</div></div></div><div class="small muted" style="margin-top:8px">'+esc([age?age+' yrs':'',c.address?String(c.address).split(',').slice(-2).join(',').trim():''].filter(Boolean).join(' · '))+'<br>'+esc([c.phone,d.patientUser].filter(Boolean).join(' · '))+'</div>'+(pend?'<div class="wsalert">Medication pending review</div>':'')+(isSub(d.intake)&&!c.plan_ready?'<div class="wsalert" style="background:#F0E7CF;color:#6B5312">Plan ready to create</div>':'')+(!c.paid?'<div class="wsalert gray">Portal locked — first invoice unpaid</div>':'')+'<div class="wsk">Stage</div><div>'+esc(c.current_stage||BOOT.stages[0])+' · <a href="#" class="stg">change</a></div><div class="wsk">Surgery</div><div>'+(c.surgery_date?esc(fmtShort(c.surgery_date))+(dts!==null?' · <b>'+(dts===0?'today':dts>0?dts+' days':'day '+(-dts))+'</b>':''):'Not scheduled')+'</div><div class="wsk">Inner circle</div><div>'+(inner.length?inner.map(function(u){return esc(u.name)+(u.relationship?' ('+esc(u.relationship)+')':'')}).join('<br>'):'<span class="muted">None yet</span>')+'<div class="small muted">Circle: '+(d.circle||[]).length+' supporter'+((d.circle||[]).length===1?'':'s')+'</div></div><div class="wsk">Care team</div><div>'+(team.length?team.map(function(m){return esc(m.name)+' · '+esc(m.role||m.org||'')}).join('<br>'):'<span class="muted">None yet</span>')+'</div><div class="wsk">Allergies</div><div>'+esc(c.allergies||'None listed')+'</div><div class="wsk">Billing</div><div>'+(c.monthly_amount!==''?money(c.monthly_amount)+' / mo · ':'')+esc(c.billing_status||(c.stripe_customer_id?'Active':'Not started'))+(c.autopay?' · autopay':'')+'</div><div class="wsk">Open items</div><div>'+open+' task'+(open===1?'':'s')+' · '+unread+' unread · '+pend+' med review</div></div>');
   $('.stg',s).onclick=function(ev){ev.preventDefault();var sel=el('<select>'+BOOT.stages.map(function(x){return'<option'+(x===(c.current_stage||BOOT.stages[0])?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select>');sel.onchange=function(){call('setStage',{stage:sel.value}).then(refresh).catch(alertErr)};this.replaceWith(sel)};
   return s;
 }
@@ -1908,6 +1920,217 @@ function answersList(mine){
   return w;
 }
 
+// ---------------------------------------------------------------- client setup (coordinator)
+// Once the intake is in, this walks the coordinator through setting the family up, screen by screen.
+// Each screen is built from the family's answers: the profile, the surgery and the stage, the timeline
+// and its tasks, the plan itself, the people around them, and sending it. The coordinator writes the
+// plan; the suggestions come from fixed rules in the intake and are only starting points.
+function suAns(id){var a=((S.data.intake||{}).answers||{})[id];return a?String(a.a||''):''}
+function suNote(id){var a=((S.data.intake||{}).answers||{})[id];return a?String(a.n||''):''}
+function suDet(id){return suAns(id+'d')}
+function suDay(base,n){var d=new Date(base.getFullYear(),base.getMonth(),base.getDate()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function suNights(){var s=suAns('G.9');return /same day/.test(s)?0:/One night/.test(s)?1:/2–3/.test(s)?3:/4–7/.test(s)?6:/More/.test(s)?9:2}
+// The timeline, from the surgery date: each stage with its dates and the answers that shape it.
+function suTimeline(){
+  var d=S.data,c=d.client,sd=toDate(c.surgery_date),em=/emergency/.test(suAns('G.6')),nights=suNights(),rehab=/rehab/.test(suAns('G.10')),T=[];
+  var today=new Date();today=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+  if(sd){var s0=new Date(sd.getFullYear(),sd.getMonth(),sd.getDate());
+    T.push({stage:'The diagnosis',from:'',to:'',note:suAns('G.1')&&!/waiting/.test(suAns('G.1'))?'Diagnosis: '+suAns('G.1'):'Diagnosis still open.'});
+    T.push({stage:'Before surgery',from:suDay(today,0),to:suDay(s0,-8),note:'Ride home, who stays, childcare, pets, insurance questions.'});
+    T.push({stage:'The week of',from:suDay(s0,-7),to:suDay(s0,-1),note:'Pre-op call, report time, packing, confirm the driver.'});
+    T.push({stage:'Surgery day',from:suDay(s0,0),to:suDay(s0,0),note:suAns('G.4')&&!/don't have/.test(suAns('G.4'))?suAns('G.4'):'Surgery (name still needed).'});
+    T.push({stage:'The hospital stay',from:suDay(s0,0),to:suDay(s0,nights),note:suAns('G.9')||'Length of stay unknown.'});
+    T.push({stage:'First weeks home',from:suDay(s0,nights),to:suDay(s0,nights+21),note:rehab?'Rehab or a facility first, then home.':/don't know/.test(suAns('G.10'))?'Straight home or rehab: still unknown.':'Straight home.'});
+    T.push({stage:'The long middle',from:suDay(s0,nights+22),to:'',note:'Follow-ups, work and school letters, the second-month slump.'});
+  } else if(em){
+    T.push({stage:'The hospital stay',from:suDay(today,0),to:'',note:[suAns('G.6a'),suAns('G.6b')].filter(Boolean).join(' — ')||'In the hospital now.'});
+    T.push({stage:'First weeks home',from:'',to:'',note:rehab?'Rehab or a facility first.':'Home, date unknown.'});
+    T.push({stage:'The long middle',from:'',to:'',note:''});
+  } else {
+    T.push({stage:'The diagnosis',from:suDay(today,0),to:'',note:suAns('G.1')||''});
+    T.push({stage:'Before surgery',from:'',to:'',note:'No surgery date yet. Hold the dated parts of the plan until it is set.'});
+  }
+  return T;
+}
+// Which stage they are in today, from the dates.
+function suStageGuess(){
+  var c=S.data.client,sd=toDate(c.surgery_date);
+  if(/emergency/.test(suAns('G.6'))){var w=suAns('G.6a');return /home/i.test(w)?'First weeks home':'The hospital stay'}
+  if(!sd)return /waiting/.test(suAns('G.1'))?'The diagnosis':'Before surgery';
+  var t=new Date();t=new Date(t.getFullYear(),t.getMonth(),t.getDate());var days=Math.round((new Date(sd.getFullYear(),sd.getMonth(),sd.getDate())-t)/864e5);
+  if(days>7)return 'Before surgery';if(days>0)return 'The week of';if(days===0)return 'Surgery day';if(days>-suNights())return 'The hospital stay';if(days>-(suNights()+22))return 'First weeks home';return 'The long middle';
+}
+// Suggested tasks with due dates, from the answers and the date. Only ones not already on the task list.
+function suTasks(){
+  var d=S.data,c=d.client,sd=toDate(c.surgery_date),pf=first(c.patient_first_name)||'the patient',out=[],CC=BOOT.categories[0],FS=BOOT.categories[2],UA=BOOT.categories[1];
+  var day=function(n){return sd?suDay(new Date(sd.getFullYear(),sd.getMonth(),sd.getDate()),n):''};
+  var add=function(title,due,cat,why){out.push({title:title,due_date:due,category:cat,why:why})};
+  var drv=suAns('L.1');
+  if(!drv||/haven't sorted/.test(drv))add('Find and name the adult who drives '+pf+' home',day(-5),CC,'They have no driver yet.');else if(/\b(uber|lyft|taxi|cab|rideshare)\b/i.test(drv))add('Replace the rideshare with a named adult for the ride home',day(-5),CC,'They put a taxi or rideshare: “'+drv+'”. Hospitals will not release to one.');else add('Confirm the ride home with '+drv.slice(0,60)+' once the report time is known',day(-2),CC,'Driver: '+drv);
+  if(suAns('A.2')==='Lives alone')add((/^Yes/.test(suAns('A.2a'))?'Confirm who stays the first night or two':'Find someone to stay the first night or two'),day(-4),FS,'Lives alone. '+(suDet('A.2a')||suAns('A.2a')||''));
+  if(suAns('M.1')==='Yes')add('Childcare for surgery week',day(-3),FS,'Children at home'+(suDet('M.1')?': '+suDet('M.1'):'.'));
+  if(suAns('M.4')&&suAns('M.4')!=='No')add('Pet care for the hospital days',day(-2),FS,suAns('M.4')+(suDet('M.4')?' — '+suDet('M.4'):''));
+  if(sd)add('Pre-op call: report time, what to bring, what to stop taking',day(-3),CC,'');
+  if(/don't have/.test(suAns('G.4')))add("Get the surgery's name, and open or minimally invasive",day(-10),UA,'They do not have a name for it yet.');
+  if(/don't know/.test(suAns('G.10')))add('Find out: straight home, or rehab first',day(-7),UA,'Changes the whole plan.');
+  if(/rehab/.test(suAns('G.10')))add('Rehab facility: which one, how far, visiting plan',day(-5),CC,'');
+  if(/None|don't know/.test(suAns('G.11'))||!suAns('G.11'))add('Insurance: find out what covers '+pf,day(-10),UA,suAns('G.11')||'Not answered.');
+  if(sd)add('Discharge check-in: what came home on paper',day(suNights()),CC,'');
+  if(sd)add('First-week-home check-in',day(suNights()+5),FS,'');
+  var have=(d.tasks||[]).map(function(t){return String(t.title).toLowerCase()});
+  return out.filter(function(t){return have.indexOf(t.title.toLowerCase())<0});
+}
+function buildView(){
+  var d=S.data,it=d.intake||{},c=d.client,spec=d.intakeSpec,ans=it.answers||{};
+  var pf=first(c.patient_first_name)||c.family_name,sub=isSub(it);
+  var v=el('<div></div>');
+  var status=c.plan_ready?'<b style="color:var(--gold)">Plan sent</b>':sub?'<b style="color:var(--gold)">Plan ready to create</b>':'<b style="color:#9B2C2C">Waiting on the intake</b>';
+  v.appendChild(el('<div class="head"><div class="k">Client setup</div><h1>Set up '+esc(pf)+'.</h1><div class="muted">'+status+(it.submitted_at?' · intake in '+esc(fmtDate(it.submitted_at)):'')+(it.consent?' · signed by '+esc(it.consent.name)+(it.consent.relationship?' ('+esc(it.consent.relationship)+')':''):'')+'</div></div>'));
+  if(!sub){v.appendChild(el('<p class="muted">The intake is not in yet. The setup builds itself from their answers, so it waits for those.</p><p><button class="btn quiet" type="button">Fill it in with them</button></p>'));$('button',v).onclick=function(){S.coFill=true;S.ia=null;S.step=null;S.view='intake';render()};return v}
+  var STEPS=[['who','Who'],['surgery','The surgery'],['timeline','The timeline'],['plan','The plan'],['people','The people'],['send','Send it']];
+  S.su=S.su||'who';var idx=STEPS.map(function(s){return s[0]}).indexOf(S.su);if(idx<0){idx=0;S.su='who'}
+  var nav=el('<div class="card" style="margin:-6px 0 18px;padding:10px 16px"><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+STEPS.map(function(s,i){return'<a href="#" data-s="'+s[0]+'" class="btn sm'+(i===idx?'':' quiet')+'">'+(i+1)+'. '+esc(s[1])+'</a>'}).join('')+'</div></div>');
+  $all('a',nav).forEach(function(a){a.onclick=function(ev){ev.preventDefault();S.su=a.getAttribute('data-s');render();window.scrollTo(0,0)}});
+  v.appendChild(nav);
+  var body=el('<div></div>');v.appendChild(body);
+  var page={who:suWho,surgery:suSurgery,timeline:suTimeline_,plan:suPlan,people:suPeople,send:suSend}[S.su];
+  body.appendChild(page());
+  var foot=el('<p style="margin:22px 0 0;display:flex;gap:8px;justify-content:space-between"><span>'+(idx>0?'<button class="btn quiet" type="button" id="bk">Back</button>':'')+'</span><span>'+(idx<STEPS.length-1?'<button class="btn" type="button" id="nx">Next: '+esc(STEPS[idx+1][1])+'</button>':'')+'</span></p>');
+  var bk=$('#bk',foot);if(bk)bk.onclick=function(){S.su=STEPS[idx-1][0];render();window.scrollTo(0,0)};
+  var nx=$('#nx',foot);if(nx)nx.onclick=function(){S.su=STEPS[idx+1][0];render();window.scrollTo(0,0)};
+  v.appendChild(foot);
+  return v;
+}
+// A small "they said" line under a field.
+function suSaid(id,label){var a=suAns(id),n=suNote(id),dd=suDet(id);if(!a&&!n)return'';return'<div class="small muted" style="margin:-6px 0 12px">'+esc(label||'They said')+': '+esc(a)+(dd?' — '+esc(dd):'')+(n?' · <i>'+esc(n)+'</i>':'')+'</div>'}
+// 1. Who: the profile, from A.name, A.phone, A.2 and the consent signature.
+function suWho(){
+  var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
+  var nm=suAns('A.name').trim().split(/\s+/),fn=c.patient_first_name||nm[0]||'',ln=c.patient_last_name||nm.slice(1).join(' ')||'';
+  var ph=c.phone||suAns('A.phone');
+  var f=el('<form class="card"><div class="k" style="margin-bottom:12px">The patient</div><div class="two"><div class="field"><label>First name</label><input name="patient_first_name" value="'+esc(fn)+'" required></div><div class="field"><label>Last name</label><input name="patient_last_name" value="'+esc(ln)+'"></div></div>'+suSaid('A.name','Full name on the intake')+'<div class="two"><div class="field"><label>Phone</label><input name="phone" value="'+esc(ph)+'"></div><div class="field"><label>Date of birth</label><input name="dob" type="date" value="'+esc(c.dob?String(c.dob).slice(0,10):'')+'"></div></div>'+suSaid('A.phone','Phone on the intake')+'<div class="field"><label>Address</label><input name="address" value="'+esc(c.address||'')+'" placeholder="Street, city, state"></div><div class="k" style="margin:6px 0 12px">Emergency contact</div><div class="two"><div class="field"><label>Name</label><input name="emergency_name" value="'+esc(c.emergency_name||'')+'"></div><div class="field"><label>Relationship</label><input name="emergency_relationship" value="'+esc(c.emergency_relationship||'')+'"></div></div><div class="field"><label>Phone</label><input name="emergency_phone" value="'+esc(c.emergency_phone||'')+'"></div><button class="btn" type="submit">Save</button> <span class="small muted ok"></span><p class="err"></p></form>');
+  f.onsubmit=function(ev){ev.preventDefault();var b=$('button',f);b.disabled=true;call('saveProfile',formData(f)).then(function(){$('.ok',f).textContent='Saved.';b.disabled=false;return refresh()}).catch(function(e){$('.err',f).textContent=e.message;b.disabled=false})};
+  left.appendChild(f);
+  var who=suAns('0.1'),mode=suAns('0.1a');
+  side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">From the intake</div><div class="small" style="line-height:1.6">'+(who?'<b>Filled out by:</b> '+esc(who)+'<br>':'')+(it_consent(d)?'<b>Signed by:</b> '+esc(it_consent(d))+'<br>':'')+(mode?'<b>Mode:</b> '+esc(mode)+(/Quick/.test(mode)?' — the meeting does more work; present assumptions as assumptions.':'')+'<br>':'')+(suAns('A.2')?'<b>Living situation:</b> '+esc(suAns('A.2'))+(suAns('A.2a')?' · first night: '+esc(suAns('A.2a'))+(suDet('A.2a')?' ('+esc(suDet('A.2a'))+')':''):'')+'<br>':'')+'</div></div>'));
+  side.appendChild(el('<div class="note">Check the name and phone against what they typed. The intake does not ask for an address or a date of birth; get those on the call.</div>'));
+  return w;
+}
+function it_consent(d){var cs=d.intake&&d.intake.consent;return cs?cs.name+(cs.relationship?' ('+cs.relationship+')':''):''}
+// 2. The surgery: diagnosis, procedure, date, stay, destination, insurance. Sets the date, the stage,
+// the surgery-day appointment and the surgeon on the care team.
+function suSurgery(){
+  var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
+  var em=/emergency/.test(suAns('G.6')),notYet=/Not scheduled/.test(suAns('G.6'));
+  var f=el('<form class="card"><div class="k" style="margin-bottom:12px">Surgery date and stage</div><div class="two"><div class="field"><label>Surgery date</label><input name="surgery_date" type="date" value="'+esc(c.surgery_date?String(c.surgery_date).slice(0,10):'')+'"></div><div class="field"><label>Stage today</label><select name="stage">'+BOOT.stages.map(function(s){return'<option'+(s===(c.current_stage||suStageGuess())?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select></div></div>'+suSaid('G.6','Date on the intake')+(em?'<div class="note" role="alert" style="margin:0 0 12px"><b>Emergency or already happened.</b> '+esc([suAns('G.6a'),suAns('G.6b')].filter(Boolean).join(' — '))+'</div>':'')+(notYet?'<div class="note" style="margin:0 0 12px">No date yet. Set the stage and hold the dated tasks until it is known.</div>':'')+'<div class="small muted" style="margin:0 0 10px">Suggested stage from the date: <b>'+esc(suStageGuess())+'</b></div><button class="btn" type="submit">Save</button> <span class="small muted ok"></span><p class="err"></p></form>');
+  f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f),b=$('button',f);b.disabled=true;call('saveProfile',{surgery_date:fd.surgery_date}).then(function(){return call('setStage',{stage:fd.stage})}).then(function(){$('.ok',f).textContent='Saved.';return refresh()}).catch(function(e){$('.err',f).textContent=e.message;b.disabled=false})};
+  left.appendChild(f);
+  // the surgery-day appointment
+  var sd=c.surgery_date?String(c.surgery_date).slice(0,10):'',hasSurgAppt=(d.appointments||[]).some(function(a){return /surgery/i.test(a.title)&&String(a.starts_at||'').slice(0,10)===sd});
+  var ap=el('<form class="card"><div class="k" style="margin-bottom:12px">Surgery day on the calendar</div>'+(hasSurgAppt?'<p class="small muted" style="margin:0">Already on the calendar for '+esc(fmtDate(sd))+'.</p>':(sd?'<div class="two"><div class="field"><label>What</label><input name="title" value="Surgery'+(suAns('G.4')&&!/don\'t have/.test(suAns('G.4'))?' — '+esc(suAns('G.4').slice(0,80)):'')+'"></div><div class="field"><label>Report time</label><input name="time" type="time" value="06:00"></div></div><div class="field"><label>Where</label><input name="location" placeholder="Hospital"></div><button class="btn quiet" type="submit">Add to the calendar</button><p class="err"></p>':'<p class="small muted" style="margin:0">Set the surgery date first.</p>'))+'</form>');
+  ap.onsubmit=function(ev){ev.preventDefault();var fd=formData(ap),b=$('button',ap);b.disabled=true;call('addAppointment',{title:fd.title,starts_at:sd+'T'+(fd.time||'06:00'),location:fd.location}).then(refresh).catch(function(e){$('.err',ap).textContent=e.message;b.disabled=false})};
+  left.appendChild(ap);
+  // the surgeon
+  var team=(d.careTeam||[]);
+  var ct=el('<form class="card"><div class="k" style="margin-bottom:12px">Care team</div>'+(team.length?'<div class="small muted" style="margin:0 0 10px">On the team: '+esc(team.map(function(m){return m.name+(m.role?' ('+m.role+')':'')}).join(', '))+'</div>':'')+'<div class="two"><div class="field"><label>Surgeon</label><input name="name" placeholder="Dr. …"></div><div class="field"><label>Practice or hospital</label><input name="org"></div></div><div class="field"><label>Office phone</label><input name="phone"></div><button class="btn quiet" type="submit">Add surgeon</button><p class="err"></p></form>');
+  ct.onsubmit=function(ev){ev.preventDefault();var fd=formData(ct),b=$('button',ct);b.disabled=true;call('addCareTeam',{name:fd.name,role:'Surgeon',org:fd.org,phone:fd.phone}).then(refresh).catch(function(e){$('.err',ct).textContent=e.message;b.disabled=false})};
+  left.appendChild(ct);
+  side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">What they told us</div><div class="small" style="line-height:1.7"><b>Diagnosis:</b> '+esc(suAns('G.1')||'—')+(suNote('G.1')?' · <i>'+esc(suNote('G.1'))+'</i>':'')+'<br><b>Surgery:</b> '+esc(suAns('G.4')||'—')+'<br><b>Hospital stay:</b> '+esc(suAns('G.9')||'—')+'<br><b>After:</b> '+esc(suAns('G.10')||'—')+'<br><b>Insurance:</b> '+esc(suAns('G.11')||'not answered')+'</div></div>'));
+  side.appendChild(el('<div class="note">The intake does not name the surgeon or the hospital. Ask on the call and add them here; the ride, the report time and the discharge planner all hang off that.</div>'));
+  return w;
+}
+// 3. The timeline: the stages with dates from the surgery date, and the dated tasks the answers call for.
+function suTimeline_(){
+  var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
+  var T=suTimeline(),cur=c.current_stage||suStageGuess();
+  var tl=el('<div class="card"><div class="k" style="margin-bottom:12px">'+esc(first(c.patient_first_name)||'Their')+'’s road, dated</div></div>');
+  T.forEach(function(s){tl.appendChild(el('<div style="display:flex;gap:14px;padding:10px 0;border-bottom:1px solid var(--line);align-items:flex-start"><div style="width:190px;flex-shrink:0"><b'+(s.stage===cur?' style="color:var(--gold)"':'')+'>'+esc(s.stage)+'</b>'+(s.stage===cur?'<div class="small muted">now</div>':'')+'</div><div style="width:200px;flex-shrink:0" class="small">'+(s.from?esc(fmtShort(s.from)):'—')+(s.to&&s.to!==s.from?' → '+esc(fmtShort(s.to)):'')+'</div><div class="small muted">'+esc(s.note)+'</div></div>'))});
+  if(!c.surgery_date&&!/emergency/.test(suAns('G.6')))tl.appendChild(el('<p class="small muted" style="margin:10px 0 0">Dates fill in once the surgery date is set (step 2).</p>'));
+  left.appendChild(tl);
+  var sug=suTasks();
+  var tk=el('<div class="card" style="margin-top:14px"><div class="k" style="margin-bottom:6px">Tasks the answers call for</div><p class="small muted" style="margin:0 0 10px">Each one becomes a task with a due date. Untick what does not apply, change a date, then add.</p></div>');
+  if(!sug.length)tk.appendChild(el('<p class="small muted" style="margin:0">Nothing left to add. The task list already has these.</p>'));
+  else{var fm=el('<form></form>');sug.forEach(function(t,i){fm.appendChild(el('<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)"><input type="checkbox" name="on'+i+'" checked style="width:auto;margin-top:4px"><div style="flex-grow:1"><input name="t'+i+'" value="'+esc(t.title)+'" style="margin-bottom:4px">'+(t.why?'<div class="small muted">'+esc(t.why)+'</div>':'')+'</div><input type="date" name="d'+i+'" value="'+esc(t.due_date)+'" style="width:160px"></div>'))});
+    fm.appendChild(el('<p style="margin:12px 0 0"><button class="btn" type="submit">Add the ticked tasks</button> <span class="small muted ok"></span></p><p class="err"></p>'));
+    fm.onsubmit=function(ev){ev.preventDefault();var fd=formData(fm),b=$('button',fm);b.disabled=true;var todo=sug.map(function(t,i){return fd['on'+i]?{title:fd['t'+i],due_date:fd['d'+i],category:t.category,owner:'Coordinator'}:null}).filter(Boolean);var p=Promise.resolve();todo.forEach(function(t){p=p.then(function(){return call('addTask',t)})});p.then(function(){$('.ok',fm).textContent=todo.length+' added.';return refresh()}).catch(function(e){$('.err',fm).textContent=e.message;b.disabled=false})};
+    tk.appendChild(fm)}
+  left.appendChild(tk);
+  var open=(d.tasks||[]).filter(function(t){return t.status!=='Done'});
+  side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">On the task list</div>'+(open.length?open.slice(0,12).map(function(t){return'<div class="small" style="padding:4px 0;border-bottom:1px solid var(--line)">'+esc(t.title)+(t.due_date?' <span class="muted">· '+esc(fmtShort(t.due_date))+'</span>':'')+'</div>'}).join(''):'<p class="small muted" style="margin:0">Nothing yet.</p>')+'</div>'));
+  side.appendChild(el('<div class="note">Hospital stay: '+esc(suAns('G.9')||'unknown')+'. After: '+esc(suAns('G.10')||'unknown')+'. The dates above assume '+suNights()+' night'+(suNights()===1?'':'s')+'.</div>'));
+  return w;
+}
+// 4. The plan: by stage, with the drafts to approve and the answers to draw from.
+function suPlan(){
+  var d=S.data,c=d.client,spec=d.intakeSpec,ans=(d.intake||{}).answers||{},flags=d.intakeFlags||[],pf=first(c.patient_first_name)||'the patient';
+  var w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
+  var plan=d.plan||[],drafts=plan.filter(isDraft),live=plan.filter(function(p){return !isDraft(p)});
+  var f=el('<form class="card"><div class="k" style="margin-bottom:12px">Add to the plan</div><div class="two"><div class="field"><label>Stop</label><select name="stage">'+BOOT.stages.map(function(s){return'<option'+(s===(c.current_stage||suStageGuess())?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select></div><div class="field"><label>Category</label><select name="category">'+BOOT.categories.map(function(s){return'<option>'+esc(s)+'</option>'}).join('')+'</select></div></div><div class="field"><label>Item</label><input name="item" required placeholder="Arrange a ride home on discharge day"></div><div class="field"><label>Detail (optional)</label><textarea name="detail" style="min-height:64px"></textarea></div><div class="two"><div class="field"><label>Who</label><input name="owner" placeholder="Coordinator"></div><div class="field"><label>By</label><input name="target_date" type="date"></div></div><input type="hidden" name="planId"><div style="display:flex;gap:8px;align-items:center"><button class="btn" type="submit">Add</button><a href="#" class="small muted cx" style="display:none">Cancel edit</a></div><p class="err"></p></form>');
+  function fill(o){$('input[name=item]',f).value=o.item||'';$('textarea',f).value=o.detail||'';if(o.stage)$('select[name=stage]',f).value=o.stage;if(o.category)$('select[name=category]',f).value=o.category;$('input[name=owner]',f).value=o.owner||'';$('input[name=target_date]',f).value=o.target_date?String(o.target_date).slice(0,10):'';$('input[name=planId]',f).value=o.planId||'';$('button',f).textContent=o.planId?'Save':'Add';$('.cx',f).style.display=o.planId?'':'none';f.scrollIntoView({behavior:'smooth',block:'start'});$('input[name=item]',f).focus()}
+  $('.cx',f).onclick=function(ev){ev.preventDefault();fill({})};
+  f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f),b=$('button',f);b.disabled=true;call(fd.planId?'editPlanItem':'addPlanItem',fd).then(refresh).catch(function(e){$('.err',f).textContent=e.message;b.disabled=false})};
+  // drafts
+  var dr=el('<div class="card"><div class="k" style="margin-bottom:6px">Drafts from the intake — '+drafts.length+'</div><p class="small muted" style="margin:0 0 10px">Starting points from fixed rules. The family does not see them until you approve. Edit the wording first if it needs it.</p></div>');
+  if(!drafts.length)dr.appendChild(el('<p class="small muted" style="margin:0">None waiting.</p>'));
+  drafts.forEach(function(p){var r=el('<div class="draft" style="flex-direction:column;gap:8px"><div class="t"><b>'+esc(p.item)+'</b><div class="d">'+esc(p.stage)+' · '+esc(p.category)+(p.detail?' — '+esc(p.detail):'')+'</div></div><div class="bs"><button class="btn quiet sm" type="button">Approve</button><button class="btn quiet sm" type="button">Edit</button><button class="btn quiet sm" type="button" style="color:var(--muted)">Discard</button></div></div>');var bs=$all('button',r);bs[0].onclick=function(){call('approvePlanItem',{planId:p.plan_id}).then(refresh).catch(alertErr)};bs[1].onclick=function(){fill({planId:p.plan_id,item:p.item,detail:p.detail,stage:p.stage,category:p.category,owner:p.owner,target_date:p.target_date})};bs[2].onclick=function(){call('approvePlanItem',{planId:p.plan_id,discard:true}).then(refresh).catch(alertErr)};dr.appendChild(r)});
+  left.appendChild(dr);
+  // the plan by stage
+  var T=suTimeline();
+  var pl=el('<div class="card" style="margin-top:14px"><div class="k" style="margin-bottom:6px">The plan so far — '+live.length+'</div></div>');
+  BOOT.stages.forEach(function(stg){var rows=live.filter(function(p){return p.stage===stg}),t=T.filter(function(x){return x.stage===stg})[0];if(!rows.length&&!t)return;var g=el('<div style="margin:12px 0 0"><div class="small muted" style="font-weight:700">'+esc(stg)+(t&&t.from?' <span style="font-weight:400">· '+esc(fmtShort(t.from))+(t.to&&t.to!==t.from?' → '+esc(fmtShort(t.to)):'')+'</span>':'')+'</div></div>');if(!rows.length)g.appendChild(el('<div class="small muted" style="padding:4px 0">Nothing here yet. <a href="#" class="ad">Add something</a></div>'));rows.forEach(function(p){var r=el('<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line)"><div style="flex-grow:1;font-size:14px">'+esc(p.item)+(p.detail?'<div class="small muted">'+esc(p.detail)+'</div>':'')+'</div><a href="#" class="small">Edit</a></div>');$('a',r).onclick=function(ev){ev.preventDefault();fill({planId:p.plan_id,item:p.item,detail:p.detail,stage:p.stage,category:p.category,owner:p.owner,target_date:p.target_date})};g.appendChild(r)});var ad=$('.ad',g);if(ad)ad.onclick=function(ev){ev.preventDefault();fill({stage:stg})};pl.appendChild(g)});
+  left.appendChild(pl);
+  side.appendChild(f);
+  // answers to draw from, compact
+  var an=el('<div class="card"><div class="k" style="margin-bottom:6px">Their answers</div><p class="small muted" style="margin:0 0 8px">Add puts the answer in the form for you to write the item.</p></div>');
+  flags.forEach(function(x){var r=el('<div class="flag '+(/Tier 1/.test(x.tier)?'t1':'')+'" style="display:flex;gap:10px;align-items:center"><span style="flex-grow:1">'+esc(x.label)+'</span><a href="#" class="small">Add</a></div>');$('a',r).onclick=function(ev){ev.preventDefault();var a=ans[x.id];fill({item:x.label,detail:(a&&a.a?'They said: '+a.a:'')+(a&&a.n?'\nIn their words: '+a.n:''),stage:c.current_stage||suStageGuess()})};an.appendChild(r)});
+  spec.steps.forEach(function(stp){stp.qs.forEach(function(q){var a=ans[q.id];if(!a||(!a.a&&!a.n))return;if(q.showIf){var p=ans[q.showIf.id];if(!p||q.showIf.is.indexOf(p.a)<0)return}if(/^(0\.|A\.name|A\.phone)/.test(q.id))return;var decl=a.a===spec.discuss;var qt=q.q.replace(/\{[A-Z_]+\}/g,pf);var det=ans[q.id+'d'];var r=el('<div class="ans" style="display:flex;gap:10px;align-items:flex-start;padding:8px 0"><div style="flex-grow:1"><div class="qq">'+esc(qt)+'</div><div class="aa'+(decl||a.a===spec.dk?' dk':'')+'" style="font-size:14px">'+esc(decl?'Declined — do not raise it unless they open it.':(a.a||'—'))+(det&&det.a?' — '+esc(det.a):'')+'</div>'+(a.n?'<div class="nn" style="font-size:13px"><b>In their words</b>'+esc(a.n)+'</div>':'')+'</div>'+(decl?'':'<a href="#" class="small" style="flex-shrink:0">Add</a>')+'</div>');var ad=$('a',r);if(ad)ad.onclick=function(ev){ev.preventDefault();fill({item:'',detail:qt+'\nThey said: '+(a.a||'—')+(det&&det.a?' — '+det.a:'')+(a.n?'\nIn their words: '+a.n:''),stage:c.current_stage||suStageGuess()})};an.appendChild(r)})});
+  side.appendChild(an);
+  return w;
+}
+// 5. The people: inner circle and the Circle, from who filled it out, who stays, who drives.
+function suPeople(){
+  var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
+  var inner=d.inner||[],pf=first(c.patient_first_name)||'the patient';
+  var cs=(d.intake||{}).consent||{};
+  var hints=[];
+  if(cs.name&&cs.relationship&&!/self/i.test(cs.relationship))hints.push({name:cs.name,rel:cs.relationship,why:'Signed the intake for '+pf+'.'});
+  if(/^Yes/.test(suAns('A.2a'))&&suDet('A.2a'))hints.push({name:suDet('A.2a'),rel:'Stays the first nights',why:'Named as the person who could stay.'});
+  var drv=suAns('L.1');if(drv&&!/haven't sorted|\b(uber|lyft|taxi|cab|rideshare)\b/i.test(drv))hints.push({name:drv.slice(0,60),rel:'Drives home',why:'Named as the ride home.'});
+  var f=el('<form class="card"><div class="k" style="margin-bottom:12px">Add to the inner circle</div><p class="small muted" style="margin:0 0 10px">Their own login, the same view as the patient. They get an email with a link.</p><div class="two"><div class="field"><label>Name</label><input name="name" required></div><div class="field"><label>Relationship</label><input name="relationship" placeholder="Spouse, daughter, friend"></div></div><div class="field"><label>Email</label><input name="email" type="email" required></div><button class="btn" type="submit">Add and email them</button><p class="err"></p></form>');
+  f.onsubmit=function(ev){ev.preventDefault();var b=$('button',f);b.disabled=true;call('addInner',formData(f)).then(refresh).catch(function(e){$('.err',f).textContent=e.message;b.disabled=false})};
+  left.appendChild(f);
+  var hs=el('<div class="card" style="margin-top:14px"><div class="k" style="margin-bottom:6px">People the answers name</div><p class="small muted" style="margin:0 0 8px">Click one to start the form. The intake does not collect their emails; get those on the call.</p></div>');
+  if(!hints.length)hs.appendChild(el('<p class="small muted" style="margin:0">Nobody named yet.</p>'));
+  hints.forEach(function(h){var r=el('<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><div style="flex-grow:1"><b>'+esc(h.name)+'</b> <span class="small muted">· '+esc(h.rel)+'</span><div class="small muted">'+esc(h.why)+'</div></div><a href="#" class="small">Use</a></div>');$('a',r).onclick=function(ev){ev.preventDefault();$('input[name=name]',f).value=h.name;$('input[name=relationship]',f).value=h.rel;$('input[name=email]',f).focus()};hs.appendChild(r)});
+  left.appendChild(hs);
+  side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">Inner circle now</div>'+(inner.length?inner.map(function(u){return'<div class="small" style="padding:4px 0;border-bottom:1px solid var(--line)"><b>'+esc(u.name||u.email)+'</b>'+(u.relationship?' · '+esc(u.relationship):'')+'<div class="muted">'+esc(u.email)+'</div></div>'}).join(''):'<p class="small muted" style="margin:0">Only the patient so far.</p>')+'</div>'));
+  side.appendChild(el('<div class="note">The wider Circle (updates only, no login) is under the Circle tab once the family turns it on. Lives-alone families usually want at least one person in the inner circle before surgery week.</div>'));
+  return w;
+}
+// 6. Send: what is done, what is missing, preview, send.
+function suSend(){
+  var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
+  var plan=d.plan||[],drafts=plan.filter(isDraft),live=plan.filter(function(p){return !isDraft(p)});
+  var checks=[
+    ['Name and phone on the profile',!!(c.patient_first_name&&c.phone),'who'],
+    ['Surgery date set (or marked emergency / not yet)',!!(c.surgery_date||/emergency|Not scheduled/.test(suAns('G.6'))),'surgery'],
+    ['Stage set',!!c.current_stage,'surgery'],
+    ['Surgeon or hospital on the care team',(d.careTeam||[]).length>0,'surgery'],
+    ['Dated tasks on the list',(d.tasks||[]).some(function(t){return t.due_date}),'timeline'],
+    ['Drafts reviewed',!drafts.length,'plan'],
+    ['At least three items on the plan',live.length>=3,'plan'],
+    ['Someone in the inner circle',(d.inner||[]).length>0,'people']];
+  var cl=el('<div class="card"><div class="k" style="margin-bottom:12px">Ready?</div></div>');
+  checks.forEach(function(x){var r=el('<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)"><span style="width:18px">'+(x[1]?'✓':'·')+'</span><span style="flex-grow:1'+(x[1]?';color:var(--muted)':'')+'">'+esc(x[0])+'</span>'+(x[1]?'':'<a href="#" class="small">Go</a>')+'</div>');var a=$('a',r);if(a)a.onclick=function(ev){ev.preventDefault();S.su=x[2];render();window.scrollTo(0,0)};cl.appendChild(r)});
+  left.appendChild(cl);
+  var fin=el('<div class="card" style="margin-top:14px"><div class="k" style="margin-bottom:10px">When it reads right</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn quiet" type="button" id="pv">Preview the PDF</button><button class="btn'+(c.plan_ready?' quiet':'')+'" type="button" id="pr">'+(c.plan_ready?'Plan sent — take it back':'Plan is ready — send them the PDF')+'</button></div><p class="small muted" style="margin:10px 0 0">'+(c.plan_ready?'The family can read the PDF from their sign-in. Paying opens the rest of the portal.':'Sending emails the family and lets them pay when they are ready. Drafts are left out until approved.')+'</p><p class="err" style="margin:6px 0 0"></p></div>');
+  $('#pv',fin).onclick=function(){openPdf(this,$('.err',fin))};
+  $('#pr',fin).onclick=function(){if(!c.plan_ready&&drafts.length&&!confirm(drafts.length+' draft'+(drafts.length===1?' is':'s are')+' still unreviewed and will be left out. Send anyway?'))return;if(!c.plan_ready&&!confirm('Send the plan? The family gets an email and can read the PDF from their sign-in.'))return;call('setPlanReady',{ready:!c.plan_ready}).then(refresh).catch(alertErr)};
+  left.appendChild(fin);
+  side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">The plan</div><div class="small muted">'+live.length+' item'+(live.length===1?'':'s')+' · '+drafts.length+' draft'+(drafts.length===1?'':'s')+' · '+(d.tasks||[]).filter(function(t){return t.status!=='Done'}).length+' open tasks · '+(d.appointments||[]).length+' appointment'+((d.appointments||[]).length===1?'':'s')+'</div></div>'));
+  side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">Money</div><div class="small muted">'+(c.monthly_amount!==''&&c.monthly_amount!=null?'$'+esc(c.monthly_amount)+' a month.':'Starts at $'+esc(BOOT.defaultMonthly||599)+' a month.')+' Set it per family under Billing. The family pays when they are ready, after the plan is sent.</div></div>'));
+  return w;
+}
 // ---------------------------------------------------------------- prep sheet (coordinator)
 function prepView(){
   var d=S.data,it=d.intake,c=d.client,flags=d.intakeFlags||[];
@@ -1919,7 +2142,7 @@ function prepView(){
   $('#pd',pb).onclick=function(){if(c.paid&&!confirm('Lock the portal for this family?'))return;call('setPaid',{paid:!c.paid}).then(refresh).catch(alertErr)};
   $('#pv',pb).onclick=function(){openPdf(this,$('.err',pb))};
   v.appendChild(pb);
-  var fb=el('<p style="margin:-10px 0 24px"><button class="btn quiet" type="button">'+(isSub(it)?'Change answers with them':'Fill it in with them — by phone or in person')+'</button></p>');$('button',fb).onclick=function(){S.coFill=true;S.ia=null;S.step=isSub(it)?1:null;render()};v.appendChild(fb);
+  var fb=el('<p style="margin:-10px 0 24px;display:flex;gap:8px;flex-wrap:wrap">'+(isSub(it)?'<button class="btn" type="button" id="bp">Set up the client</button>':'')+'<button class="btn quiet" type="button" id="cf">'+(isSub(it)?'Change answers with them':'Fill it in with them — by phone or in person')+'</button></p>');$('#cf',fb).onclick=function(){S.coFill=true;S.ia=null;S.step=isSub(it)?1:null;render()};var bp=$('#bp',fb);if(bp)bp.onclick=function(){S.view='build';render();window.scrollTo(0,0)};v.appendChild(fb);
   if(it.status==='Not started'){v.appendChild(el('<p class="muted">The family has not started the intake. They see it first when they sign in.</p>'));return v}
   var cols=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>');var left=$('.left',cols),side=$('aside',cols);
   var tiers=[];flags.forEach(function(f){if(tiers.indexOf(f.tier)<0)tiers.push(f.tier)});
@@ -1928,7 +2151,7 @@ function prepView(){
   tiers.forEach(function(t){fl.appendChild(el('<div class="small muted" style="margin:10px 0 6px;font-weight:700">'+esc(t)+'</div>'));flags.filter(function(f){return f.tier===t}).forEach(function(f){fl.appendChild(el('<div class="flag '+(/Tier 1/.test(t)?'t1':'')+'">'+esc(f.label)+' <span class="faint">· '+esc(f.id)+'</span></div>'))})});
   side.appendChild(fl);
   var drafts=(d.plan||[]).filter(isDraft).length;
-  if(drafts)side.appendChild(el('<div class="note">'+drafts+' draft plan item'+(drafts===1?'':'s')+' from this intake are waiting on the Plan page.</div>'));
+  if(drafts)side.appendChild(el('<div class="note">'+drafts+' draft plan item'+(drafts===1?'':'s')+' from this intake are waiting under Set up.</div>'));
   side.appendChild(el('<div class="note">A declined question is information, not a gap. Never raise it in the meeting unless they open it.</div>'));
   left.appendChild(answersList(false));
   v.appendChild(cols);return v;
