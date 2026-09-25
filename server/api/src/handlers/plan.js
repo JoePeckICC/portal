@@ -6,7 +6,7 @@ const core = require('../core');
 const mail = require('../mail');
 const intake = require('../intake');
 const { CONSENT_ITEMS_ } = require('../intakeSpec');
-const { id, must, clean, pick, famName, first, normEmail } = require('../util');
+const { id, must, clean, pick, famName, first, normEmail, isTrue } = require('../util');
 // The family may check off the tasks that are theirs; everything else is the coordinator's to move.
 const familyTask = (t, co) => { const o = String(t.owner || '').trim(); if (!o) return false; return !(co && (normEmail(o) === normEmail(co.email) || first(o).toLowerCase() === first(co.name).toLowerCase())); };
 const { localToIso, localStamp, apptPublic } = require('../time');
@@ -140,6 +140,8 @@ async function editPlanItem(ctx, p, c) {
     [row.plan_id, item, clean(p.detail === undefined ? row.detail : p.detail, 2000), pick(p.stage, C.STAGES, row.stage), pick(p.category, C.CATEGORIES, row.category), clean(p.owner === undefined ? row.owner : p.owner, 80), /^\d{4}-\d{2}-\d{2}$/.test(String(p.target_date || '')) ? p.target_date : (p.target_date === '' ? null : row.target_date)], c);
   // Your notes: the vendor, the in-depth version, what you will actually do. The family never sees these.
   if (p.note !== undefined) await db.q(`update plan_items set extra = (extra - 'note') || $2::jsonb where plan_id=$1`, [row.plan_id, JSON.stringify(clean(p.note, 2000).trim() ? { note: clean(p.note, 2000) } : {})], c);
+  // Coordinated: the in-depth work behind this item is lined up (Implement → Coordinate, after the family pays).
+  if (p.coordinated !== undefined) await db.q(`update plan_items set extra = (extra - 'coordinated') || $2::jsonb where plan_id=$1`, [row.plan_id, JSON.stringify(isTrue(p.coordinated) ? { coordinated: true } : {})], c);
   return {};
 }
 async function setPlanStatus(ctx, p, c) {
