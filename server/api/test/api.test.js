@@ -694,3 +694,144 @@ test('consent initials must match the signature; phones are checked and tidied; 
   await api(r, 'saveIntake', { answers });
   assert.match((await api(r, 'submitIntake', {})).error, /A.phone \(not a working number\)/);
 });
+
+test('the family email timeline: first ten days, renewal, receipt, pause, ended, why, win-back', async () => {
+  const booking = require('../src/booking');
+  const B = require('../src/billing');
+  const L = require('../src/lifecycle');
+  const webhook = require('../src/webhook');
+  const crypto = require('crypto');
+  process.env.BOOKING_HOOK_KEY = 'hook-key-for-tests-0123456789';
+  await booking.handle({ 'x-hook-key': process.env.BOOKING_HOOK_KEY }, { email: 'tess@example.com', name: 'Tess Tran' });
+  delete process.env.BOOKING_HOOK_KEY;
+  const tess = await signIn('tess@example.com');
+  const cid = (await db.one(`select client_id from users where email='tess@example.com'`)).client_id;
+  await db.q(`update clients set patient_first_name='Sam', stripe_customer_id='cus_tess', stripe_subscription_id='sub_tess', billing_status='Active' where client_id=$1`, [cid]);
+  const saved = { stripe: B.stripe, key: process.env.STRIPE_SECRET_KEY, wh: process.env.STRIPE_WEBHOOK_SECRET };
+  process.env.STRIPE_SECRET_KEY = 'sk_test_fake'; process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+  const calls = []; B.stripe = async (m, path, params) => { calls.push(m + ' ' + path + ' ' + JSON.stringify(params || {})); return { id: 'x', url: 'https://stripe.test/portal' }; };
+  const hook = async ev => {
+    const raw = JSON.stringify(ev), t = Math.floor(Date.now() / 1000);
+    const sig = crypto.createHmac('sha256', 'whsec_test').update(t + '.' + raw).digest('hex');
+    const res = { code: 0, writeHead(c) { this.code = c; }, end() {} };
+    await webhook.handle({ headers: { 'stripe-signature': 't=' + t + ',v1=' + sig } }, res, Buffer.from(raw));
+    return res.code;
+  };
+  const subjects = from => mail.sent.slice(from).filter(m => m.to === 'tess@example.com' || /Tran family/i.test(m.subject)).map(m => m.subject);   // other test families have timelines too
+  const { localToIso } = require('../src/time'); const { ymd } = require('../src/util'); const CFG = require('../src/config');
+  const at = (base, days, hour) => new Date(localToIso(ymd(new Date(base.getTime() + days * 864e5), CFG.TZ) + 'T' + String(hour).padStart(2, '0') + ':00'));   // that local hour, N days on
+  try {
+    // Plan ready, not paid: the two nudges, once each, and never once they pay.
+    await db.q(`update clients set plan_ready=true, plan_ready_at=now() where client_id=$1`, [cid]);
+    const ready = new Date((await db.one(`select plan_ready_at from clients where client_id=$1`, [cid])).plan_ready_at);
+    let n = mail.sent.length;
+    await L.timed(at(ready, 4, L.SEND_HOUR)); await L.timed(at(ready, 4, L.SEND_HOUR)); await L.timed(at(ready, 11, L.SEND_HOUR));
+    assert.deepEqual(subjects(n), ['InCadence Care: Your plan is waiting', 'InCadence Care: Checking in']);   // the 9 am after the third and tenth full days
+    // First payment: the portal opens (existing email) and paid_at is set. Day-0 note an hour later.
+    n = mail.sent.length;
+    assert.equal(await hook({ type: 'invoice.paid', data: { object: { id: 'in_1', customer: 'cus_tess', subscription: 'sub_tess', billing_reason: 'subscription_create' } } }), 200);
+    let cl = await db.one(`select * from clients where client_id=$1`, [cid]);
+    assert.equal(cl.paid, true); assert.ok(cl.paid_at);
+    assert.deepEqual(subjects(n), ['InCadence Care: Your portal is open']);
+    const paid = new Date(cl.paid_at);
+    n = mail.sent.length;
+    await L.timed(new Date(paid.getTime() + 30 * 60e3));                       // 30 minutes: too soon
+    assert.deepEqual(subjects(n), []);
+    await L.timed(new Date(paid.getTime() + 90 * 60e3)); await L.timed(new Date(paid.getTime() + 95 * 60e3));
+    assert.deepEqual(subjects(n), ['InCadence Care: A note from Joe']);
+    assert.match(mail.sent[mail.sent.length - 1].html, /Hi Tess,/); assert.match(mail.sent[mail.sent.length - 1].html, /Sam’s road/);
+    // Days 1, 3, 6, 10 at the send hour only; the plan-ready nudge never fires now that they paid.
+    n = mail.sent.length;
+    await L.timed(at(paid, 1, 8));
+    assert.deepEqual(subjects(n), [], 'not at 8 am');
+    for (const d of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) await L.timed(at(paid, d, L.SEND_HOUR));
+    assert.deepEqual(subjects(n), ['InCadence Care: What you have now', 'InCadence Care: Three habits that make this work', 'InCadence Care: What the first weeks look like', 'InCadence Care: Ten days in']);
+    // A family who paid long before this existed gets no stale "day one" note; month two lands in its window.
+    n = mail.sent.length;
+    await L.timed(at(paid, 25, L.SEND_HOUR)); assert.deepEqual(subjects(n), []);
+    await L.timed(at(paid, 32, L.SEND_HOUR)); assert.deepEqual(subjects(n), ['InCadence Care: Month two']);
+    // Families can turn the notes off; the switch stops everything.
+    await api(tess, 'savePrefs', { prefs: { notes: false } });
+    n = mail.sent.length; await L.timed(at(paid, 92, L.SEND_HOUR)); assert.deepEqual(subjects(n), []);
+    await api(tess, 'savePrefs', { prefs: { notes: true } });
+    await L.setEnabled(false); n = mail.sent.length; await L.timed(at(paid, 93, L.SEND_HOUR)); assert.deepEqual(subjects(n), []);
+    await L.setEnabled(true); await L.timed(at(paid, 93, L.SEND_HOUR)); assert.deepEqual(subjects(n), ['InCadence Care: Month four']);
+    // Three days before the charge: the renewal note with the month's numbers. Once per period.
+    await api(tess, 'newTopic', { kind: 'question', title: 'Rides', body: 'Who drives Tuesday?' });
+    const periodEnd = Math.floor(Date.now() / 1000) + 3 * 86400;
+    n = mail.sent.length;
+    assert.equal(await hook({ type: 'invoice.upcoming', data: { object: { customer: 'cus_tess', subscription: 'sub_tess', period_end: periodEnd, next_payment_attempt: periodEnd, amount_due: 59900 } } }), 200);
+    assert.equal(await hook({ type: 'invoice.upcoming', data: { object: { customer: 'cus_tess', subscription: 'sub_tess', period_end: periodEnd, next_payment_attempt: periodEnd, amount_due: 59900 } } }), 200);
+    assert.equal(subjects(n).length, 1); assert.match(subjects(n)[0], /^InCadence Care: Your next month starts /);
+    assert.match(mail.sent[mail.sent.length - 1].html, /Pause or change billing/);
+    // The second month's payment: "This month is covered", not "Your portal is open" again.
+    n = mail.sent.length;
+    assert.equal(await hook({ type: 'invoice.paid', data: { object: { id: 'in_2', customer: 'cus_tess', subscription: 'sub_tess', billing_reason: 'subscription_cycle', hosted_invoice_url: 'https://stripe.test/in_2' } } }), 200);
+    assert.deepEqual(subjects(n), ['InCadence Care: This month is covered']);
+    assert.match(mail.sent[mail.sent.length - 1].html, /Receipt/);
+    // The family pauses from their own Billing page: Stripe is told, the family and the coordinator hear.
+    n = mail.sent.length; calls.length = 0;
+    const pz = await api(tess, 'pauseBilling', {});
+    assert.equal(pz.ok, true, pz.error);
+    assert.ok(calls.some(x => x.includes('pause_collection[behavior]')), calls.join('\n'));
+    assert.deepEqual(subjects(n), ['InCadence Care: Your billing is paused', 'InCadence Care: Billing paused — The Tran family']);   // the family's note, and the coordinator's alert
+    cl = await db.one(`select * from clients where client_id=$1`, [cid]); assert.equal(cl.billing_status, 'Paused');
+    assert.equal((await api(tess, 'pauseBilling', { resume: true })).ok, true);
+    // Cancelled in Stripe: the ended note with the one-click reasons, the coordinator alert, and no more monthly notes.
+    n = mail.sent.length;
+    assert.equal(await hook({ type: 'customer.subscription.deleted', data: { object: { id: 'sub_tess', customer: 'cus_tess', cancellation_details: { feedback: 'too_expensive', comment: 'Sam is home now' } } } }), 200);
+    cl = await db.one(`select * from clients where client_id=$1`, [cid]);
+    assert.ok(cl.cancelled_at); assert.equal(cl.billing_status, 'Cancelled'); assert.equal(cl.stripe_subscription_id, null); assert.match(cl.cancel_reason, /Too expensive — Sam is home now/);
+    const s2 = subjects(n);
+    assert.ok(s2.includes('InCadence Care: Your membership has ended'), s2.join(' | '));
+    assert.ok(s2.some(x => /Cancelled — The Tran family/i.test(x)) || (await db.all(`select * from digest where lower(subject) like 'cancelled — the tran family%'`)).length, 'the coordinator hears (instant or digest, per their settings)');
+    const endedMail = mail.sent.find(m => m.subject === 'InCadence Care: Your membership has ended');
+    assert.match(endedMail.html, /\?why=cost/); assert.match(endedMail.html, /Sam is recovered/);
+    n = mail.sent.length; await L.timed(at(paid, 152, L.SEND_HOUR)); assert.deepEqual(subjects(n), [], 'no month-six note after cancelling');
+    // One click on "why": recorded, coordinator told. Then the 45-day check-in, once.
+    assert.equal((await api(tess, 'leaveReason', { why: 'cost' })).ok, true);
+    cl = await db.one(`select * from clients where client_id=$1`, [cid]); assert.match(cl.cancel_reason, /Family said: The cost/);
+    const gone = new Date(cl.cancelled_at);
+    n = mail.sent.length;
+    await L.timed(at(gone, 45, L.SEND_HOUR)); assert.deepEqual(subjects(n), []);
+    await L.timed(at(gone, 46, L.SEND_HOUR)); await L.timed(at(gone, 47, L.SEND_HOUR));
+    assert.deepEqual(subjects(n), ['InCadence Care: Checking in on Sam']);
+    // Everything sent is on the family's access log.
+    const log = await db.all(`select action from audit where client_id=$1 and action like 'lifecycle:%' order by at`, [cid]);
+    assert.ok(log.length >= 10, 'audit rows: ' + log.length);
+  } finally { B.stripe = saved.stripe; process.env.STRIPE_SECRET_KEY = saved.key; process.env.STRIPE_WEBHOOK_SECRET = saved.wh; }
+});
+
+test('a finished intake shows "Plan ready to create" until the plan is sent; the builder edits drafts and items', async () => {
+  const co = await signIn('joe@incadencecare.com');
+  const C = require('../src/config');
+  // Olga (from the Pay-when-ready test) has a submitted intake and a plan marked ready; take the plan back.
+  const olga = await db.one(`select c.* from clients c join users u on u.client_id=c.client_id where u.email='olga@example.com'`);
+  await db.q(`update clients set plan_ready=false where client_id=$1`, [olga.client_id]);
+  let ib = await api(co, 'inbasket', {});
+  const need = ib.needs.find(n => n.client_id === olga.client_id && n.kind === 'Plan');
+  assert.ok(need, 'a Plan row for Olga'); assert.match(need.text, /Plan ready to create/); assert.equal(need.go, 'build'); assert.equal(need.pri, 1);
+  assert.ok(ib.families.find(f => f.client_id === olga.client_id).flags.includes('Plan'));
+  // Pick the family; edit a draft, approve it, add an item by hand.
+  const cid = olga.client_id;
+  const boot = await api(co, 'bootstrap', { clientId: cid });
+  const drafts = (boot.plan || []).filter(p => p.draft === true);
+  assert.ok(drafts.length, 'drafts from the intake rules');
+  const d0 = drafts[0];
+  const ed = await api(co, 'editPlanItem', { clientId: cid, planId: d0.plan_id, item: 'Ride home: confirm with her brother', detail: 'They said: not sorted yet', stage: C.STAGES[1], owner: 'Joe', target_date: '2026-11-01' });
+  assert.equal(ed.ok, true, ed.error);
+  let row = await db.one(`select * from plan_items where plan_id=$1`, [d0.plan_id]);
+  assert.equal(row.item, 'Ride home: confirm with her brother'); assert.equal(row.stage, C.STAGES[1]); assert.equal(row.owner, 'Joe'); assert.equal(String(row.target_date).slice(0, 10), '2026-11-01'); assert.equal(row.draft, true, 'editing keeps it a draft');
+  assert.equal((await api(co, 'approvePlanItem', { clientId: cid, planId: d0.plan_id })).ok, true);
+  row = await db.one(`select * from plan_items where plan_id=$1`, [d0.plan_id]); assert.equal(row.draft, false);
+  assert.match((await api(co, 'editPlanItem', { clientId: cid, planId: d0.plan_id, item: '   ' })).error, /Write the item/);
+  assert.equal((await api(co, 'editPlanItem', { clientId: cid, planId: 'nope' })).ok, false);
+  // Sending the plan clears the row.
+  assert.equal((await api(co, 'setPlanReady', { clientId: cid, ready: true })).ok, true);
+  ib = await api(co, 'inbasket', {});
+  assert.ok(!ib.needs.find(n => n.client_id === olga.client_id && n.kind === 'Plan'), 'no Plan row once the plan is sent');
+  // The consent never claims software writes the plan.
+  const spec = require('../src/intakeSpec').intakeSpec();
+  assert.ok(!spec.consent.some(([h, t]) => /\bAI\b/.test(h + ' ' + t)), 'no AI in the consent');
+  assert.ok(spec.consent.some(([h, t]) => /written by a person/.test(t)));
+});
