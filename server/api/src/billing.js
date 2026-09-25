@@ -63,10 +63,11 @@ function invPi(i) {
 
 const clientByCustomer = cust => db.one(`select * from clients where stripe_customer_id=$1`, [String(cust || '')]);
 // First payment in: open the portal, tell everyone.
-async function markPaid(cust) {
+async function markPaid(cust, inv) {
   const core = require('./core');
-  const cl = await clientByCustomer(cust); if (!cl || isTrue(cl.paid)) return;
-  await db.q(`update clients set paid=true where client_id=$1`, [cl.client_id]);
+  const cl = await clientByCustomer(cust); if (!cl) return;
+  if (isTrue(cl.paid)) { try { await require('./lifecycle').covered(cl, inv); } catch (e) { console.error('covered', e.message); } return; }   // a later month
+  await db.q(`update clients set paid=true, paid_at=coalesce(paid_at, now()), cancelled_at=null where client_id=$1`, [cl.client_id]);
   const co = await core.coordinatorFor(cl);
   await core.autoMsg(cl.client_id, 'Your first payment is in and your portal is open.');
   for (const u of await db.all(`select email from users where client_id=$1 and active and lower(role) in ('client','family')`, [cl.client_id]))
