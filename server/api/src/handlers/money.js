@@ -21,7 +21,7 @@ async function startBilling(ctx, p, c) {
   let sub = null;
   if (amount > 0) { sub = await B.stripe('POST', '/v1/subscriptions', await B.subParams(cust, amount, ctx.clientId, cl)); await B.sendFirstInvoice(sub); }
   await db.update('clients', { client_id: cl.client_id }, { stripe_customer_id: cust, stripe_subscription_id: sub ? sub.id : null, monthly_amount: amount, billing_status: amount > 0 ? 'Active' : 'No charge' }, c);
-  if (amount === 0) { await db.q(`update clients set paid=true where client_id=$1`, [cl.client_id], c); await core.autoMsg(ctx.clientId, 'Your portal is open. There is no monthly charge on your account.', c); }
+  if (amount === 0) { await db.q(`update clients set paid=true, paid_at=coalesce(paid_at, now()) where client_id=$1`, [cl.client_id], c); await core.autoMsg(ctx.clientId, 'Your portal is open. There is no monthly charge on your account.', c); }
   else await core.autoMsg(ctx.clientId, 'Billing started: $' + amount.toFixed(2) + ' a month. Your first invoice is on its way by email; you can also pay it under Billing.', c);
   return pub(ctx, c);
 }
@@ -44,12 +44,14 @@ async function changeAmount(ctx, p, c) {
   return pub(ctx, c);
 }
 async function pauseBilling(ctx, p, c) {
-  coOnly(ctx);
+  famOrCo(ctx);
   const cl = await core.clientById(ctx.clientId, c); must(cl && cl.stripe_subscription_id, 'Nothing to pause');
   if (p.resume) await B.stripe('POST', '/v1/subscriptions/' + cl.stripe_subscription_id, { pause_collection: '' });
   else await B.stripe('POST', '/v1/subscriptions/' + cl.stripe_subscription_id, { 'pause_collection[behavior]': 'void' });
   await db.q(`update clients set billing_status=$2 where client_id=$1`, [cl.client_id, p.resume ? 'Active' : 'Paused'], c);
   await core.autoMsg(ctx.clientId, p.resume ? 'Billing resumed.' : 'Billing is paused. No invoices until it is resumed.', c);
+  if (!p.resume) { try { await require('../lifecycle').paused(cl, c); } catch (e) { console.error('paused', e.message); } }
+  if (core.fam(ctx)) await core.notifyCo(await core.coordinatorFor(cl), 'billing', (p.resume ? 'Billing resumed — ' : 'Billing paused — ') + famName(cl.family_name), (ctx.user.name || ctx.email) + (p.resume ? ' resumed billing from the Billing page.' : ' paused billing from the Billing page. You may want to check in.'), '', 'Open the portal');
   return pub(ctx, c);
 }
 async function billing(ctx) {
@@ -179,4 +181,7 @@ async function allBilling(ctx) {
   return { invoices: rows, totals: t, families: fams };
 }
 
-module.exports = { startBilling, changeAmount, pauseBilling, billing, portalLink, checkoutLink, cardSetupLink, payInvoice, setAutopay, chargeOnce, sendReminder, refundInvoice, addCredit, allBilling };
+// The one-click "why did you stop?" link in the membership-ended email.
+async function leaveReason(ctx, p, c) { famOnly(ctx); return require('../lifecycle').leaveReason(ctx, p, c); }
+
+module.exports = { leaveReason, startBilling, changeAmount, pauseBilling, billing, portalLink, checkoutLink, cardSetupLink, payInvoice, setAutopay, chargeOnce, sendReminder, refundInvoice, addCredit, allBilling };
