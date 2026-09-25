@@ -14,6 +14,7 @@ async function saveProfile(ctx, p, c) {
   const patch = {};
   fields.forEach(f => { if (p[f] !== undefined) patch[f] = clean(p[f], 240); });
   if (patch.dob !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(patch.dob)) patch.dob = null;
+  if (ctx.role === 'coordinator' && p.family_name !== undefined && clean(p.family_name, 80).trim()) patch.family_name = clean(p.family_name, 80).trim();   // the setup screen: the intake may be signed under a different name
   if (ctx.role === 'coordinator' && p.surgery_date !== undefined) patch.surgery_date = /^\d{4}-\d{2}-\d{2}$/.test(String(p.surgery_date)) ? p.surgery_date : null;   // the setup screen (2026-09-25)
   if (p.goes_by !== undefined) patch.extra = JSON.stringify({ ...(cl.extra || {}), goes_by: clean(p.goes_by, 240) });
   must(String(patch.patient_first_name === undefined ? cl.patient_first_name : patch.patient_first_name).trim(), 'First name is needed');
