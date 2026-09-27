@@ -30,9 +30,10 @@ function indexFrom(list) { const m = new Map(); for (const h of list || []) if (
 async function loadMaps() {
   if (MAPS && Date.now() - MAPS_AT < 5 * 60e3) return MAPS;
   try {
-    const [buf] = await require('../maps').file('hospitals/index.json').download();
+    const buf = await require('../maps').read('hospitals/index.json');
     MAPS = indexFrom(JSON.parse(buf.toString('utf8')).hospitals);
   } catch (e) {
+    console.error('campus map index', e.message);
     if (!MAPS) { try { MAPS = indexFrom(require('../data/maps.json').hospitals); } catch (e2) { MAPS = new Map(); } }
   }
   MAPS_AT = Date.now(); return MAPS;
