@@ -62,6 +62,8 @@ async function bootstrap(ctx) {
   out.plan = plan.filter(p => !(p.extra && p.extra.draft === 'Discarded'));
   // The coordinator's notes on an item (the vendor, the in-depth version) are theirs alone.
   if (ctx.role !== 'coordinator') out.plan = out.plan.map(p => { const e = { ...(p.extra || {}) }; delete e.note; delete e.coordinated; return { ...p, extra: e }; });
+  { const MK = require('./market'); const vmap = await MK.vendorsFor(out.plan); out.plan.forEach(p => { if (p.extra && p.extra.vendor_id && vmap[p.extra.vendor_id]) p.vendor = vmap[p.extra.vendor_id]; });
+    if (ctx.role === 'coordinator') { out.vendors = await MK.vendors(); out.vendorServices = MK.SERVICES; } }
   out.inner = inner; out.patientUser = patient ? patient.email : '';
   out.intake = await intake.readIntake(cid); out.intakeSpec = await intake.specFor();
   if (ctx.role === 'coordinator') out.intakeFlags = intake.intakeFlags(out.intake.answers);
