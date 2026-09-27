@@ -67,6 +67,17 @@ account for 15 minutes. The emailed link is only for setting a password the firs
 - Coordinators see it all under **Access log** in the portal, with CSV export.
 - `deploy/alerts.sh`: uptime, 5xx, security events (lockout / export / purge), failed jobs -> email.
 
+## Where the API answers
+
+The page calls the API at **api.incadencecare.com**, a Cloud Run domain mapping that goes straight to Google
+(the DNS record in Cloudflare is DNS-only, grey cloud, so nothing a family types passes through Cloudflare;
+Cloudflare only serves the page itself). Set it up once:
+1. `gcloud beta run domain-mappings create --service portal-api --domain api.incadencecare.com --region us-central1`
+   (the domain must be verified for the project's owner: Search Console → incadencecare.com).
+2. In Cloudflare DNS: `api` CNAME `ghs.googlehosted.com`, proxy **off**. The certificate takes 15–60 minutes.
+3. `curl https://api.incadencecare.com/health` → `{"ok":true}`.
+The API's cookie mode (HttpOnly session cookies) is on for calls that carry `cookies: true`, which the page sends.
+
 ## Huntress (Managed SIEM)
 
 Ready to connect; nothing sends until the token exists.
