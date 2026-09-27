@@ -37,7 +37,18 @@ async function saveIntake(ctx, p, c) {
     if (JSON.stringify(ch) !== JSON.stringify(cur.changed)) { ok._changed = { a: JSON.stringify(ch) }; ok._status = { a: 'Updated after submitting' }; }
   } else if (cur.status === 'Not started') ok._status = { a: 'In progress' };
   await intake.writeIntake(ctx.clientId, ok, ctx.email, c);
+  if (ok['G.6h']) await hospitalFromIntake(ctx.clientId, String(ok['G.6h'].a || ''), c);
   return { intake: await intake.readIntake(ctx.clientId, c) };
+}
+// The hospital question (G.6h) picks the family's hospital: its facts, walk and campus map land on their plan.
+// A hospital the coordinator assigned by hand is never overridden; one the intake picked follows the answer.
+async function hospitalFromIntake(clientId, name, c) {
+  const cl = await core.clientById(clientId, c); if (!cl) return;
+  const ex = cl.extra && typeof cl.extra === 'object' ? cl.extra : {};
+  if (ex.walk_id && ex.walk_by !== 'intake') return;
+  const w = name ? await db.one(`select walk_id from hospital_walks where name=$1`, [name], c) : null;
+  const next = { ...ex }; if (w) { next.walk_id = w.walk_id; next.walk_by = 'intake'; } else { delete next.walk_id; delete next.walk_by; }
+  if (JSON.stringify(next) !== JSON.stringify(ex)) await db.q(`update clients set extra=$2 where client_id=$1`, [clientId, JSON.stringify(next)], c);
 }
 // Consent comes first. Nothing else in the portal opens until the intake is submitted.
 async function signConsent(ctx, p, c) {

@@ -35,7 +35,7 @@ async function bootstrap(ctx) {
   if (core.fam(ctx) && !isTrue(client.paid)) {
     out.billing = await billing.billingFor(client);
     out.intake = await intake.readIntake(ctx.clientId);
-    out.intakeSpec = intake.intakeSpec();
+    out.intakeSpec = await intake.specFor();
     out.coordinator = pubCo(await core.coordinatorFor(client));
     return out;
   }
@@ -63,7 +63,7 @@ async function bootstrap(ctx) {
   // The coordinator's notes on an item (the vendor, the in-depth version) are theirs alone.
   if (ctx.role !== 'coordinator') out.plan = out.plan.map(p => { const e = { ...(p.extra || {}) }; delete e.note; delete e.coordinated; return { ...p, extra: e }; });
   out.inner = inner; out.patientUser = patient ? patient.email : '';
-  out.intake = await intake.readIntake(cid); out.intakeSpec = intake.intakeSpec();
+  out.intake = await intake.readIntake(cid); out.intakeSpec = await intake.specFor();
   if (ctx.role === 'coordinator') out.intakeFlags = intake.intakeFlags(out.intake.answers);
   out.tasks = tasks; out.topics = topics;
   out.updates = withPhoto(updates, ctx.role);

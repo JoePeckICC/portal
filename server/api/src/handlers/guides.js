@@ -44,7 +44,7 @@ async function assignWalk(ctx, p, c) {
   coOnly(ctx); must(ctx.clientId, 'Pick a family first');
   const client = await core.clientById(ctx.clientId, c);
   const ex = client.extra && typeof client.extra === 'object' ? client.extra : {};
-  await db.q(`update clients set extra=$2 where client_id=$1`, [client.client_id, JSON.stringify({ ...ex, walk_id: String(p.walkId || '') })], c);
+  await db.q(`update clients set extra=$2 where client_id=$1`, [client.client_id, JSON.stringify({ ...ex, walk_id: String(p.walkId || ''), walk_by: 'coordinator' })], c);
   return { ok: true };
 }
 
