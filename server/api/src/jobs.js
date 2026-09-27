@@ -139,6 +139,7 @@ async function quietFamilies() {
 
 // Archived families whose retention date has passed: emailed to the coordinator as a list. Nothing is deleted by a job.
 async function retention() {
+  try { await require('./handlers/market').logNeeds(); } catch (e) { console.error('needs log', e.message); }   // the needs log rebuilds daily with this job
   const due = await db.all(`select client_id, family_name, archived_at, retain_until from clients where status='Archived' and retain_until is not null and retain_until <= current_date order by retain_until`);
   if (!due.length) return { due: 0 };
   for (const co of await db.all(`select email, name from users where lower(role)='coordinator' and active`)) {

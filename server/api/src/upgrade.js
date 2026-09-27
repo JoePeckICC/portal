@@ -4,6 +4,16 @@
 const db = require('./db');
 
 const STEPS = [
+  // ---- the marketplace, step 1, and the needs log (2026-09-27): see handlers/market.js
+  `create table if not exists vendors (
+     vendor_id text primary key, name text not null, city text not null default '', state text not null default '',
+     service text not null default 'Other', phone text not null default '', email text not null default '', website text not null default '',
+     price text not null default '', insured boolean not null default false, checked boolean not null default false,
+     notes text not null default '', active boolean not null default true, updated_by text not null default '', updated_at timestamptz not null default now())`,
+  `create table if not exists need_events (
+     event_id text primary key, client_id text not null references clients(client_id) on delete cascade, hospital text not null default '',
+     surgery text not null default '', need text not null, day integer not null, logged_at timestamptz not null default now())`,
+  `create index if not exists need_events_group_idx on need_events(hospital, need)`,
   // ---- the Circle, grown up (2026-09-27): reactions, comments, ways to help
   `create table if not exists update_reactions (
      update_id text not null references updates(update_id) on delete cascade,
