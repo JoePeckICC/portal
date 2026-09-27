@@ -17,5 +17,5 @@ gcloud run deploy portal-api --image "$IMG" --region "$REGION" --platform manage
   --cpu 2 --memory 1Gi --min-instances 1 --max-instances 20 --concurrency 40 --timeout 60
 URL=$(gcloud run services describe portal-api --region "$REGION" --format 'value(status.url)')
 # The service needs its own address for the document links it hands out.
-gcloud run services update portal-api --region "$REGION" --update-env-vars "API_URL=${API_URL:-$URL}" --quiet >/dev/null
+gcloud run services update portal-api --region "$REGION" --update-env-vars "API_URL=${API_URL:-https://api.incadencecare.com}" --quiet >/dev/null
 echo "API is at: $URL   (health: $URL/health)"
