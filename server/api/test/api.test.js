@@ -907,3 +907,23 @@ test("the coordinator's notes on a plan item never reach the family; the full PD
   const r = await api(olgaS, 'bootstrap', {});
   assert.equal(r.ok, false); assert.equal(r.error, 'signed_out');
 });
+
+test('the hospital question puts that hospital (facts, walk, campus map) on the plan; a coordinator pick wins', async () => {
+  await db.q(`insert into users (email,name,role,client_id) values ('hana@example.com','Hana H','client','c2') on conflict (email) do nothing`);
+  await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) - 'walk_id' - 'walk_by' where client_id='c2'`);
+  const w1 = (await db.one(`insert into hospital_walks (walk_id,name,steps) values ('hw1','Test General Hospital','[]') on conflict (walk_id) do update set name=excluded.name returning walk_id`)).walk_id;
+  await db.q(`insert into hospital_walks (walk_id,name,steps) values ('hw2','Other Test Hospital','[]') on conflict (walk_id) do nothing`);
+  const s = await signIn('hana@example.com');
+  const spec = (await api(s, 'bootstrap', {})).intakeSpec;
+  const hq = spec.steps.flatMap(st => st.qs).find(q => q.id === 'G.6h');
+  assert.ok(hq && hq.type === 'select'); assert.ok(spec.hospitals.includes('Test General Hospital'));
+  assert.equal((await api(s, 'saveIntake', { answers: { 'G.6h': { a: 'Test General Hospital', n: '' } } })).ok, true);
+  let cl = await db.one(`select extra from clients where client_id='c2'`); assert.equal(cl.extra.walk_id, w1); assert.equal(cl.extra.walk_by, 'intake');
+  await api(s, 'saveIntake', { answers: { 'G.6h': { a: "We don't know yet", n: '' } } });
+  cl = await db.one(`select extra from clients where client_id='c2'`); assert.equal(cl.extra.walk_id, undefined, 'a changed answer takes it back');
+  await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) || '{"walk_id":"hw2","walk_by":"coordinator"}' where client_id='c2'`);
+  await api(s, 'saveIntake', { answers: { 'G.6h': { a: 'Test General Hospital', n: '' } } });
+  cl = await db.one(`select extra from clients where client_id='c2'`); assert.equal(cl.extra.walk_id, 'hw2', 'the coordinator pick stays');
+  await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) - 'walk_id' - 'walk_by' where client_id='c2'`);
+  await db.q(`delete from hospital_walks where walk_id in ('hw1','hw2')`);
+});
