@@ -21,7 +21,7 @@ const dateOnly = s => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? s : null);
 async function saveIntake(ctx, p, c) {
   clientOrCo(ctx); needFamily(ctx);
   const answers = p.answers || {}, ok = {};
-  Object.keys(answers).forEach(qid => { if (/^[A-Z0-9][A-Za-z0-9.]{0,12}$/.test(qid)) ok[qid] = intake.tidyAnswer(qid, answers[qid]); });
+  Object.keys(answers).forEach(qid => { if (/^[A-Z0-9][A-Za-z0-9._]{0,24}$/.test(qid)) ok[qid] = intake.tidyAnswer(qid, answers[qid]); });
   if (answers._full && String(answers._full.a) === 'yes') ok._full = { a: 'yes', n: '' };   // emergency family circling back for the rest of the form
   const cur = await intake.readIntake(ctx.clientId, c);
   // After submitting, keep a running list of what changed (first value -> latest value), so the
@@ -37,10 +37,10 @@ async function saveIntake(ctx, p, c) {
     if (JSON.stringify(ch) !== JSON.stringify(cur.changed)) { ok._changed = { a: JSON.stringify(ch) }; ok._status = { a: 'Updated after submitting' }; }
   } else if (cur.status === 'Not started') ok._status = { a: 'In progress' };
   await intake.writeIntake(ctx.clientId, ok, ctx.email, c);
-  if (ok['G.6h']) await hospitalFromIntake(ctx.clientId, String(ok['G.6h'].a || ''), c);
+  if (ok['G.7']) await hospitalFromIntake(ctx.clientId, String(ok['G.7'].a || ''), c);
   return { intake: await intake.readIntake(ctx.clientId, c) };
 }
-// The hospital question (G.6h) picks the family's hospital: its facts, walk and campus map land on their plan.
+// The hospital question (G.7) picks the family's hospital: its facts, walk and campus map land on their plan.
 // A hospital the coordinator assigned by hand is never overridden; one the intake picked follows the answer.
 async function hospitalFromIntake(clientId, name, c) {
   const cl = await core.clientById(clientId, c); if (!cl) return;
@@ -76,7 +76,7 @@ async function resubmitIntake(ctx, client, cur, c) {
   await intake.writeIntake(ctx.clientId, { _status: { a: 'Submitted' }, _changed: { a: '{}' } }, ctx.email, c);
   const made = await intake.seedPlan(ctx.clientId, cur.answers, client, ctx.email, c);
   const byId = {};
-  intake.intakeSpec().steps.forEach(st => st.qs.forEach(q => { byId[q.id] = q.q.replace(/\{[A-Z_]+\}/g, 'they'); }));
+  intake.intakeSpec().steps.forEach(st => st.qs.forEach(q => { byId[q.id] = q.q.replace(/\[\[([^\]|]*)\|[^\]]*\]\]/g, '$1').replace(/\{[A-Z_]+\}/g, 'they'); }));
   const lines = Object.keys(cur.changed || {}).map(qid => {
     const x = cur.changed[qid], base = qid.replace(/d$/, ''), label = byId[qid] || (byId[base] ? byId[base] + ' (details)' : qid);
     return x.from === x.to ? label + ': note changed' : label + ': "' + (x.from || '—') + '" → "' + (x.to || '—') + '"' + (x.note ? ' (note changed too)' : '');

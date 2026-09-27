@@ -52,11 +52,11 @@ async function saveAnswers(ctx, p, c) {
   spec.steps.forEach(st => st.qs.forEach(q => { byId[q.id] = q; }));
   const ok = {}, changes = [];
   Object.keys(p.answers || {}).forEach(qid => {
-    const base = qid.replace(/d$/, '');
+    const base = qid.replace(/(_d(\.[a-z]+)?|\.[a-z]+)$/, '');
     if (!byId[base] || C.FIXED_ANSWERS.indexOf(base) >= 0) return;
     ok[qid] = p.answers[qid];
     const before = (cur.answers[qid] || {}).a || '', after = String((p.answers[qid] || {}).a || '');
-    if (byId[qid] && before !== after) changes.push(byId[qid].q.replace(/\{[A-Z_]+\}/g, 'they') + ': "' + (before || '—') + '" → "' + (after || '—') + '"');
+    if (byId[qid] && before !== after) changes.push(byId[qid].q.replace(/\[\[([^\]|]*)\|[^\]]*\]\]/g, '$1').replace(/\{[A-Z_]+\}/g, 'they') + ': "' + (before || '—') + '" → "' + (after || '—') + '"');
   });
   must(Object.keys(ok).length, 'Nothing to change');
   ok._status = { a: 'Updated after submitting' };
