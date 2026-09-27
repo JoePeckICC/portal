@@ -927,3 +927,37 @@ test('the hospital question puts that hospital (facts, walk, campus map) on the 
   await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) - 'walk_id' - 'walk_by' where client_id='c2'`);
   await db.q(`delete from hospital_walks where walk_id in ('hw1','hw2')`);
 });
+
+test('marketplace step 1: vendors by city, booked on a plan item, the family sees only that one; the needs log waits for 11 families', async () => {
+  const co = await signIn('joe@incadencecare.com');
+  const bad = await api(co, 'saveVendor', { name: 'X' }); assert.match(bad.error, /city/);
+  const v = (await api(co, 'saveVendor', { name: 'Franklin Rides', city: 'Franklin', state: 'tn', service: 'Rides', phone: '(615) 555-0199', website: 'javascript:alert(1)', insured: true, notes: 'Owner is Tom' })).vendor;
+  assert.equal(v.state, 'TN'); assert.equal(v.website, '', 'only https links'); assert.equal(v.insured, true);
+  await api(co, 'saveVendor', { name: 'Old Cab', city: 'Franklin', service: 'Rides', active: false });
+  const pid = (await db.one(`insert into plan_items (plan_id, client_id, stage, category, item, status) values ('mk1','c2','The day of surgery','Care coordination','Ride home from the hospital','Not started') on conflict (plan_id) do update set item=excluded.item returning plan_id`)).plan_id;
+  const old = await db.one(`select vendor_id from vendors where name='Old Cab'`);
+  assert.match((await api(co, 'setPlanVendor', { clientId: 'c2', planId: pid, vendorId: old.vendor_id })).error, /not on the list/, 'a vendor not in use cannot be booked');
+  assert.equal((await api(co, 'setPlanVendor', { clientId: 'c2', planId: pid, vendorId: v.vendor_id })).ok, true);
+  const cb = await api(co, 'bootstrap', { clientId: 'c2' }); assert.ok(cb.vendors.length >= 2); assert.ok(cb.vendorServices.includes('Meals'));
+  await db.q(`update clients set paid=true where client_id='c2'`);
+  const fam = await api(await signIn('hana@example.com'), 'bootstrap', {});
+  const item = fam.plan.find(p => p.plan_id === pid);
+  assert.deepEqual(item.vendor, { name: 'Franklin Rides', service: 'Rides', phone: '(615) 555-0199', website: '' });
+  assert.equal(fam.vendors, undefined, 'families never get the vendor list'); assert.equal(JSON.stringify(fam).includes('Owner is Tom'), false, 'nor the notes');
+  const pat = await signIn('hana@example.com'); assert.equal((await api(pat, 'saveVendor', { name: 'Y', city: 'Z' })).error, 'Not allowed');
+  // the needs log: built from the plan; a day shows only with 11 families behind it
+  const MK = require('../src/handlers/market');
+  assert.equal(MK.needOf('Ride home from the hospital'), 'Ride'); assert.equal(MK.needOf('Meals the first week'), 'Meals'); assert.equal(MK.needOf('Sign the consent'), '');
+  await db.q(`update clients set surgery_date='2026-10-10' where client_id='c2'`);
+  await db.q(`update plan_items set target_date='2026-10-13' where plan_id=$1`, [pid]);
+  await MK.logNeeds();
+  let r = await api(co, 'needsReport', {}); assert.equal(r.min, 11);
+  let ride = r.rows.find(x => x.need === 'Ride'); assert.ok(ride);
+  const before = ride.families;
+  for (let i = 0; i < 11; i++) await db.q(`insert into need_events (event_id, client_id, hospital, surgery, need, day) values ($1,'c2',$2,'','Ride',3) on conflict (event_id) do nothing`, ['fake' + i, ride.hospital === 'Hospital not chosen yet' ? '' : ride.hospital]);
+  r = await api(co, 'needsReport', {}); ride = r.rows.find(x => x.need === 'Ride');
+  assert.equal(ride.families, before, 'more items from the same family do not add families');
+  r.rows.forEach(x => assert.equal(x.median_day === null, x.families < 11, 'a day shows only with 11 or more families'));
+  await db.q(`delete from need_events where event_id like 'fake%'`);
+  await db.q(`delete from plan_items where plan_id=$1`, [pid]); await db.q(`delete from vendors`);
+});
