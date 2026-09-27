@@ -2,6 +2,7 @@
 // End-to-end against a real Postgres (DATABASE_URL). Loads the schema + fixture, then drives api() like the page does.
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-test-secret';
 process.env.MAIL_TRANSPORT = 'log';
+process.env.QUIET_FROM = '0'; process.env.QUIET_TO = '0';   // no quiet hours in tests: the mail assertions run at any hour
 process.env.UPLOAD_DIR = require('os').tmpdir() + '/portal-test-uploads';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -309,7 +310,7 @@ test('plan, tasks, goals, appointments, care team, referrals', async () => {
   const co = await signIn('joe@incadencecare.com');
   const pat = await signIn('pat@example.com');
   // plan: coordinator adds; family sees it; draft approve/discard
-  const a = await api(co, 'addPlanItem', { clientId: 'c1', item: 'Pick up the walker', stage: 'Before surgery', category: 'Care coordination' });
+  const a = await api(co, 'addPlanItem', { clientId: 'c1', item: 'Pick up the walker', stage: 'The countdown', category: 'Care coordination' });
   assert.equal(a.ok, true); assert.equal(a.item.draft, false);
   const d = await api(co, 'approvePlanItem', { clientId: 'c1', planId: 'p1', discard: true }); assert.equal(d.ok, true);
   const bp = await api(pat, 'bootstrap', {});
@@ -869,7 +870,7 @@ test("the coordinator's notes on a plan item never reach the family; the full PD
   const co = await signIn('joe@incadencecare.com');
   const olga = await db.one(`select c.* from clients c join users u on u.client_id=c.client_id where u.email='olga@example.com'`);
   const cid = olga.client_id;
-  const add = await api(co, 'addPlanItem', { clientId: cid, stage: 'Before surgery', category: 'Care coordination', item: 'Arrange the ride home', detail: 'A named adult, confirmed the week of.', note: 'Vendor: Franklin Rides, $45, ask for Dee. We book it; they think a neighbor is driving.' });
+  const add = await api(co, 'addPlanItem', { clientId: cid, stage: 'The countdown', category: 'Care coordination', item: 'Arrange the ride home', detail: 'A named adult, confirmed the week of.', note: 'Vendor: Franklin Rides, $45, ask for Dee. We book it; they think a neighbor is driving.' });
   assert.equal(add.ok, true, add.error);
   const pid = add.item.plan_id;
   let row = await db.one(`select * from plan_items where plan_id=$1`, [pid]);
