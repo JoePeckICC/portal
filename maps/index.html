@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Campus map — InCadence Care</title>
+<!-- Self-hosted campus maps (2026-09-27). MapLibre GL JS + one small PMTiles file per hospital, cut from the
+     Protomaps OpenStreetMap build. No Google, no Mapbox, no tile server: everything below is a static file.
+     A hospital is a JSON file in hospitals/ (area + pins) and a .pmtiles file; adding one is data, not code. -->
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<style>
+@font-face{font-family:Manrope;font-weight:500;font-display:swap;src:url(fonts/files/manrope-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:Manrope;font-weight:600;font-display:swap;src:url(fonts/files/manrope-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:Manrope;font-weight:700;font-display:swap;src:url(fonts/files/manrope-latin-700-normal.woff2) format('woff2')}
+@font-face{font-family:Manrope;font-weight:800;font-display:swap;src:url(fonts/files/manrope-latin-800-normal.woff2) format('woff2')}
+:root{--ink:#1C2A3A;--gold:#C09B36;--ground:#E4E9EE;--line:#D3DAE1;--muted:#5B6470;--panel:#FFFFFF;--tint:#F0E7CF}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ground);color:var(--ink);font-family:Manrope,system-ui,sans-serif}
+#map{position:absolute;inset:0}
+.top{position:absolute;left:12px;right:12px;top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;pointer-events:none;z-index:2}
+.top>*{pointer-events:auto}
+.title{background:var(--panel);border-radius:10px;padding:9px 14px;box-shadow:0 2px 10px rgba(28,42,58,.12);font-weight:800;font-size:15px;max-width:100%}
+.title small{display:block;font-weight:600;font-size:12px;color:var(--muted);margin-top:1px}
+.chips{display:flex;gap:6px}
+.chip{border:0;background:var(--panel);color:var(--ink);font:inherit;font-weight:700;font-size:13px;padding:8px 12px;border-radius:18px;box-shadow:0 2px 10px rgba(28,42,58,.12);cursor:pointer}
+.chip[aria-pressed=false]{opacity:.55}
+/* pins: navy by default, gold when chosen. Buildings are circles with the campus-map number; parking is a square P. */
+.pin{width:30px;height:30px;border-radius:50%;background:var(--ink);color:#fff;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font:800 13px Manrope,sans-serif;box-shadow:0 2px 6px rgba(28,42,58,.35);cursor:pointer;padding:0;transition:transform .12s}
+.pin.parking{border-radius:7px;background:#fff;color:var(--ink);border:2px solid var(--ink);font-size:13px;flex-direction:column;line-height:1}.pin.parking small{font-size:8px;font-weight:800;margin-bottom:1px;opacity:.7}.pin.parking.on{background:var(--gold)}
+.pin.entrance{width:22px;height:22px;background:#fff;border:3px solid var(--ink)}
+.pin.on{background:var(--gold);color:var(--ink);border-color:#fff;transform:scale(1.18);z-index:5}
+.pin.flag::after{content:'!';position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#B3261E;color:#fff;font-size:11px;line-height:16px;text-align:center}
+.pin:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+/* the card: bottom sheet on phones, a panel on the left on wide screens */
+.card{position:absolute;z-index:3;background:var(--panel);box-shadow:0 -4px 24px rgba(28,42,58,.18);left:0;right:0;bottom:0;border-radius:16px 16px 0 0;padding:16px 18px calc(16px + env(safe-area-inset-bottom));max-height:60vh;overflow:auto;transform:translateY(110%);transition:transform .2s}
+.card.open{transform:none}
+@media(min-width:760px){.card{left:12px;right:auto;bottom:auto;top:76px;width:360px;border-radius:12px;max-height:calc(100% - 100px);transform:translateX(-120%)}.card.open{transform:none}}
+.card .k{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.card h2{margin:4px 0 6px;font-size:20px;line-height:1.25}
+.card .note{font-size:14px;line-height:1.5;color:var(--ink)}
+.card .warn{margin-top:10px;font-size:13px;line-height:1.45;background:#FBF3F1;border-left:3px solid #B3261E;padding:8px 10px;border-radius:4px}
+.card .x{position:absolute;right:10px;top:10px;border:0;background:#EEF1F4;border-radius:50%;width:30px;height:30px;font-size:18px;cursor:pointer;color:var(--ink)}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px;margin-top:12px}
+.photos img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;background:#EEF1F4}
+.soon{margin-top:12px;border:1px dashed var(--line);border-radius:8px;padding:14px;font-size:13px;color:var(--muted);text-align:center}
+.maplibregl-ctrl-attrib{font:500 11px Manrope,sans-serif}
+.maplibregl-ctrl-attrib a{color:var(--ink)}
+.err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font-weight:600}
+</style>
+</head>
+<body>
+<div id="map" role="application" aria-label="Campus map"></div>
+<div class="top"><div class="title" id="title">Campus map</div><div class="chips" id="chips"></div></div>
+<section class="card" id="card" aria-live="polite"></section>
+<script src="vendor/maplibre-gl.js"></script>
+<script src="vendor/pmtiles.js"></script>
+<script src="vendor/basemaps.js"></script>
+<script>
+// ---- the look: our brand on the Protomaps layers. Navy text, cool blue-grey ground, white streets, pale buildings.
+// Gold appears only on the chosen pin and its building. Change colors here; nothing else needs touching.
+var BRAND = Object.assign({}, basemaps.namedFlavor('light'), {
+  background:'#E4E9EE', earth:'#E4E9EE', landcover:{grassland:'#DCE4DE',barren:'#E4E9EE',urban_area:'#E4E9EE',farmland:'#DCE4DE',glacier:'#F4F6F8',scrub:'#DCE4DE',forest:'#D5E0D8'},
+  park_a:'#D8E2DB', park_b:'#CBD9CF', wood_a:'#D5E0D8', wood_b:'#C9D8CD', scrub_a:'#DCE4DE', scrub_b:'#D1DDD4', hospital:'#DDE3EA', school:'#E0E5EA', industrial:'#DEE3E8', pedestrian:'#EEF1F4', zoo:'#DCE4DE', military:'#E0E4E8', aerodrome:'#E0E4E8', runway:'#F2F4F6', sand:'#E6E8EA', beach:'#E6E8EA', glacier:'#F4F6F8', pier:'#F4F6F8',
+  water:'#BFD0DD', buildings:'#F7F5F0',
+  other:'#FFFFFF', minor_service:'#FFFFFF', minor_a:'#FFFFFF', minor_b:'#FFFFFF', link:'#FFFFFF', major:'#FFFFFF', highway:'#FFFFFF',
+  minor_service_casing:'#CDD5DD', minor_casing:'#CDD5DD', link_casing:'#CDD5DD', major_casing_early:'#C3CCD6', major_casing_late:'#C3CCD6', highway_casing_early:'#B7C2CE', highway_casing_late:'#B7C2CE',
+  bridges_other:'#FFFFFF', bridges_minor:'#FFFFFF', bridges_link:'#FFFFFF', bridges_major:'#FFFFFF', bridges_highway:'#FFFFFF', tunnel_other:'#EEF1F4', tunnel_minor:'#EEF1F4', tunnel_link:'#EEF1F4', tunnel_major:'#EEF1F4', tunnel_highway:'#EEF1F4',
+  railway:'#A9B4BF', boundaries:'#A9B4BF',
+  roads_label_minor:'#1C2A3A', roads_label_minor_halo:'#FFFFFF', roads_label_major:'#1C2A3A', roads_label_major_halo:'#FFFFFF', address_label:'#5B6470', address_label_halo:'#FFFFFF',
+  subplace_label:'#1C2A3A', subplace_label_halo:'#E4E9EE', city_label:'#1C2A3A', city_label_halo:'#E4E9EE', state_label:'#5B6470', state_label_halo:'#E4E9EE', country_label:'#5B6470', ocean_label:'#4A6275',
+  regular:'Manrope Regular', bold:'Manrope Bold', italic:'Manrope Regular'
+});
+var DROP = {pois:1, roads_shields:1, roads_oneway:1};   // their icons need a sprite; our own pins replace POIs
+function styleFor(tilesUrl){
+  var L = basemaps.layers('protomaps', BRAND, {lang:'en'}).filter(function(l){return !DROP[l.id]}).map(function(l){
+    if (l.layout && l.layout['icon-image']) { l = JSON.parse(JSON.stringify(l)); delete l.layout['icon-image']; }
+    if (l.id === 'buildings') { l = JSON.parse(JSON.stringify(l)); l.paint['fill-outline-color'] = '#D3DAE1'; l.paint['fill-opacity'] = 1; }
+    return l;
+  });
+  return { version:8, glyphs: new URL('fonts/{fontstack}/{range}.pbf', location.href).href.replace('%7Bfontstack%7D','{fontstack}').replace('%7Brange%7D','{range}'),
+    sources:{ protomaps:{ type:'vector', url:'pmtiles://' + tilesUrl, attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · <a href="https://protomaps.com" target="_blank" rel="noopener">Protomaps</a>' } },
+    layers: L };
+}
+var protocol = new pmtiles.Protocol(); maplibregl.addProtocol('pmtiles', protocol.tile);
+
+// ---- one hospital = one JSON file. ?h=vumc  (optional &pin=9 opens that pin)
+var Q = new URLSearchParams(location.search), HID = (Q.get('h') || 'vumc').replace(/[^a-z0-9-]/g,''), START = Q.get('pin');
+var KINDS = {building:'Buildings', parking:'Parking', entrance:'Entrances'}, KIND1 = {building:'Building', parking:'Parking', entrance:'Entrance'};
+var esc = function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+
+fetch('hospitals/' + HID + '.json').then(function(r){ if(!r.ok) throw new Error('No map for this hospital yet.'); return r.json(); }).then(start).catch(function(e){
+  document.getElementById('map').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+});
+
+function start(H){
+  document.title = H.name + ' — campus map';
+  document.getElementById('title').innerHTML = esc(H.name) + '<small>' + esc(H.subtitle || 'Tap a pin for the entrance and what to expect') + '</small>';
+  var b = H.bounds, pad = 0.004;   // the file holds the whole cut area; the map will not wander off it
+  var map = new maplibregl.Map({ container:'map', style: styleFor(new URL(H.tiles, location.href).href), bounds: H.view || b, maxBounds:[[b[0]-pad,b[1]-pad],[b[2]+pad,b[3]+pad]], minZoom:13, maxZoom:19, attributionControl:{compact:false}, cooperativeGestures:false, dragRotate:false, pitchWithRotate:false });
+  map.touchZoomRotate.disableRotation();
+  map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'bottom-right');
+  map.addControl(new maplibregl.GeolocateControl({positionOptions:{enableHighAccuracy:true}, trackUserLocation:true}), 'bottom-right');
+  var pins = H.pins || [], on = {building:true, parking:true, entrance:true}, markers = {}, current = null;
+
+  map.on('load', function(){
+    // the chosen building's own OpenStreetMap outline, filled gold
+    map.addSource('sel', {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+    map.addLayer({id:'sel-fill', type:'fill', source:'sel', paint:{'fill-color':'#C09B36', 'fill-opacity':0.38}});
+    map.addLayer({id:'sel-line', type:'line', source:'sel', paint:{'line-color':'#C09B36', 'line-width':2.5}});
+    pins.forEach(function(p){
+      if (!p.lngLat) return;
+      var el = document.createElement('button'); el.type = 'button'; el.className = 'pin ' + (p.kind || 'building') + (p.flag ? ' flag' : '');
+      if (p.kind === 'parking') el.innerHTML = '<small>P</small>' + esc(p.label || ''); else el.textContent = p.label || ''; el.setAttribute('aria-label', (KIND1[p.kind]||'') + ' ' + (p.label||'') + ': ' + p.name);
+      el.onclick = function(ev){ ev.stopPropagation(); choose(p); };
+      markers[p.id] = { m: new maplibregl.Marker({element:el, anchor:'center'}).setLngLat(p.lngLat).addTo(map), el: el, p: p };
+    });
+    var chips = document.getElementById('chips');
+    Object.keys(KINDS).forEach(function(k){ if (!pins.some(function(p){return p.kind===k})) return;
+      var c = document.createElement('button'); c.className = 'chip'; c.type = 'button'; c.textContent = KINDS[k]; c.setAttribute('aria-pressed','true');
+      c.onclick = function(){ on[k] = !on[k]; c.setAttribute('aria-pressed', on[k]); Object.keys(markers).forEach(function(id){ var x = markers[id]; if (x.p.kind === k) x.el.style.display = on[k] ? '' : 'none'; }); };
+      chips.appendChild(c); });
+    if (START) { var s = pins.filter(function(p){return String(p.id)===START || String(p.label)===START})[0]; if (s) choose(s, true); }
+  });
+  map.on('click', function(){ choose(null); });
+
+  function choose(p, fly){
+    if (current && markers[current.id]) markers[current.id].el.classList.remove('on');
+    current = p;
+    map.getSource('sel') && map.getSource('sel').setData({type:'FeatureCollection', features: p && p.outline ? [{type:'Feature', properties:{}, geometry:{type:'Polygon', coordinates:[p.outline]}}] : []});
+    var card = document.getElementById('card');
+    if (!p) { card.classList.remove('open'); return; }
+    markers[p.id] && markers[p.id].el.classList.add('on');
+    var photos = (p.photos || []).map(function(ph){ return '<figure style="margin:0"><img src="' + esc(ph.src) + '" alt="' + esc(ph.caption||'') + '" loading="lazy"></figure>'; }).join('');
+    card.innerHTML = '<button class="x" type="button" aria-label="Close">×</button><div class="k">' + esc(KIND1[p.kind] || 'Place') + (p.label ? ' ' + esc(p.kind==='parking' ? p.label : p.label) : '') + '</div><h2>' + esc(p.name) + '</h2>' +
+      (p.note ? '<div class="note">' + esc(p.note) + '</div>' : '') + (p.flag ? '<div class="warn">' + esc(p.flag) + '</div>' : '') +
+      (photos ? '<div class="photos">' + photos + '</div>' : '<div class="soon">Our own photos of this entrance — the walk from the car to the door — go here.</div>');
+    card.querySelector('.x').onclick = function(){ choose(null); };
+    card.classList.add('open');
+    if (fly || !map.getBounds().contains(p.lngLat)) map.easeTo({center:p.lngLat, zoom:Math.max(map.getZoom(), 17), duration: fly ? 0 : 400});
+  }
+}
+</script>
+</body>
+</html>
