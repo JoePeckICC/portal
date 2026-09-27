@@ -54,4 +54,9 @@ async function serve(req, res, url) {
 }
 
 const file = key => gcs().file(key);
-module.exports = { serve, keyFor, file, BUCKET };
+// A whole small file (the hospital index), read the same way the viewer's files are served.
+function read(key) {
+  return new Promise((resolve, reject) => { const parts = []; gcs().file(key).createReadStream({ decompress: false, validation: false })
+    .on('data', d => parts.push(d)).on('end', () => resolve(Buffer.concat(parts))).on('error', reject); });
+}
+module.exports = { serve, keyFor, file, read, BUCKET };
