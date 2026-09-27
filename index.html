@@ -162,6 +162,12 @@ input,select,textarea,button{scroll-margin-top:110px}
 .alt{padding:8px 12px;border:1px solid var(--line2);border-radius:3px;background:#fff;font-size:13px;cursor:pointer}
 .alt.on{border-color:var(--gold);background:var(--tint);font-weight:700}
 .detail{margin-top:10px}
+.qf{display:flex;flex-wrap:wrap;gap:10px}.qfl{flex:1 1 180px;display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.og{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-ink);font-weight:700;margin:16px 0 8px}
+.qh{font-family:Fraunces,Georgia,serif;font-size:20px;margin:0 0 14px}
+.q.qx{padding:6px 0}
+.brief{border:1px solid var(--gold);background:var(--tint);padding:16px;border-radius:3px;margin-top:18px}
+.more{margin-top:16px}
 .notel{display:inline-block;margin-top:0;font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline;background:none;border:0;padding:12px 0;min-height:44px;font-family:inherit}
 .qerr{margin-top:8px;font-size:14px;color:#9B2C2C;font-weight:600}
 .note-f{margin-top:10px}.note-f textarea{min-height:64px;font-size:14px}
@@ -1111,12 +1117,12 @@ function answersPage(){
   if(!S.ia||S.iaFor!==S.clientId){S.ia={};S.iaFor=S.clientId;Object.keys(ans).forEach(function(k){S.ia[k]={a:ans[k].a,n:ans[k].n}})}
   spec.steps.forEach(function(st){st.qs.forEach(function(q){
     if(!qShows(q,ans))return;
-    var a=ans[q.id]||{a:'',n:''},det=ans[q.id+'d'],isF=fixed.indexOf(q.id)>=0||locked;
-    var row=el('<div class="arow"><div class="ax"><div class="aq">'+esc(pipe(q.q))+'</div><div class="aa">'+esc(q.type==='date'&&/^\d{4}-\d{2}-\d{2}$/.test(a.a)?fmtDate(a.a):(a.a||'—'))+(det&&det.a?' — '+esc(det.a):'')+(a.n?'<div class="small muted">'+esc(a.n)+'</div>':'')+'</div></div>'+(isF?'<span class="lock"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'+(locked?'':'Ask '+esc(cf)+' to change')+'</span>':'<a href="#" class="chg">Change</a>')+'</div>');
+    var a=ans[q.id]||{a:'',n:''},det={a:qDet(ans,q.id)},isF=fixed.indexOf(q.id)>=0||locked;
+    var row=el('<div class="arow"><div class="ax"><div class="aq">'+esc(pipe(q.q))+'</div><div class="aa">'+esc(q.type==='date'&&/^\d{4}-\d{2}-\d{2}$/.test(a.a)?fmtDate(a.a):pipe(a.a||'—'))+(det&&det.a?' — '+esc(det.a):'')+(a.n?'<div class="small muted">'+esc(a.n)+'</div>':'')+'</div></div>'+(isF?'<span class="lock"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'+(locked?'':'Ask '+esc(cf)+' to change')+'</span>':'<a href="#" class="chg">Change</a>')+'</div>');
     var chg=$('.chg',row);if(chg)chg.onclick=function(ev){ev.preventDefault();
       var ed=el('<div class="aedit"></div>'),qe=null;function redraw(){var n=questionEl(q,redraw);if(qe)ed.replaceChild(n,qe);else ed.appendChild(n);qe=n}redraw();
       var bar=el('<div class="abar"><button class="btn sm" type="button">Save</button><a href="#" class="small">Cancel</a><span class="small muted" style="margin-left:auto">'+esc(cf)+' gets a note, and the plan is re-checked.</span><p class="err" style="width:100%;margin:0"></p></div>');
-      $('button',bar).onclick=function(){var b=this;b.disabled=true;var out={};out[q.id]=S.ia[q.id];if(S.ia[q.id+'d'])out[q.id+'d']=S.ia[q.id+'d'];call('saveAnswers',{answers:out}).then(function(r){S.data.intake=r.intake;S.data.client=r.client;S.ia=null;return refresh()}).catch(function(e){$('.err',bar).textContent=e.message;b.disabled=false})};
+      $('button',bar).onclick=function(){var b=this;b.disabled=true;var out={};out[q.id]=S.ia[q.id];var on=qDetSpec(q,(S.ia[q.id]||{}).a);qSubIds(q).forEach(function(k){if(S.ia[k])out[k]=(q.type==='fields'||on)?{a:S.ia[k].a,n:''}:{a:'',n:''}});call('saveAnswers',{answers:out}).then(function(r){S.data.intake=r.intake;S.data.client=r.client;S.ia=null;return refresh()}).catch(function(e){$('.err',bar).textContent=e.message;b.disabled=false})};
       $('a',bar).onclick=function(ev){ev.preventDefault();S.ia[q.id]={a:a.a,n:a.n};render()};
       ed.appendChild(bar);row.innerHTML='';row.classList.add('editing');row.appendChild(ed)};
     list.appendChild(row);
@@ -2459,7 +2465,7 @@ var _lblN=0;function linkLabels(root){(root||document).querySelectorAll('.field 
 try{new MutationObserver(function(ms){for(var i=0;i<ms.length;i++)if(ms[i].addedNodes.length){linkLabels(document);break}}).observe(document.documentElement,{childList:true,subtree:true})}catch(e){}
 function tr(s){if(S.lang!=='es'||!s)return s;return ES[s]||s}
 // pipe() in Spanish: the same tokens, Spanish words.
-function pipeEs(t){var d=S.data,ia=S.ia||{},pat=/person having surgery/.test((ia['0.1']||{}).a||''),n=first(d.client.patient_first_name)||'el/la paciente';return t.replace(/{NAME_CAP}/g,pat?'Su':'de '+n).replace(/{NAME_S}/g,pat?'su':'de '+n).replace(/{NAME_OBJ}/g,pat?'usted':n).replace(/{DOES_KNOW}/g,'¿Sabe '+n+' que usted está llenando esto?').replace(/{DOES}/g,pat?'Usted':n).replace(/{IS}/g,pat?'usted':n)}
+function pipeEs(t){var d=S.data,ia=S.ia||{},pat=iaRole(ia)==='patient',n=first(d.client.patient_first_name)||'el/la paciente',h=iaHelper(ia),hy=h==='you';if(h==='the main caregiver')h='la persona que más ayuda';return String(t||'').replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g,function(m,f,p){return pat?p:f}).replace(/{NAME_CAP_S}/g,pat?'Su':'De '+n).replace(/{NAME_S}/g,pat?'su':'de '+n).replace(/{NAME_CAP}/g,pat?'Usted':n).replace(/{NAME_OBJ}/g,pat?'usted':n).replace(/{NAME}/g,pat?'usted':n).replace(/{DOES_KNOW}/g,'¿Sabe '+n+' que usted está llenando esto?').replace(/{DOES}/g,pat?'Usted':n).replace(/{IS}/g,pat?'usted':n).replace(/{HAS}/g,pat?'Usted':n).replace(/{WAS}/g,pat?'usted':n).replace(/{HELPER} gets/g,hy?'usted':h).replace(/{HELPER_DOES}/g,hy?'Usted':h).replace(/{HELPER_IS}/g,hy?'Usted':h).replace(/{HELPER}/g,hy?'usted':h)}
 function setLang(l){S.lang=l;store('ic_lang',l==='es'?'es':null);render()}
 // ---- disaster mode: if the power goes out, the water is off, or the roads close.
 var DZ_ITEMS=[['oxygen','Oxygen concentrator'],['cpap','CPAP or BiPAP'],['fridge','Medication that must stay cold (insulin, some injectables)'],['pump','A feeding pump or IV pump'],['bed','A powered hospital bed or lift'],['charge','A powered wheelchair or scooter']];
@@ -2523,13 +2529,6 @@ function outsideEl(list){
   return c}
 
 // ---------------------------------------------------------------- intake (client)
-function pipe(t){if(S.lang==='es')return pipeEs(tr(t));var d=S.data,ia=S.ia||{},pat=/person having surgery/.test((ia['0.1']||{}).a||''),n=first(d.client.patient_first_name)||'the patient';return t.replace(/{NAME_CAP}/g,pat?'Your':n+'’s').replace(/{NAME_S}/g,pat?'your':n+'’s').replace(/{NAME_OBJ}/g,pat?'you':n).replace(/{DOES_KNOW}/g,'Does '+n+' know you’re filling this out?').replace(/{DOES}/g,pat?'Do you':'Does '+n).replace(/{IS}/g,pat?'are you':'is '+n)}
-// Which questions show, given an answers map: the showIf condition (is / any), and the emergency short path,
-// where only the questions marked em are asked until the family chooses to answer the rest.
-function qShows(q,ans){ans=ans||{};if(/emergency/.test((ans['G.6']||{}).a||'')&&!((ans._full||{}).a==='yes')&&!q.em)return false;if(!q.showIf)return true;var p=ans[q.showIf.id];if(!p)return false;var parts=String(p.a||'').split('; ');if(q.showIf.any)return q.showIf.any.some(function(v){return parts.indexOf(v)>=0});return q.showIf.is.indexOf(String(p.a||''))>=0}
-function qVisible(q){return qShows(q,S.ia)}
-function emShort(ans){return /emergency/.test((ans['G.6']||{}).a||'')&&!((ans._full||{}).a==='yes')}
-function qBlank(q){return !((S.ia[q.id]||{}).a||'').trim()}
 // What is wrong with one visible answer, in plain words, or ''. Required, a real phone number, a sensible surgery date.
 function qDay(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
 // A US phone number: 10 digits (a leading 1 is fine), a real area code, optional extension. Returns '' when it is not one.
@@ -2540,9 +2539,9 @@ var RIDESHARE_=/\b(uber|lyft|taxi|cab|rideshare|ride share)\b/i;
 function qProblem(q){var v=((S.ia[q.id]||{}).a||'').trim(),alt=(q.alts||[]).indexOf(v)>=0;
   if(!v)return q.req?tr('This one is needed.'):'';
   if(q.id==='A.phone'&&!phoneOk(v))return 'Please enter a 10-digit US phone number, like (615) 555-0100. An extension is fine: 555-0100 ext. 22.';
-  if(q.type==='date'&&!alt&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||v<qDay(-365)||v>qDay(1095)))return 'Please check this date. It should be within the past year or the next three years.';
+  if(q.type==='date'&&q.dob&&!alt&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||v<'1900-01-01'||v>qDay(0)))return 'Please check this date of birth.';
+  if(q.type==='date'&&!q.dob&&!alt&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||v<qDay(-365)||v>qDay(1095)))return 'Please check this date. It should be within the past year or the next three years.';
   return ''}
-var EMERGENCY_='This is an emergency, or it has already happened';
 function iaInit(){var d=S.data;if(S.ia&&S.iaFor===S.clientId)return;S.ia={};S.iaFor=S.clientId;Object.keys(d.intake.answers||{}).forEach(function(k){S.ia[k]={a:d.intake.answers[k].a,n:d.intake.answers[k].n}});var steps=d.intakeSpec.steps;if(S.step===null){S.step=lastStep();for(var i=0;i<steps.length;i++){if(steps[i].qs.some(function(q){return qVisible(q)&&q.req&&qBlank(q)})){S.step=i+1;break}}if(!d.intake.consent)S.step=0;if(isSub(d.intake))S.step='review'}}
 function stepHas(i){var st=S.data.intakeSpec.steps[i-1];return !!st&&st.qs.some(qVisible)}
 function nextStep(i){var n=S.data.intakeSpec.steps.length;for(var k=i+1;k<=n;k++)if(stepHas(k))return k;return n+1}
@@ -2557,10 +2556,11 @@ function intakeView(){
   var v=el('<div style="max-width:640px"></div>');
   if(d.me.role==='family'){v.appendChild(el('<div class="head"><div class="k">'+esc(BOOT.appName)+'</div><h1>Almost there.</h1><p class="muted">The portal opens once the family’s first payment is in.</p></div>'));return v}
   if((S.step==='done'||S.step==='review')&&d.me.role==='client'&&!d.client.paid)return waitingView(v,S.step==='done');
-  if(S.step==='done'){if(d.me.role==='coordinator'){S.coFill=false;S.ia=null;S.step=null;return prepView()}v.appendChild(el('<div class="head"><div class="k">Your intake</div><h1>You’re done — and thank you.</h1><div class="muted" style="font-size:16px">This gives us a real head start. We’ll go through everything before we meet, and we’ll bring questions about anything you marked “I don’t know.”</div></div><div class="card" style="font-family:Fraunces,Georgia,serif;font-size:22px">Your only job is to be there. We’ll carry the rest.</div><p style="margin-top:20px"><a href="#plan" class="btn" id="gp">See the plan so far</a>'+(emShort(S.ia)?' <a href="#" class="btn quiet" id="gr">Answer the rest when you’re ready</a>':'')+'</p>'));$('#gp',v).onclick=function(ev){ev.preventDefault();S.touched=true;S.view='plan';render()};var gr=$('#gr',v);if(gr)gr.onclick=function(ev){ev.preventDefault();circleBack()};return v}
+  if(S.step==='done'){if(d.me.role==='coordinator'){S.coFill=false;S.ia=null;S.step=null;return prepView()}v.appendChild(el('<div class="head"><div class="k">Your intake</div><h1>You’re done — and thank you.</h1><div class="muted" style="font-size:16px">This gives us a real head start. We’ll go through everything before we meet, and we’ll bring questions about anything you marked “I don’t know.”</div></div><div class="card" style="font-family:Fraunces,Georgia,serif;font-size:22px">Your only job is to be there. We’ll carry the rest.</div><p style="margin-top:20px"><a href="#plan" class="btn" id="gp">See the plan so far</a>'+(emShort(S.ia)?' <a href="#" class="btn quiet" id="gr">Answer the rest when you’re ready</a>':'')+'</p>'));$('#gp',v).onclick=function(ev){ev.preventDefault();S.touched=true;S.view='plan';render()};var gr=$('#gr',v);if(gr)gr.onclick=function(ev){ev.preventDefault();circleBack()};skippedNote(v);return v}
+
   if(S.step==='review'){return intakeReview(v)}
   var i=S.step,isConsent=i===0,st=isConsent?null:steps[i-1];
-  v.appendChild(el('<div class="head"><div class="k">'+esc(tr(isSub(d.intake)?'Your intake':'Before we meet'))+' <a href="#" class="lang small" style="font-weight:400;letter-spacing:0;text-transform:none">'+(S.lang==='es'?'English':'Español')+'</a></div><h1>'+esc(isConsent?tr('Before anything else.'):pipe(st.title))+'</h1><div class="muted">'+esc(isConsent?'Please read and initial each item, then sign with your name. After that, a few short questions — about three minutes.':pipe(st.lead||''))+'</div></div>'));
+  v.appendChild(el('<div class="head"><div class="k">'+esc(tr(isSub(d.intake)?'Your intake':'Before we meet'))+' <a href="#" class="lang small" style="font-weight:400;letter-spacing:0;text-transform:none">'+(S.lang==='es'?'English':'Español')+'</a></div><h1>'+esc(isConsent?tr('Before anything else.'):pipe(st.title))+'</h1><div class="muted">'+esc(isConsent?'Please read and initial each item, then sign with your name. After that, the questions. How many depends on how you’d like to do it — you choose on the next page.':pipe(st.lead||''))+'</div></div>'));
   $('.lang',v).onclick=function(ev){ev.preventDefault();setLang(S.lang==='es'?'en':'es')};
   var pr=iaProgress(),pct=isConsent?0:Math.round(pr.done/Math.max(1,pr.all)*100);
   v.appendChild(el('<div class="prog"><span>'+(isConsent?tr('Consent first'):pr.done+' '+tr('of')+' '+pr.all+' '+tr('answered'))+'</span><div class="bar"><i style="width:'+pct+'%"></i></div><span>'+tr(isConsent?'Then the questions':emShort(S.ia)?'The short version':'Saves as you go')+'</span></div>'));
@@ -2569,8 +2569,15 @@ function intakeView(){
   if(isConsent)consentStep(body,v);else questionStep(body,v,st);
   return v;
 }
+// On submit: the optional sections they skipped, each with a way back in. Never a nudge, only an open door.
+function skippedNote(v){if(emShort(S.ia))return;var steps=S.data.intakeSpec.steps,sk=iaWalk(S.ia).steps.filter(function(x){return x.cut&&iaA(S.ia,'Z.'+x.id)!=='yes'});if(!sk.length)return;
+  var b=el('<div class="card" style="margin-top:20px"><div style="line-height:1.6">'+esc(tr('You skipped some optional sections. That’s completely fine — we’ll cover what we need when we talk. If you’d rather fill any of it in, here it is:'))+'</div><div class="alts"></div></div>');
+  sk.forEach(function(x){var btn=el('<button type="button" class="alt">'+esc(pipe(x.title))+'</button>');btn.onclick=function(){iaPut('Z.'+x.id,'yes');var o={};o['Z.'+x.id]={a:'yes',n:''};call('saveIntake',{answers:o}).then(function(r){S.data.intake=r.intake;for(var i=0;i<steps.length;i++)if(steps[i].id===x.id)S.step=i+1;render();window.scrollTo(0,0)}).catch(alertErr)};$('.alts',b).appendChild(btn)});v.appendChild(b)}
 function questionStep(body,v,st){
-  function draw(){body.innerHTML='';st.qs.forEach(function(q){if(qVisible(q))body.appendChild(questionEl(q,draw))})}
+  function draw(){body.innerHTML='';st.qs.forEach(function(q){if(qVisible(q))body.appendChild(questionEl(q,draw))});
+    // Quick mode, or "just handle it": a visible way back to the questions they skipped here.
+    var ws=iaWalk(S.ia).steps.filter(function(x){return x.id===st.id})[0];
+    if(ws&&ws.cut&&iaA(S.ia,'Z.'+st.id)!=='yes'){var m=el('<p class="more"><button type="button" class="btn quiet sm">'+esc(tr('Actually, ask me more about this'))+'</button></p>');$('button',m).onclick=function(){iaPut('Z.'+st.id,'yes');call('saveIntake',{answers:(function(o){o['Z.'+st.id]={a:'yes',n:''};return o})({})}).catch(function(){});draw()};body.appendChild(m)}}
   draw();
   var last=S.step===lastStep(),wasSub=isSub(S.data.intake),lbl=tr(last?(wasSub?'Save my changes':'Submit my intake'):'Next');
   var nav=el('<div class="steps"><button class="btn quiet" type="button" '+(S.step<=1?'disabled':'')+'>'+esc(tr('Back'))+'</button><span class="err" id="se" role="alert" style="margin:0"></span><button class="btn" type="button">'+lbl+'</button></div>');
@@ -2579,46 +2586,127 @@ function questionStep(body,v,st){
   function recheck(){var left=0;$all('.q.bad',body).forEach(function(x){var q=st.qs.filter(function(k){return k.id===x.getAttribute('data-id')})[0];if(q&&!qProblem(q)){x.classList.remove('bad');var e=$('.qerr',x);if(e)e.remove()}else left++});var se=$('#se',nav);if(se&&/need(s)? a look/.test(se.textContent))se.textContent=!left?'':left===1?'One answer needs a look — it is marked in red above.':left+' answers need a look — they are marked in red above.'}
   body.addEventListener('input',recheck);body.addEventListener('click',function(){setTimeout(recheck,0)});
   bs[0].onclick=function(){saveStep(st).then(function(){S.step=prevStep(S.step);render();window.scrollTo(0,0)}).catch(function(e){$('#se',nav).textContent=e.message})};
-  bs[1].onclick=function(){var bad=st.qs.filter(function(q){return qVisible(q)&&qProblem(q)});$all('.q',body).forEach(function(x){x.classList.remove('bad');var e=$('.qerr',x);if(e)e.remove()});if(bad.length){bad.forEach(function(q){var x=$('.q[data-id="'+q.id+'"]',body);if(x){x.classList.add('bad');var e=el('<div class="qerr"></div>');e.textContent=qProblem(q);$('.ctl',x).appendChild(e)}});$('#se',nav).textContent=bad.length===1?'One answer needs a look — it is marked in red above.':bad.length+' answers need a look — they are marked in red above.';var f=$('.q.bad',body);if(f)f.scrollIntoView({behavior:'smooth',block:'center'});return}bs[1].disabled=true;bs[1].textContent='Saving…';saveStep(st).then(function(){if(!last){S.step=nextStep(S.step);render();window.scrollTo(0,0);return}return call('submitIntake',{}).then(function(r){S.data.intake=r.intake;return refresh()}).then(function(){S.step=wasSub?'review':'done';render();window.scrollTo(0,0)})}).catch(function(e){$('#se',nav).textContent=e.message;bs[1].disabled=false;bs[1].textContent=lbl})};
+  var briefDone=false;
+  // Three or more optional questions on a page, all skipped: offer the short version, once.
+  function briefOffer(go){var opt=st.qs.filter(function(q){return qVisible(q)&&!q.req&&!q.collapsed});
+    if(briefDone||iaMode(S.ia)==='quick'||iaA(S.ia,'Z.brief')||opt.length<3||opt.some(function(q){return !qBlank(q)}))return go();
+    briefDone=true;var o=el('<div class="brief" role="dialog" aria-label="Keep it brief?"><div style="font-weight:700;margin-bottom:10px">'+esc(tr('Looks like you’d rather keep this brief — want us to just ask the essentials from here?'))+'</div><div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn sm">'+esc(tr('Yes please'))+'</button><button type="button" class="btn quiet sm">'+esc(tr('No, I’ll keep going'))+'</button></div></div>');
+    var pick=function(yes){var ex={'Z.brief':{a:'offered',n:''}};iaPut('Z.brief','offered');if(yes){var qm=S.data.intakeSpec.steps[0].qs[1].opts[0];iaPut('0.1a',qm);ex['0.1a']={a:qm,n:(S.ia['0.1a']||{}).n||''}}o.remove();go(ex)};
+    $all('button',o)[0].onclick=function(){pick(true)};$all('button',o)[1].onclick=function(){pick(false)};nav.parentNode.insertBefore(o,nav);$('button',o).focus()}
+  bs[1].onclick=function(){var bad=st.qs.filter(function(q){return qVisible(q)&&qProblem(q)});$all('.q',body).forEach(function(x){x.classList.remove('bad');var e=$('.qerr',x);if(e)e.remove()});if(bad.length){bad.forEach(function(q){var x=$('.q[data-id="'+q.id+'"]',body);if(x){x.classList.add('bad');var e=el('<div class="qerr"></div>');e.textContent=qProblem(q);$('.ctl',x).appendChild(e)}});$('#se',nav).textContent=bad.length===1?'One answer needs a look — it is marked in red above.':bad.length+' answers need a look — they are marked in red above.';var f=$('.q.bad',body);if(f)f.scrollIntoView({behavior:'smooth',block:'center'});return}briefOffer(function(ex){bs[1].disabled=true;bs[1].textContent='Saving…';saveStep(st,ex).then(function(){if(nextStep(S.step)<=S.data.intakeSpec.steps.length){S.step=nextStep(S.step);render();window.scrollTo(0,0);return}return call('submitIntake',{}).then(function(r){S.data.intake=r.intake;return refresh()}).then(function(){S.step=wasSub?'review':'done';render();window.scrollTo(0,0)})}).catch(function(e){$('#se',nav).textContent=e.message;bs[1].disabled=false;bs[1].textContent=lbl})})};
   v.appendChild(nav);
 }
-// A hidden question (its showIf no longer matches) and a detail box whose option is no longer picked are saved blank,
-// so an answer the family took back never reaches the plan. What they typed stays on screen until they leave the page.
-function saveStep(st){var a={},E={a:'',n:''};st.qs.forEach(function(q){var vis=qVisible(q),x=S.ia[q.id];if(x)a[q.id]=vis?x:E;var d=S.ia[q.id+'d'];if(d){var on=vis&&x&&(x.a||'').split('; ').indexOf(q.detailOn)>=0;a[q.id+'d']=on?d:E}});return call('saveIntake',{answers:a}).then(function(r){S.data.intake=r.intake})}
+// The master intake on the page. Text is written once and piped: "you" when the patient fills it out, their
+// name otherwise. The helper is the main caregiver from Key contacts. Stored answers keep the raw option text.
+function iaA(ans,id){return ans&&ans[id]?String(ans[id].a||''):''}
+function iaHelper(ans){ans=ans||S.ia||{};var c2=iaA(ans,'C.2'),c1=iaA(ans,'C.1'),pat=iaRole(ans)==='patient',nm=function(id){return first(iaA(ans,id))};
+  if(c2==='Someone else')return nm('C.2_d.name')||'the main caregiver';
+  if(c2==='Same as above')return c1==='Someone else'?(nm('C.1_d.name')||'the main caregiver'):pat?(nm('0.2_d.name')||'the main caregiver'):'you';
+  if(pat&&iaA(ans,'0.2')==='Yes')return nm('0.2_d.name')||'the main caregiver';
+  return 'the main caregiver'}
+function pipeFor(t,pat,n,h){t=String(t||'').replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g,function(m,f,p){return pat?p:f});var hy=h==='you',hc=h.charAt(0).toUpperCase()+h.slice(1);
+  return t.replace(/{NAME_CAP_S}/g,pat?'Your':n+'’s').replace(/{NAME_S}/g,pat?'your':n+'’s').replace(/{NAME_CAP}/g,pat?'You':n).replace(/{NAME}/g,pat?'you':n)
+    .replace(/{DOES}/g,pat?'Do you':'Does '+n).replace(/{IS}/g,pat?'are you':'is '+n).replace(/{HAS}/g,pat?'Have you':'Has '+n).replace(/{WAS}/g,pat?'were you':'was '+n)
+    .replace(/{HELPER} gets/g,hy?'you get':h+' gets').replace(/{HELPER_DOES}/g,hy?'Do you':'Does '+h).replace(/{HELPER_IS}/g,hy?'Are you':'Is '+h).replace(/{HELPER}/g,hy?(/^{HELPER}/.test(t)?'You':'you'):(/^{HELPER}/.test(t)?hc:h))}
+function pipe(t){if(S.lang==='es')return pipeEs(tr(t));var d=S.data,ia=S.ia||{};return pipeFor(t,iaRole(ia)==='patient',first(d.client.patient_first_name)||'the patient',iaHelper(ia))}
+// For the coordinator: always the patient's name, never "you".
+function pipe3(t,ans){var d=S.data;return pipeFor(t,false,first(d.client.patient_first_name)||'the patient',(function(h){return h==='you'?'the caregiver':h})(iaHelper(ans||(d.intake||{}).answers||{})))}
+// What shows: the same rules as the API (intake.js walk/cond). Conditions only look at questions already shown.
+function iaRole(ans){var w=iaA(ans,'0.1');return /person having surgery/.test(w)?'patient':/together/.test(w)?'together':w?'family':''}
+function iaMode(ans){var m=iaA(ans,'0.1a');return /^Quick/.test(m)?'quick':/^Thorough/.test(m)?'thorough':'decide'}
+function iaSvc(ans){var map=S.data.intakeSpec.services||{};return iaA(ans,'F').split('; ').map(function(t){return map[t]}).filter(Boolean)}
+function iaAges(ans){var out=[];iaA(ans,'M.1_d').replace(/(\d+(?:\.\d+)?)\s*(months?|mos?|weeks?|wks?)?/gi,function(m,n,u){out.push(u?Math.floor(+n/(/^w/i.test(u)?52:12)):+n);return m});return out}
+function iaCond(c,ans,shown){if(!c)return true;var val=function(id){return shown&&!shown[id]?'':iaA(ans,id)};
+  if(c.all)return c.all.every(function(x){return iaCond(x,ans,shown)});
+  if(c.any)return c.any.some(function(x){return iaCond(x,ans,shown)});
+  if(c.not)return !iaCond(c.not,ans,shown);
+  if(c.role)return c.role.indexOf(iaRole(ans))>=0;
+  if(c.mode)return c.mode.indexOf(iaMode(ans))>=0;
+  if(c.svc){var s=iaSvc(ans);return c.svc.some(function(k){return s.indexOf(k)>=0})}
+  if(c.ages)return val('M.1')==='Yes'&&iaAges(ans).some(function(n){return n>=c.ages[0]&&n<=c.ages[1]});
+  if(c.differentFloors){var b=val('K.3'),t=val('K.3x');return !!b&&!!t&&b!==t}
+  if(c.lodgingNeeded){if(iaSvc(ans).indexOf('lodging')<0)return false;var l5=val('L.5');return l5==="No, we'd like help"||(/More than 2|Out of state/.test(val('L.4'))&&!/close enough|already arranged/.test(l5))}
+  if(c.q){var v=val(c.q);if(c.filled)return !!v.trim();if(c.startsWith)return v.indexOf(c.startsWith)===0;if(c.has){var p=v.split('; ');return c.has.some(function(x){return p.indexOf(x)>=0})}if(c.is)return c.is.indexOf(v)>=0}
+  return true}
+var EMERGENCY_='This is an emergency, or it has already happened';
+function emShort(ans){return iaA(ans,'G.6')===EMERGENCY_&&!((ans._full||{}).a==='yes')}
+S.iaVer=0;var _wk=null;
+function iaWalk(ans){ans=ans||{};if(_wk&&_wk.obj===ans&&_wk.ver===S.iaVer&&_wk.spec===S.data.intakeSpec)return _wk.res;
+  var em=emShort(ans),shown={},steps=[],jh=S.data.intakeSpec.justHandle;
+  S.data.intakeSpec.steps.forEach(function(st){if(!iaCond(st.when,ans,shown))return;var more=iaA(ans,'Z.'+st.id)==='yes',mode=more?'thorough':iaMode(ans),qs=[],cut=0;
+    st.qs.forEach(function(q){if(em&&!q.em)return;
+      if(mode==='quick'&&(q.detail||st.standards||!(q.req||q.quick||q.tier===2))){cut++;return}
+      if(q.detail&&q.area&&mode==='decide'&&iaA(ans,'F.d.'+q.area)===jh){cut++;return}
+      if(!iaCond(q.when,ans,shown))return;shown[q.id]=1;qs.push(q)});
+    steps.push({id:st.id,title:st.title,qs:qs,cut:cut&&!em})});
+  _wk={obj:ans,ver:S.iaVer,spec:S.data.intakeSpec,res:{shown:shown,steps:steps}};return _wk.res}
+function qShows(q,ans){return !!iaWalk(ans||{}).shown[q.id]}
+function qVisible(q){return qShows(q,S.ia)}
+function qBlank(q){return !((S.ia[q.id]||{}).a||'').trim()}
+// The extra boxes of an answer, joined: the detail under an option (id_d, id_d.k).
+function qDet(ans,id){ans=ans||{};if(iaA(ans,id+'_d'))return iaA(ans,id+'_d');return Object.keys(ans).filter(function(k){return k.indexOf(id+'_d.')===0}).map(function(k){return iaA(ans,k)}).filter(Boolean).join(', ')}
+// The detail boxes an answer opens: the first picked option that has some ({opt:'label'} or {opt:[fields]}), or the select's detailOn.
+function qDetSpec(q,val){if(q.detailOn)return val===q.detailOn?(q.detailLabel||'Detail'):null;if(!q.details)return null;var p=String(val||'').split('; ');for(var i=0;i<p.length;i++)if(q.details[p[i]])return q.details[p[i]];return null}
+function qSubIds(q){var out=[];if(q.type==='fields')q.fields.forEach(function(f){out.push(q.id+'.'+f.k)});var seen={};Object.keys(q.details||{}).forEach(function(o){var d=q.details[o];if(typeof d==='string'){if(!seen._)out.push(q.id+'_d');seen._=1}else d.forEach(function(f){var k=q.id+'_d.'+f.k;if(!seen[k]){out.push(k);seen[k]=1}})});if(q.detailOn)out.push(q.id+'_d');return out}
+// A hidden question, and a box whose option is no longer picked, are saved blank, so an answer the family took
+// back never reaches the plan. What they typed stays on screen until they leave the page.
+function saveStep(st,extra){var a={},E={a:'',n:''};st.qs.forEach(function(q){var vis=qVisible(q),x=S.ia[q.id];if(x)a[q.id]=vis?{a:x.a,n:x.n}:E;
+  var on=vis&&x&&qDetSpec(q,x.a);qSubIds(q).forEach(function(k){var y=S.ia[k];if(!y)return;var keep=q.type==='fields'&&k.indexOf(q.id+'.')===0?vis:on&&(typeof on==='string'?k===q.id+'_d':k.indexOf(q.id+'_d.')===0);a[k]=keep?{a:y.a,n:''}:E})});
+  Object.keys(extra||{}).forEach(function(k){a[k]=extra[k]});
+  return call('saveIntake',{answers:a}).then(function(r){S.data.intake=r.intake})}
+function iaPut(id,v){var x=S.ia[id]||(S.ia[id]={a:'',n:''});x.a=v;S.iaVer++;return x}
+var EXCL_=['No','None','None of these','None that we know of','Nothing we know of','Nothing unusual','No license needed','No preferences',"I don't know",'Rather not say','Rather discuss this with you directly','Rather discuss in person','Not sure yet','Just this surgery'];
+function qBoxes(prefix,fields,label){var g=el('<div class="detail qf">'+(label?'<div class="small muted" style="width:100%">'+esc(tr(label))+'</div>':'')+'</div>');
+  fields.forEach(function(f){var id=prefix+'.'+f.k,x=S.ia[id]||(S.ia[id]={a:'',n:''}),b=el('<label class="qfl"><span>'+esc(tr(f.label))+'</span><input'+(f.tel?' type="tel" inputmode="tel"':'')+' value="'+esc(x.a)+'"></label>');$('input',b).oninput=function(){x.a=this.value;S.iaVer++;if(g.onchange2)g.onchange2()};g.appendChild(b)});return g}
 function questionEl(q,redraw){
-  var a=S.ia[q.id]||(S.ia[q.id]={a:'',n:''});
+  var a=S.ia[q.id]||(S.ia[q.id]={a:'',n:''}),spec=S.data.intakeSpec;
   var lid='qt-'+q.id.replace(/[^A-Za-z0-9]/g,'_');
-  var w=el('<div class="q" data-id="'+esc(q.id)+'"><div class="qt" id="'+lid+'">'+esc(pipe(q.q))+(q.req?' <span class="req">*</span>':'')+'</div>'+(q.why?'<div class="qw">'+esc(tr(q.why))+'</div>':'')+'<div class="ctl"></div></div>');
+  if(q.collapsed&&!a.a&&!a.n&&!a.open){var cw=el('<div class="q qx" data-id="'+esc(q.id)+'"><button type="button" class="notel" aria-expanded="false">+ '+esc(pipe(q.q))+'</button></div>');$('button',cw).onclick=function(){a.open=true;redraw()};return cw}
+  var w=el('<div class="q" data-id="'+esc(q.id)+'">'+(q.head?'<div class="qh">'+esc(tr(q.head))+'</div>':'')+'<div class="qt" id="'+lid+'">'+esc(pipe(q.q))+(q.req?' <span class="req">*</span>':'')+'</div>'+(q.why?'<div class="qw">'+esc(pipe(q.why))+'</div>':'')+'<div class="ctl"></div></div>');
   var c=$('.ctl',w);
-  function set(val){a.a=val;S.ia[q.id]=a}
+  function set(val){iaPut(q.id,val);a=S.ia[q.id]}
+  function detailBox(){var ds=qDetSpec(q,a.a);if(!ds)return;if(typeof ds==='string'){var dd=S.ia[q.id+'_d']||(S.ia[q.id+'_d']={a:'',n:''});var di=el('<div class="detail"><label>'+esc(tr(ds))+'</label><input aria-label="'+esc(tr(ds))+'" value="'+esc(dd.a)+'"></div>');$('input',di).oninput=function(){dd.a=this.value;S.iaVer++};c.appendChild(di)}else c.appendChild(qBoxes(q.id+'_d',ds))}
   if(q.type==='choice'||q.type==='multi'){
-    var multi=q.type==='multi',sel=multi?a.a.split('; ').filter(Boolean):[a.a];
-    var o=el('<div class="opts" role="group" aria-labelledby="'+lid+'"></div>');
-    q.opts.forEach(function(op){var b=el('<button type="button" aria-pressed="'+(sel.indexOf(op)>=0)+'" class="opt '+(multi?'box':'')+' '+(sel.indexOf(op)>=0?'on':'')+'"><i></i><span>'+esc(tr(op))+'</span></button>');b.onclick=function(){if(multi){var ex=function(x){return x==='No'||x==='None'||x===S.data.intakeSpec.dk};if(ex(op))sel=sel.indexOf(op)>=0?[]:[op];else{sel=sel.filter(function(x){return !ex(x)});var k=sel.indexOf(op);if(k>=0)sel.splice(k,1);else sel.push(op)}set(sel.join('; '))}else set(op);redraw()};o.appendChild(b)});
-    c.appendChild(o);
-    if(q.detailOn&&sel.indexOf(q.detailOn)>=0){var dd=S.ia[q.id+'d']||(S.ia[q.id+'d']={a:'',n:''});var di=el('<div class="detail"><label>'+esc(tr(q.detailLabel||'Detail'))+'</label><input aria-label="'+esc(q.detailLabel||'Detail')+'" value="'+esc(dd.a)+'"></div>');$('input',di).oninput=function(){dd.a=this.value};c.appendChild(di)}
+    var multi=q.type==='multi',sel=multi?a.a.split('; ').filter(Boolean):(a.a?[a.a]:[]);
+    var hint=el('<div class="small muted" role="status" style="margin-top:6px"></div>');
+    var mk=function(op){var on=sel.indexOf(op)>=0,k=q.ordered&&on?sel.indexOf(op)+1:0;var b=el('<button type="button" aria-pressed="'+on+'" class="opt '+(multi?'box':'')+' '+(on?'on':'')+'"><i></i><span>'+(k?'<b>'+k+'.</b> ':'')+esc(pipe(op))+'</span></button>');
+      b.onclick=function(){if(multi){if(EXCL_.indexOf(op)>=0)sel=on?[]:[op];else{sel=sel.filter(function(x){return EXCL_.indexOf(x)<0});var i=sel.indexOf(op);if(i>=0)sel.splice(i,1);else if(q.max&&sel.length>=q.max){hint.textContent='Up to '+q.max+' — take one off first.';return}else sel.push(op)}set(sel.join('; '))}else set(op);redraw()};return b};
+    if(q.groups)q.groups.forEach(function(g){c.appendChild(el('<div class="og">'+esc(tr(g.label))+'</div>'));var o=el('<div class="opts" role="group" aria-label="'+esc(tr(g.label))+'"></div>');g.opts.forEach(function(op){o.appendChild(mk(op))});c.appendChild(o)});
+    else{var o=el('<div class="opts" role="group" aria-labelledby="'+lid+'"></div>');q.opts.forEach(function(op){o.appendChild(mk(op))});c.appendChild(o)}
+    if(q.max)hint.textContent=q.ordered?'Pick up to '+q.max+', most important first.':'Pick up to '+q.max+'.';
+    c.appendChild(hint);detailBox();
   } else if(q.type==='select'){
     // A long list (the hospital question): a dropdown of the names, plus the way-out buttons below it.
-    var list=q.optsFrom==='hospitals'?(S.data.intakeSpec.hospitals||[]):(q.opts||[]),salts=q.alts||[];
+    var list=q.optsFrom==='hospitals'?(spec.hospitals||[]):(q.opts||[]),salts=q.alts||[];
     var sl=el('<select aria-labelledby="'+lid+'"><option value="">'+esc(tr(q.ph||'Choose one'))+'</option>'+list.map(function(n){return '<option'+(a.a===n?' selected':'')+'>'+esc(n)+'</option>'}).join('')+'</select>');
     sl.onchange=function(){set(this.value);redraw()};c.appendChild(sl);
     var sal=el('<div class="alts"></div>');salts.forEach(function(x){var b=el('<button type="button" aria-pressed="'+(a.a===x)+'" class="alt '+(a.a===x?'on':'')+'">'+esc(tr(x))+'</button>');b.onclick=function(){set(a.a===x?'':x);redraw()};sal.appendChild(b)});c.appendChild(sal);
-    if(q.detailOn&&a.a===q.detailOn){var sd=S.ia[q.id+'d']||(S.ia[q.id+'d']={a:'',n:''});var sdi=el('<div class="detail"><label>'+esc(tr(q.detailLabel||'Detail'))+'</label><input aria-label="'+esc(q.detailLabel||'Detail')+'" value="'+esc(sd.a)+'"></div>');$('input',sdi).oninput=function(){sd.a=this.value};c.appendChild(sdi)}
+    detailBox();
+  } else if(q.type==='fields'){
+    // Several short boxes (name, phone …). Each is kept on its own (id.k); the answer is all of them in one line.
+    var alts2=q.alts||[],bx=qBoxes(q.id,q.fields);
+    var join=function(){return q.fields.map(function(f){var v=((S.ia[q.id+'.'+f.k]||{}).a||'').trim();return v?f.label+': '+v:''}).filter(Boolean).join(' · ')};
+    bx.onchange2=function(){set(join());$all('.alt',c).forEach(function(x){x.classList.remove('on');x.setAttribute('aria-pressed','false')})};
+    $all('input',bx).forEach(function(i){i.setAttribute('aria-describedby',lid)});c.appendChild(bx);
+    if(alts2.length){var al2=el('<div class="alts"></div>');alts2.forEach(function(x){var b=el('<button type="button" aria-pressed="'+(a.a===x)+'" class="alt '+(a.a===x?'on':'')+'">'+esc(tr(x))+'</button>');b.onclick=function(){set(a.a===x?join():x);redraw()};al2.appendChild(b)});c.appendChild(al2)}
   } else {
     var alts=q.alts||[],isAlt=alts.indexOf(a.a)>=0;
-    var lab=' aria-labelledby="'+lid+'"',tel=q.id==='A.phone'?' type="tel" inputmode="tel" autocomplete="tel"':'';
-    var inp=q.type==='date'?el('<input type="date"'+lab+' min="'+qDay(-365)+'" max="'+qDay(1095)+'" value="'+esc(isAlt?'':a.a)+'">'):(q.long?el('<textarea'+lab+' placeholder="'+esc(tr(q.ph||''))+'">'+esc(isAlt?'':a.a)+'</textarea>'):el('<input'+lab+tel+' placeholder="'+esc(tr(q.ph||''))+'" value="'+esc(isAlt?'':a.a)+'">'));
-    inp.oninput=function(){set(this.value);$all('.alt',c).forEach(function(x){x.classList.remove('on');x.setAttribute('aria-pressed','false')});var had=!!$('.qwarn',c),want=(q.id==='G.6'&&/^\d{4}-\d{2}-\d{2}$/.test(a.a)&&a.a<qDay(0)&&a.a>=qDay(-365))||(q.id==='L.1'&&RIDESHARE_.test(a.a));if(had!==want){var at=this.selectionStart,tag=this.tagName;redraw();var n=$('.q[data-id="'+q.id+'"] '+tag);if(n){n.focus();try{n.setSelectionRange(at,at)}catch(e){}}}};
+    var lab=' aria-labelledby="'+lid+'"',tel=/phone$/.test(q.id)?' type="tel" inputmode="tel" autocomplete="tel"':'';
+    var inp=q.type==='date'?el('<input type="date"'+lab+(q.dob?' min="1900-01-01" max="'+qDay(0)+'" autocomplete="bday"':' min="'+qDay(-365)+'" max="'+qDay(1095)+'"')+' value="'+esc(isAlt?'':a.a)+'">'):(q.long?el('<textarea'+lab+' placeholder="'+esc(tr(q.ph||''))+'">'+esc(isAlt?'':a.a)+'</textarea>'):el('<input'+lab+tel+' placeholder="'+esc(tr(q.ph||''))+'" value="'+esc(isAlt?'':a.a)+'">'));
+    inp.oninput=function(){set(this.value);$all('.alt',c).forEach(function(x){x.classList.remove('on');x.setAttribute('aria-pressed','false')});var had=!!$('.qwarn',c),want=q.id==='G.6'&&/^\d{4}-\d{2}-\d{2}$/.test(a.a)&&a.a<qDay(0)&&a.a>=qDay(-365);if(had!==want){var at=this.selectionStart,tag=this.tagName;redraw();var n=$('.q[data-id="'+q.id+'"] '+tag);if(n){n.focus();try{n.setSelectionRange(at,at)}catch(e){}}}};
     c.appendChild(inp);
     // Picking an alternative never throws away what they typed: it moves into the note (a date is simply cleared).
     if(alts.length){var al=el('<div class="alts"></div>');alts.forEach(function(x){var b=el('<button type="button" aria-pressed="'+(a.a===x)+'" class="alt '+(a.a===x?'on':'')+'">'+esc(tr(x))+'</button>');b.onclick=function(){var typed=q.type!=='date'&&alts.indexOf(a.a)<0?(a.a||'').trim():'';if(typed&&(a.n||'').indexOf(typed)<0)a.n=(a.n?a.n+'\n':'')+typed;set(x);redraw()};al.appendChild(b)});c.appendChild(al)}
-    // Soft hints (they never block): a past date, and a rideshare as the ride home.
     if(q.id==='G.6'&&/^\d{4}-\d{2}-\d{2}$/.test(a.a)&&a.a<qDay(0)&&a.a>=qDay(-365))c.appendChild(el('<div class="qwarn">That date has passed. If the surgery already happened, choose “'+esc(EMERGENCY_)+'” above so we ask the right questions.</div>'));
-    if(q.id==='L.1'&&RIDESHARE_.test(a.a))c.appendChild(el('<div class="qwarn">Most hospitals will not release a patient to a taxi or rideshare after anesthesia. If you can, put a person here. If there is nobody yet, choose “We haven’t sorted this out yet” and we will help.</div>'));
     if(q.id==='G.6'&&a.a===EMERGENCY_)c.appendChild(el('<div class="note" role="alert" style="margin-top:12px"><b>If this is a medical emergency, call <a href="tel:911">911</a> now.</b> Otherwise, tell us where things stand below, and call us at <a href="tel:+16298003622">(629) 800-3622</a> if you need us sooner.</div>'))
   }
-  var open=q.noteOpen||!!a.n||!!a.no;
-  var nl=el('<button type="button" class="notel">'+esc(tr('+ add a note'))+'</button>'),nf=el('<div class="note-f '+(open?'':'hidden')+'"><label>'+esc(tr(q.noteOpen?'Anything to add? In your own words.':'Your note'))+'</label><textarea aria-label="'+(q.noteOpen?'Anything to add':'Your note')+' — '+esc(pipe(q.q))+'">'+esc(a.n)+'</textarea></div>');
+  var disc=a.a===spec.discuss||a.a==='Rather discuss in person',dk=a.a===spec.dk||(q.type==='multi'&&a.a.split('; ').indexOf(spec.dk)>=0);
+  if(disc)c.appendChild(el('<div class="small muted" style="margin-top:8px">'+esc(tr('That’s fine — it goes on the list for when we meet, not into a void.'))+'</div>'));
+  // "I don't know" opens the note: half-remembered is still information.
+  var open=q.noteOpen||dk||!!a.n||!!a.no||(q.collapsed&&a.open);
+  var nlab=dk?'Did they say anything about it, even if you’re not sure?':q.noteOpen?'Anything to add? In your own words.':'Your note';
+  if(q.collapsed&&q.type==='text'){return w}
+  var nl=el('<button type="button" class="notel">'+esc(tr('+ add a note'))+'</button>'),nf=el('<div class="note-f '+(open?'':'hidden')+'"><label>'+esc(tr(nlab))+'</label><textarea aria-label="'+esc(nlab)+' — '+esc(pipe(q.q))+'">'+esc(a.n)+'</textarea></div>');
   $('textarea',nf).oninput=function(){a.n=this.value};
   if(!open){nl.onclick=function(){a.no=true;nf.classList.remove('hidden');nl.remove();$('textarea',nf).focus()};c.appendChild(nl)}
   c.appendChild(nf);
@@ -2651,6 +2739,7 @@ function waitingView(v,justDone){
   var b=el('<p style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn quiet" type="button">See what you told us</button>'+(emShort(S.ia||it.answers)?'<button class="btn" type="button" id="gr">Answer the rest when you’re ready</button>':'')+'</p>');$all('button',b)[0].onclick=function(){v.innerHTML='';intakeReview(v)};
   var gr=$('#gr',b);if(gr)gr.onclick=function(){circleBack()};
   v.appendChild(b);
+  if(S.ia)skippedNote(v);
   return v;
 }
 // An emergency family chose to answer the rest of the form: mark it, then open the first page with something left to answer.
@@ -2678,14 +2767,15 @@ function intakeReview(v){
   var b=el('<p style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn quiet" type="button">Change an answer</button>'+(emShort(S.ia||it.answers)?'<button class="btn" type="button" id="gr">Answer the rest of the questions</button>':'')+'</p>');$all('button',b)[0].onclick=function(){S.step=1;render()};
   var gr=$('#gr',b);if(gr)gr.onclick=function(){circleBack()};
   v.appendChild(b);
+  if(S.ia)skippedNote(v);
   return v;
 }
 function answersList(mine){
   var d=S.data,spec=d.intakeSpec,ans=d.intake.answers||{},w=el('<div></div>');
   spec.steps.forEach(function(st){
     var g=el('<div class="group" style="margin-top:22px"><span class="k">'+esc(st.title)+'</span></div>');var any=false;
-    st.qs.forEach(function(q){var a=ans[q.id];if(!a||(!a.a&&!a.n))return;if(!qShows(q,ans))return;any=true;var dk=a.a===spec.dk||a.a===spec.discuss;var det=ans[q.id+'d'];var shown=a.a;if(q.type==='date'){var dm=/^(\d{4})-(\d{2})-(\d{2})$/.exec(a.a||'');if(dm)shown=new Date(+dm[1],+dm[2]-1,+dm[3]).toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'})}
-      g.appendChild(el('<div class="ans"><div class="qq">'+esc(mine?pipe(q.q):q.id+' · '+q.q.replace(/\{[A-Z_]+\}/g,'they'))+'</div><div class="aa '+(dk?'dk':'')+'">'+esc(a.a===spec.discuss&&!mine?'Declined — rather discuss in person. Do not raise it unless they open it.':(shown||'—'))+(det&&det.a?' — '+esc(det.a):'')+'</div>'+(a.n?'<div class="nn">'+(mine?'':'<b>In their words</b>')+esc(a.n)+'</div>':'')+'</div>'))});
+    st.qs.forEach(function(q){var a=ans[q.id];if(!a||(!a.a&&!a.n))return;if(!qShows(q,ans))return;any=true;var dk=a.a===spec.dk||a.a===spec.discuss;var det={a:qDet(ans,q.id)};var shown=mine?pipe(a.a):pipe3(a.a,ans);if(q.type==='date'){var dm=/^(\d{4})-(\d{2})-(\d{2})$/.exec(a.a||'');if(dm)shown=new Date(+dm[1],+dm[2]-1,+dm[3]).toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'})}
+      g.appendChild(el('<div class="ans"><div class="qq">'+esc(mine?pipe(q.q):q.id+' · '+pipe3(q.q,ans))+'</div><div class="aa '+(dk?'dk':'')+'">'+esc(!mine&&a.a===spec.discuss?'Rather discuss in person — it goes on the meeting agenda.':!mine&&a.a===spec.rns?'Declined. Information, not a gap — never raise it unless they open it.':(shown||'—'))+(det&&det.a?' — '+esc(det.a):'')+'</div>'+(a.n?'<div class="nn">'+(mine?'':'<b>In their words</b>')+esc(a.n)+'</div>':'')+'</div>'))});
     if(any)w.appendChild(g);
   });
   return w;
@@ -2698,7 +2788,10 @@ function answersList(mine){
 // plan; the suggestions come from fixed rules in the intake and are only starting points.
 function suAns(id){var a=((S.data.intake||{}).answers||{})[id];return a?String(a.a||''):''}
 function suNote(id){var a=((S.data.intake||{}).answers||{})[id];return a?String(a.n||''):''}
-function suDet(id){return suAns(id+'d')}
+function suDet(id){return qDet((S.data.intake||{}).answers,id)}
+// The ride home as one line: the named adult and their phone, or what they said instead.
+function suDriver(){var l=suAns('L.1');if(l!=='Someone named')return l;return [suAns('L.1_d.name'),suAns('L.1_d.phone')].filter(Boolean).join(' — ')||l}
+function suIns(){return [suAns('E.carrier'),suAns('E.type')].filter(Boolean).join(' · ')}
 function suDay(base,n){var d=new Date(base.getFullYear(),base.getMonth(),base.getDate()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function suNights(){var s=suAns('G.9');return /same day/.test(s)?0:/One night/.test(s)?1:/2–3/.test(s)?3:/4–7/.test(s)?6:/More/.test(s)?9:2}
 // The timeline, from the surgery date: each stage with its dates and the answers that shape it.
@@ -2737,16 +2830,16 @@ function suTasks(){
   var d=S.data,c=d.client,sd=toDate(c.surgery_date),pf=first(c.patient_first_name)||'the patient',out=[],CC=BOOT.categories[0],FS=BOOT.categories[2],UA=BOOT.categories[1];
   var day=function(n){return sd?suDay(new Date(sd.getFullYear(),sd.getMonth(),sd.getDate()),n):''};
   var add=function(title,due,cat,why){out.push({title:title,due_date:due,category:cat,why:why})};
-  var drv=suAns('L.1');
+  var drv=suDriver();
   if(!drv||/haven't sorted/.test(drv))add('Find and name the adult who drives '+pf+' home',day(-5),CC,'They have no driver yet.');else if(/\b(uber|lyft|taxi|cab|rideshare)\b/i.test(drv))add('Replace the rideshare with a named adult for the ride home',day(-5),CC,'They put a taxi or rideshare: “'+drv+'”. Hospitals will not release to one.');else add('Confirm the ride home with '+drv.slice(0,60)+' once the report time is known',day(-2),CC,'Driver: '+drv);
   if(suAns('A.2')==='Lives alone')add((/^Yes/.test(suAns('A.2a'))?'Confirm who stays the first night or two':'Find someone to stay the first night or two'),day(-4),FS,'Lives alone. '+(suDet('A.2a')||suAns('A.2a')||''));
   if(suAns('M.1')==='Yes')add('Childcare for surgery week',day(-3),FS,'Children at home'+(suDet('M.1')?': '+suDet('M.1'):'.'));
-  if(suAns('M.4')&&suAns('M.4')!=='No')add('Pet care for the hospital days',day(-2),FS,suAns('M.4')+(suDet('M.4')?' — '+suDet('M.4'):''));
+  if(suAns('M.4')&&suAns('M.4')!=='No')add('Pet care for the hospital days',day(-2),FS,suAns('M.4')+(suAns('M.4f')?' — '+suAns('M.4f'):''));
   if(sd)add('Pre-op call: report time, what to bring, what to stop taking',day(-3),CC,'');
   if(/don't have/.test(suAns('G.4')))add("Get the surgery's name, and open or minimally invasive",day(-10),UA,'They do not have a name for it yet.');
   if(/don't know/.test(suAns('G.10')))add('Find out: straight home, or rehab first',day(-7),UA,'Changes the whole plan.');
   if(/rehab/.test(suAns('G.10')))add('Rehab facility: which one, how far, visiting plan',day(-5),CC,'');
-  if(/None|don't know/.test(suAns('G.11'))||!suAns('G.11'))add('Insurance: find out what covers '+pf,day(-10),UA,suAns('G.11')||'Not answered.');
+  if(!suIns()&&iaSvc((S.data.intake||{}).answers||{}).some(function(k){return /records|bills|auth/.test(k)}))add('Insurance: get the card details',day(-10),UA,'They asked for help with bills, records or authorizations.');
   if(sd)add('Discharge check-in: what came home on paper',day(suNights()),CC,'');
   if(sd)add('First-week-home check-in',day(suNights()+5),FS,'');
   var have=(d.tasks||[]).map(function(t){return String(t.title).toLowerCase()});
@@ -2780,7 +2873,7 @@ function suWho(){
   var d=S.data,c=d.client,w=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',w),side=$('aside',w);
   var nm=suAns('A.name').trim().split(/\s+/),fn=c.patient_first_name||nm[0]||'',ln=c.patient_last_name||nm.slice(1).join(' ')||'';
   var ph=c.phone||suAns('A.phone');
-  var drv=suAns('L.1'),dm=/^(.*?)(?:\s*[—–-]\s*|\s*\(|\s+)?((?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})?\s*$/.exec(drv)||[],eName=c.emergency_name||(dm[1]||'').replace(/\s*\([^)]*\)\s*$/,'').trim(),eRel=c.emergency_relationship||((/\(([^)]+)\)/.exec(drv)||[])[1]||''),ePhone=c.emergency_phone||(dm[2]||'');
+  var drv=suDriver(),dm=/^(.*?)(?:\s*[—–-]\s*|\s*\(|\s+)?((?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})?\s*$/.exec(drv)||[],eName=c.emergency_name||suAns('C.4.name')||(dm[1]||'').replace(/\s*\([^)]*\)\s*$/,'').trim(),eRel=c.emergency_relationship||suAns('C.4.rel')||((/\(([^)]+)\)/.exec(drv)||[])[1]||''),ePhone=c.emergency_phone||suAns('C.4.phone')||(dm[2]||'');
   var f=el('<form class="card"><div class="k" style="margin-bottom:12px">The patient</div><div class="field"><label>Family name (the chart, the emails, the In Basket)</label><input name="family_name" value="'+esc(c.family_name||'')+'" required></div>'+(nm.slice(1).join(' ')&&nm.slice(1).join(' ').toLowerCase()!==String(c.family_name||'').toLowerCase()?'<div class="small" style="margin:-6px 0 12px;color:#9B2C2C">The intake was signed as '+esc(suAns('A.name'))+'. If that is the family name, change it above.</div>':'')+'<div class="two"><div class="field"><label>First name</label><input name="patient_first_name" value="'+esc(fn)+'" required></div><div class="field"><label>Last name</label><input name="patient_last_name" value="'+esc(ln)+'"></div></div>'+suSaid('A.name','Full name on the intake')+'<div class="two"><div class="field"><label>Phone</label><input name="phone" value="'+esc(ph)+'"></div><div class="field"><label>Date of birth</label><input name="dob" type="date" value="'+esc(c.dob?String(c.dob).slice(0,10):'')+'"></div></div>'+suSaid('A.phone','Phone on the intake')+'<div class="field"><label>Address</label><input name="address" value="'+esc(c.address||'')+'" placeholder="Street, city, state"></div><div class="k" style="margin:6px 0 12px">Emergency contact</div><div class="two"><div class="field"><label>Name</label><input name="emergency_name" value="'+esc(eName)+'"></div><div class="field"><label>Relationship</label><input name="emergency_relationship" value="'+esc(eRel)+'"></div></div><div class="field"><label>Phone</label><input name="emergency_phone" value="'+esc(ePhone)+'"></div>'+(!c.emergency_name&&drv&&!/haven't sorted/.test(drv)?'<div class="small muted" style="margin:-6px 0 12px">Filled from the ride home on the intake: '+esc(drv)+(suNote('L.1')?' · <i>'+esc(suNote('L.1'))+'</i>':'')+'. Change it if someone else should be called first.</div>':'')+'<button class="btn" type="submit">Save</button> <span class="small ok" style="color:#2F6B3A;font-weight:700">'+(S.flash==='who'?'Saved.':'')+'</span><p class="err"></p></form>');S.flash='';
   f.onsubmit=function(ev){ev.preventDefault();var b=$('button',f);b.disabled=true;call('saveProfile',formData(f)).then(function(){S.flash='who';return refresh()}).catch(function(e){$('.err',f).textContent=e.message;b.disabled=false})};
   left.appendChild(f);
@@ -2808,7 +2901,7 @@ function suSurgery(){
   var ct=el('<form class="card"><div class="k" style="margin-bottom:12px">Care team</div>'+(team.length?'<div class="small muted" style="margin:0 0 10px">On the team: '+esc(team.map(function(m){return m.name+(m.role?' ('+m.role+')':'')}).join(', '))+'</div>':'')+'<div class="two"><div class="field"><label>Surgeon</label><input name="name" placeholder="Dr. …"></div><div class="field"><label>Practice or hospital</label><input name="org"></div></div><div class="field"><label>Office phone</label><input name="phone"></div><button class="btn quiet" type="submit">Add surgeon</button><p class="err"></p></form>');
   ct.onsubmit=function(ev){ev.preventDefault();var fd=formData(ct),b=$('button',ct);b.disabled=true;call('addCareTeam',{name:fd.name,role:'Surgeon',org:fd.org,phone:fd.phone}).then(refresh).catch(function(e){$('.err',ct).textContent=e.message;b.disabled=false})};
   left.appendChild(ct);
-  side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">What they told us</div><div class="small" style="line-height:1.7"><b>Diagnosis:</b> '+esc(suAns('G.1')||'—')+(suNote('G.1')?' · <i>'+esc(suNote('G.1'))+'</i>':'')+'<br><b>Surgery:</b> '+esc(suAns('G.4')||'—')+'<br><b>Hospital stay:</b> '+esc(suAns('G.9')||'—')+'<br><b>After:</b> '+esc(suAns('G.10')||'—')+'<br><b>Insurance:</b> '+esc(suAns('G.11')||'not answered')+'</div></div>'));
+  side.appendChild(el('<div class="card"><div class="k" style="margin-bottom:8px">What they told us</div><div class="small" style="line-height:1.7"><b>Diagnosis:</b> '+esc(suAns('G.1')||'—')+(suNote('G.1')?' · <i>'+esc(suNote('G.1'))+'</i>':'')+'<br><b>Surgery:</b> '+esc(suAns('G.4')||'—')+'<br><b>Hospital stay:</b> '+esc(suAns('G.9')||'—')+'<br><b>After:</b> '+esc(suAns('G.10')||'—')+'<br><b>Hospital:</b> '+esc(suAns('G.7')+(suDet('G.7')?' — '+suDet('G.7'):'')||'—')+'<br><b>Insurance:</b> '+esc(suIns()||'not asked')+'</div></div>'));
   side.appendChild(el('<div class="note">The intake does not name the surgeon or the hospital. Ask on the call and add them here; the ride, the report time and the discharge planner all hang off that.</div>'));
   return w;
 }
@@ -2856,7 +2949,7 @@ function suPlan(){
   // answers to draw from, compact
   var an=el('<div class="card"><div class="k" style="margin-bottom:6px">Their answers</div><p class="small muted" style="margin:0 0 8px">Add puts the answer in the form for you to write the item.</p></div>');
   flags.forEach(function(x){var r=el('<div class="flag '+(/Tier 1/.test(x.tier)?'t1':'')+'" style="display:flex;gap:10px;align-items:center"><span style="flex-grow:1">'+esc(x.label)+'</span><a href="#" class="small">Add</a></div>');$('a',r).onclick=function(ev){ev.preventDefault();var a=ans[x.id];fill({item:x.label,detail:(a&&a.a?'They said: '+a.a:'')+(a&&a.n?'\nIn their words: '+a.n:''),stage:c.current_stage||suStageGuess()})};an.appendChild(r)});
-  spec.steps.forEach(function(stp){stp.qs.forEach(function(q){var a=ans[q.id];if(!a||(!a.a&&!a.n))return;if(!qShows(q,ans))return;if(/^(0\.|A\.name|A\.phone)/.test(q.id))return;var decl=a.a===spec.discuss;var qt=q.q.replace(/\{NAME_CAP\}/g,pf+'’s').replace(/\{NAME_OBJ\}/g,pf).replace(/\{DOES\}/g,'Does '+pf).replace(/\{IS\}/g,'is '+pf);var det=ans[q.id+'d'];var r=el('<div class="ans" style="display:flex;gap:10px;align-items:flex-start;padding:8px 0"><div style="flex-grow:1"><div class="qq">'+esc(qt)+'</div><div class="aa'+(decl||a.a===spec.dk?' dk':'')+'" style="font-size:14px">'+esc(decl?'Declined — do not raise it unless they open it.':(a.a||'—'))+(det&&det.a?' — '+esc(det.a):'')+'</div>'+(a.n?'<div class="nn" style="font-size:13px"><b>In their words</b>'+esc(a.n)+'</div>':'')+'</div>'+(decl?'':'<a href="#" class="small" style="flex-shrink:0">Add</a>')+'</div>');var ad=$('a',r);if(ad)ad.onclick=function(ev){ev.preventDefault();fill({item:'',detail:qt+'\nThey said: '+(a.a||'—')+(det&&det.a?' — '+det.a:'')+(a.n?'\nIn their words: '+a.n:''),stage:c.current_stage||suStageGuess()})};an.appendChild(r)})});
+  spec.steps.forEach(function(stp){stp.qs.forEach(function(q){var a=ans[q.id];if(!a||(!a.a&&!a.n))return;if(!qShows(q,ans))return;if(/^(0\.|A\.name|A\.phone)/.test(q.id))return;var decl=a.a===spec.discuss;var qt=pipe3(q.q,ans);var det={a:qDet(ans,q.id)};var r=el('<div class="ans" style="display:flex;gap:10px;align-items:flex-start;padding:8px 0"><div style="flex-grow:1"><div class="qq">'+esc(qt)+'</div><div class="aa'+(decl||a.a===spec.dk?' dk':'')+'" style="font-size:14px">'+esc(decl?'Declined — do not raise it unless they open it.':(a.a||'—'))+(det&&det.a?' — '+esc(det.a):'')+'</div>'+(a.n?'<div class="nn" style="font-size:13px"><b>In their words</b>'+esc(a.n)+'</div>':'')+'</div>'+(decl?'':'<a href="#" class="small" style="flex-shrink:0">Add</a>')+'</div>');var ad=$('a',r);if(ad)ad.onclick=function(ev){ev.preventDefault();fill({item:'',detail:qt+'\nThey said: '+(a.a||'—')+(det&&det.a?' — '+det.a:'')+(a.n?'\nIn their words: '+a.n:''),stage:c.current_stage||suStageGuess()})};an.appendChild(r)})});
   side.appendChild(an);
   return w;
 }
@@ -2868,7 +2961,7 @@ function suPeople(){
   var hints=[];
   if(cs.name&&cs.relationship&&!/self/i.test(cs.relationship))hints.push({name:cs.name,rel:cs.relationship,why:'Signed the intake for '+pf+'.'});
   if(/^Yes/.test(suAns('A.2a'))&&suDet('A.2a'))hints.push({name:suDet('A.2a'),rel:'Stays the first nights',why:'Named as the person who could stay.'});
-  var drv=suAns('L.1');if(drv&&!/haven't sorted|\b(uber|lyft|taxi|cab|rideshare)\b/i.test(drv))hints.push({name:drv.slice(0,60),rel:'Drives home',why:'Named as the ride home.'});
+  var drv=suDriver();if(drv&&!/haven't sorted|\b(uber|lyft|taxi|cab|rideshare)\b/i.test(drv))hints.push({name:drv.slice(0,60),rel:'Drives home',why:'Named as the ride home.'});
   var f=el('<form class="card"><div class="k" style="margin-bottom:12px">Add to the inner circle</div><p class="small muted" style="margin:0 0 10px">Their own login, the same view as the patient. They get an email with a link.</p><div class="two"><div class="field"><label>Name</label><input name="name" required></div><div class="field"><label>Relationship</label><input name="relationship" placeholder="Spouse, daughter, friend"></div></div><div class="field"><label>Email</label><input name="email" type="email" required></div><button class="btn" type="submit">Add and email them</button><p class="err"></p></form>');
   f.onsubmit=function(ev){ev.preventDefault();var b=$('button',f);b.disabled=true;call('addInner',formData(f)).then(refresh).catch(function(e){$('.err',f).textContent=e.message;b.disabled=false})};
   left.appendChild(f);
