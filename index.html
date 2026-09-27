@@ -2396,7 +2396,8 @@ function assignGuidesEl(){
 // Spanish is a second column over the same questions: answers are stored in English (the rules read them), only the
 // words on the screen change. The emergency short path and the intake chrome are translated here; the long form
 // falls back to English line by line until each line has its Spanish.
-var ES={
+var ES={'Which hospital is the surgery at?':'¿En qué hospital será la cirugía?','Choose the hospital':'Elija el hospital','Somewhere else':'En otro lugar',"We don't know yet":'Todavía no lo sabemos','Which hospital, and which city?':'¿Qué hospital y en qué ciudad?','For the hospitals we know, this puts the campus map, parking, the entrance to use and help nearby on your plan.':'Para los hospitales que conocemos, esto pone en su plan el mapa del campus, el estacionamiento, la entrada que debe usar y la ayuda cercana.',
+
   'Before we start':'Antes de empezar','Two quick questions about how you want to do this.':'Dos preguntas rápidas sobre cómo quiere hacer esto.',
   "Who's filling this out?":'¿Quién está llenando esto?',"I'm the person having surgery":'Soy la persona que va a operarse',"I'm a family member or friend":'Soy familiar o amigo/a',"We're doing it together":'Lo estamos haciendo juntos',
   'How would you like to do this?':'¿Cómo prefiere hacerlo?','Quick — just the essentials, we will sort the details out when we talk':'Rápido — solo lo esencial; los detalles los vemos cuando hablemos','Thorough — ask me everything, I would rather get it right on paper':'Completo — pregúntenme todo; prefiero dejarlo bien por escrito','Let me decide as I go — I will go deep on the parts that matter to me':'Decido sobre la marcha — me detendré en lo que me importa',
@@ -2564,6 +2565,13 @@ function questionEl(q,redraw){
     q.opts.forEach(function(op){var b=el('<button type="button" aria-pressed="'+(sel.indexOf(op)>=0)+'" class="opt '+(multi?'box':'')+' '+(sel.indexOf(op)>=0?'on':'')+'"><i></i><span>'+esc(tr(op))+'</span></button>');b.onclick=function(){if(multi){var ex=function(x){return x==='No'||x==='None'||x===S.data.intakeSpec.dk};if(ex(op))sel=sel.indexOf(op)>=0?[]:[op];else{sel=sel.filter(function(x){return !ex(x)});var k=sel.indexOf(op);if(k>=0)sel.splice(k,1);else sel.push(op)}set(sel.join('; '))}else set(op);redraw()};o.appendChild(b)});
     c.appendChild(o);
     if(q.detailOn&&sel.indexOf(q.detailOn)>=0){var dd=S.ia[q.id+'d']||(S.ia[q.id+'d']={a:'',n:''});var di=el('<div class="detail"><label>'+esc(tr(q.detailLabel||'Detail'))+'</label><input aria-label="'+esc(q.detailLabel||'Detail')+'" value="'+esc(dd.a)+'"></div>');$('input',di).oninput=function(){dd.a=this.value};c.appendChild(di)}
+  } else if(q.type==='select'){
+    // A long list (the hospital question): a dropdown of the names, plus the way-out buttons below it.
+    var list=q.optsFrom==='hospitals'?(S.data.intakeSpec.hospitals||[]):(q.opts||[]),salts=q.alts||[];
+    var sl=el('<select aria-labelledby="'+lid+'"><option value="">'+esc(tr(q.ph||'Choose one'))+'</option>'+list.map(function(n){return '<option'+(a.a===n?' selected':'')+'>'+esc(n)+'</option>'}).join('')+'</select>');
+    sl.onchange=function(){set(this.value);redraw()};c.appendChild(sl);
+    var sal=el('<div class="alts"></div>');salts.forEach(function(x){var b=el('<button type="button" aria-pressed="'+(a.a===x)+'" class="alt '+(a.a===x?'on':'')+'">'+esc(tr(x))+'</button>');b.onclick=function(){set(a.a===x?'':x);redraw()};sal.appendChild(b)});c.appendChild(sal);
+    if(q.detailOn&&a.a===q.detailOn){var sd=S.ia[q.id+'d']||(S.ia[q.id+'d']={a:'',n:''});var sdi=el('<div class="detail"><label>'+esc(tr(q.detailLabel||'Detail'))+'</label><input aria-label="'+esc(q.detailLabel||'Detail')+'" value="'+esc(sd.a)+'"></div>');$('input',sdi).oninput=function(){sd.a=this.value};c.appendChild(sdi)}
   } else {
     var alts=q.alts||[],isAlt=alts.indexOf(a.a)>=0;
     var lab=' aria-labelledby="'+lid+'"',tel=q.id==='A.phone'?' type="tel" inputmode="tel" autocomplete="tel"':'';
