@@ -58,6 +58,34 @@ const TIMED = [
   { key: 'p10', anchor: 'ready', after: 10, window: 7, kind: 'notes', subject: 'Checking in', paras: [
     'This is Joe. We met about {patient} a couple of weeks ago and I wanted to check in myself.',
     'If you went another way, that is fine, and I hope it is going well. If things got busy, the plan is still there and one click opens it. And if you are not sure it is worth it, reply and tell me what is holding you back. I would rather hear it than guess.'], cta: 'Open my plan' },
+  // ---- keyed to the surgery date (2026-09-27). Negative = days before. hour: the local hour it goes out.
+  // These go to any family with a plan (released or paid), so the pre-op notes reach them even before they pay.
+  { key: 's-7', anchor: 'surgery', after: -7, window: 2, hour: 9, kind: 'notes', subject: 'One week out', paras: [
+    'One week. Here is the short list for the next seven days, in the order it matters.',
+    'Sort the ride home and a backup driver. Write the one-page medication list. Pick the one person who sends updates so you are not the switchboard. Fill the freezer. Write your questions down as they come.',
+    'The readiness checklist in the portal has the things that cancel surgeries on the day — fasting times, medication stop dates, the report time. Tick them off with the whole household.',
+    'If someone else is carrying the organizing, forward this to them.'], cta: 'Open the checklists', url: C.PORTAL_URL + '#plan' },
+  { key: 's-1', anchor: 'surgery', after: -1, window: 1, hour: 18, kind: 'notes', subject: 'For tonight', paras: [
+    'Tonight, pack the bag with your own hands, even if you packed it already. The lists are in the portal — one for {patient}, one for whoever is staying.',
+    'Then stop. The preparation is done. Get what sleep you can.'], cta: 'The packing lists', url: C.PORTAL_URL + '#plan' },
+  { key: 's0', anchor: 'surgery', after: 0, window: 1, hour: 6, kind: 'notes', subject: 'Today', paras: [
+    'Almost nothing is in your control now except staying steady. Bring the notebook. Ask who brings updates and when.',
+    'Breathe. Hug your people. We are here.'] },
+  { key: 's3', anchor: 'surgery', after: 3, window: 3, hour: 9, kind: 'notes', subject: 'Heading home', paras: [
+    'Before anyone leaves the hospital, three things written down: the exact medication schedule, who to call once home and at what number, and when the follow-ups are and who books them. The list is in the portal.',
+    'Set up one spot at home for the medications, the notebook, the discharge papers and a charger. Put the fridge sheet on the fridge.',
+    'Then upload the discharge papers in the portal, and we build the medication list from them.',
+    'You are doing this right, even when it does not feel like it.'], cta: 'Before you leave', url: C.PORTAL_URL + '#plan' },
+  { key: 's7', anchor: 'surgery', after: 7, window: 3, hour: 9, kind: 'notes', subject: 'A hundred small wins', paras: [
+    'A week in. Nobody claps for the walk to the mailbox, so I will. Every dose on time, every night slept, every day without a call to the hospital — those are the wins this week is made of.',
+    'A bad day is a day, not a trend. If something worries you, message us and we will get you to the right person.'], cta: 'Open the portal' },
+  { key: 's30', anchor: 'surgery', after: 30, window: 5, hour: 9, kind: 'notes', subject: 'The long middle', paras: [
+    'A month. This is when the casseroles stop and the fatigue sets in, and nobody warns you. It is normal, it passes, and it is easier with someone in your corner.',
+    'Never “by now you should.” Recovery is not a schedule. If the quiet stretch has you second-guessing, tell us the one thing you needed this week that you did not get.'], cta: 'Open the portal' },
+  { key: 's45c', anchor: 'surgery', after: 45, window: 5, hour: 9, kind: 'notes', to: 'family', subject: 'How are you holding up?', paras: [
+    'This one is for you, not for {patient}. Six weeks of carrying someone is a long time, and the people asking “how is {patient}?” rarely ask how you are.',
+    'So: how are you? Sleeping? Eating something that is not standing up at the counter? Has anyone taken a shift so you could leave the house?',
+    'Reply to this, or write it in your own check-in on the Home page — there is a caregiver version. Nothing you say there goes to {patient}.'], cta: 'Open the portal' },
   { key: 'wb', anchor: 'gone', after: 45, window: 14, kind: 'notes', subject: 'Checking in on {patient}', paras: [
     'It has been about six weeks. No pitch, I just wanted to ask how {patient} is doing.',
     'If things have gotten complicated again, a follow-up surgery, a new diagnosis, a caregiver who is worn down, the door is open. Reply here or call me and we will pick the plan up where it left off. Your first month back is on me.'] },
@@ -98,6 +126,7 @@ async function sendOnce(cl, key, kind, build, c) {
   let n = 0;
   for (const u of await familyUsers(cl.client_id)) {
     if (kind && !core.prefs(u)[kind]) continue;
+    if (build.to === 'family' && String(u.role).toLowerCase() !== 'family') continue;   // a note for the caregivers only
     const m = await build(u);
     if (!m) continue;
     await mail.sendMail(u.email, `${C.APP_NAME}: ${m.subject}`, mail.frame(m.html + mail.footer()));
@@ -122,8 +151,19 @@ async function timed(now) {
   const hour = hourIn(C.TZ, now);
   let sent = 0;
   const rows = await db.all(`select * from clients where status<>'Archived' and (paid_at is not null or plan_ready_at is not null or cancelled_at is not null)`);
+  const today = require('./util').ymd(now, C.TZ);
   for (const cl of rows) {
     for (const t of TIMED) {
+      if (t.anchor === 'surgery') {
+        // Day arithmetic on the local calendar date, so "the night before" is the evening before, not 24 hours before.
+        const sd = cl.surgery_date ? String(cl.surgery_date).slice(0, 10) : '';
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(sd) || cl.cancelled_at || !(isTrue(cl.paid) || cl.plan_ready_at)) continue;
+        const diff = Math.round((Date.parse(today) - Date.parse(sd)) / DAY);
+        if (diff < t.after || diff >= t.after + t.window || hour !== t.hour) continue;
+        const bl = u => letter(cl, u, t); bl.to = t.to;
+        if (await sendOnce(cl, t.key + ':' + sd, t.kind, bl)) sent++;   // keyed to the date, so a moved date sends again
+        continue;
+      }
       const at = t.anchor === 'paid' ? cl.paid_at : t.anchor === 'ready' ? cl.plan_ready_at : cl.cancelled_at;
       if (!at) continue;
       if (t.anchor === 'paid' && (!isTrue(cl.paid) || cl.cancelled_at)) continue;

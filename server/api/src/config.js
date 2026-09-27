@@ -13,7 +13,7 @@ module.exports = {
   LOCK_MINUTES: 15,
   SESSION_DAYS: Number(env.SESSION_DAYS || 30),
   IDLE_MINUTES: env.IDLE_MINUTES === undefined ? 30 : Number(env.IDLE_MINUTES),   // 30 minutes of inactivity signs you out (2026-09-25); 0 turns it off
-  STAGES: ['The diagnosis', 'Before surgery', 'The week of', 'Surgery day', 'The hospital stay', 'First weeks home', 'The long middle'],
+  STAGES: ['Diagnosis', 'The countdown', 'The last week', 'The day of surgery', 'At the hospital', 'In surgery', 'ICU', 'On the way home', 'Home', 'Recovery', 'Finding wisdom'],   // renamed 2026-09-27 (Joe's words); upgrade.js moves old rows
   CATEGORIES: ['Care coordination', 'Understanding & advocacy', 'Family & ongoing support'],
   PLAN_STATUSES: ['Not started', 'In progress', 'Done'],
   TASK_STATUSES: ['Not started', 'In progress', 'Done', 'Blocked'],
@@ -29,20 +29,23 @@ module.exports = {
   REFERRAL_STATUSES: ['Suggested', 'Contacted', 'In place', 'Not needed'],
   FIXED_ANSWERS: ['0.1', '0.1a', 'A.name', 'G.1', 'G.4'],
   NOTIFY_KINDS: { message: 'Messages', plan: 'Plan changes', booking: 'Booking confirmations', meds: 'Medication reminders', notes: 'Notes from Joe' },
-  CO_KINDS: { urgent: 'Urgent messages', missed: 'Missed-dose check-ins', billing: 'Declined cards and payment problems', bookingSoon: 'Bookings for today or tomorrow', message: 'Messages', booking: 'Bookings further out', upload: 'Uploads', meds: 'Medications to review', intake: 'Intake finished or changed', assist: 'Assistance asks and payments in' },
-  CO_DEFAULTS: { urgent: 'instant', missed: 'instant', billing: 'instant', bookingSoon: 'instant', message: 'digest', booking: 'digest', upload: 'digest', meds: 'digest', intake: 'digest', assist: 'digest' },
+  CO_KINDS: { urgent: 'Urgent messages', missed: 'Missed-dose check-ins', billing: 'Declined cards and payment problems', bookingSoon: 'Bookings for today or tomorrow', message: 'Messages', booking: 'Bookings further out', upload: 'Uploads', meds: 'Medications to review', intake: 'Intake finished or changed', assist: 'Assistance asks and payments in', comment: 'Circle comments to approve', quiet: 'A family gone quiet', medical: 'Medical questions', er: 'ER and 911 alerts', checkin: 'Low check-ins' },
+  CO_DEFAULTS: { urgent: 'instant', missed: 'instant', billing: 'instant', bookingSoon: 'instant', message: 'digest', booking: 'digest', upload: 'digest', meds: 'digest', intake: 'digest', assist: 'digest', comment: 'digest', quiet: 'instant', medical: 'instant', er: 'instant', checkin: 'instant' },
   MED_STATUSES: ['Pending review', 'Accepted', 'Stopped'],
   DOC_KINDS: ['Discharge', 'Insurance', 'Forms', 'Letters', 'Living will', 'Other'],
   DEFAULT_MONTHLY: 599,
-  BILL_STATUSES: ['Estimate', 'Due', 'Paid', 'Covered'],
+  BILL_STATUSES: ['Estimate', 'Due', 'Paid', 'Covered', 'Waiting on insurance', 'Needs prior auth', 'Looks like a duplicate', 'Disputed'],
   ASSIST_STATUSES: ['Suggested', 'Coordinator is on it', 'Applied', 'Approved', 'Not a fit'],
   AVATARS: ['#1C2A3A', '#C09B36', '#2F6B3A', '#7A2E2E', '#3B5B8C'],
   RES_KINDS: ['Video', 'Article', 'Guide', 'Checklist'],
   UPDATE_KINDS: ['Clinical', 'Faith', 'Family'],                 // the color of an update on the timeline
   RES_TRACKS: ['Open', 'Members'],
-  TOPIC_KINDS: { question: 'Question for {CO}', plan: 'About the plan', billing: 'Billing', urgent: 'Something urgent today', other: 'Something else', auto: 'Automated messages' },
+  TOPIC_KINDS: { question: 'Question for {CO}', plan: 'About the plan', billing: 'Billing', urgent: 'Something urgent today', medical: 'A medical question', other: 'Something else', auto: 'Automated messages' },
   MSG_KEEP: 150,
   TZ: env.TZ || 'America/Chicago',
+  CAPACITY: Number(env.CAPACITY || 12),            // families one coordinator can carry well; the In Basket shows the meter
+  QUIET: { from: Number(env.QUIET_FROM ?? 22), to: Number(env.QUIET_TO ?? 7) },   // family emails wait through the night and go out as one note at 7; from = to turns it off
+  QUIET_DAYS: 10,                                   // a paid family with no sign-in and no message for this long is flagged to the coordinator
   PORTAL_URL: env.PORTAL_URL || 'https://portal.incadencecare.com',
   API_URL: env.API_URL || '',                                // this service's own public address (for links in documents)
   ALLOWED_ORIGINS: (env.ALLOWED_ORIGINS || 'https://portal.incadencecare.com').split(',').map(s => s.trim()).filter(Boolean),

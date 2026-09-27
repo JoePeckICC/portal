@@ -4,6 +4,166 @@
 const db = require('./db');
 
 const STEPS = [
+  // ---- the Circle, grown up (2026-09-27): reactions, comments, ways to help
+  `create table if not exists update_reactions (
+     update_id text not null references updates(update_id) on delete cascade,
+     who       text not null,
+     kind      text not null,
+     at        timestamptz not null default now(),
+     primary key (update_id, who, kind)
+   )`,
+  `create table if not exists update_comments (
+     comment_id text primary key,
+     update_id  text not null references updates(update_id) on delete cascade,
+     client_id  text not null references clients(client_id) on delete cascade,
+     author     text not null default '',
+     email      text not null default '',
+     body       text not null default '',
+     status     text not null default 'Pending',
+     by_role    text not null default '',
+     at         timestamptz not null default now()
+   )`,
+  `create index if not exists update_comments_client_idx on update_comments(client_id, at)`,
+  `create table if not exists help_items (
+     item_id       text primary key,
+     client_id     text not null references clients(client_id) on delete cascade,
+     title         text not null,
+     detail        text not null default '',
+     when_text     text not null default '',
+     status        text not null default 'Open',
+     claimed_by    text not null default '',
+     claimed_email text not null default '',
+     claimed_at    timestamptz,
+     added_by      text not null default '',
+     added_at      timestamptz not null default now()
+   )`,
+  // ---- checklists: what each family has ticked (2026-09-27)
+  // stage names in Joe's words (2026-09-27): every row that carries a stage moves to the new name
+  ...[['The diagnosis','Diagnosis'],['Before surgery','The countdown'],['The week of','The last week'],['Surgery day','The day of surgery'],['The hospital stay','ICU'],['First weeks home','Home'],['The long middle','Recovery'],['Alumni','Finding wisdom']].flatMap(([o, n]) => [
+    `update clients set current_stage='${n}' where current_stage='${o}'`,
+    `update plan_items set stage='${n}' where stage='${o}'`,
+    `update updates set stage='${n}' where stage='${o}'`,
+    `update resources set stage='${n}' where stage='${o}'`,
+  ]),
+  `create table if not exists escalations (
+     esc_id     text primary key,
+     client_id  text not null references clients(client_id) on delete cascade,
+     at         timestamptz not null default now(),
+     by         text not null default '',
+     kind       text not null default '',
+     hospital   text not null default '',
+     what       text not null default '',
+     outcome    text not null default '',
+     outcome_by text not null default '',
+     outcome_at timestamptz
+   )`,
+  `create table if not exists checkins (
+     checkin_id text primary key,
+     client_id  text not null references clients(client_id) on delete cascade,
+     at         timestamptz not null default now(),
+     by         text not null default '',
+     role       text not null default '',
+     mood       integer,
+     pain       integer,
+     words      text not null default '',
+     caregiver  boolean not null default false
+   )`,
+  `create table if not exists symptoms (
+     symptom_id text primary key,
+     client_id  text not null references clients(client_id) on delete cascade,
+     at         timestamptz not null default now(),
+     by         text not null default '',
+     name       text not null default '',
+     severity   integer,
+     note       text not null default ''
+   )`,
+  `create table if not exists journal (
+     entry_id  text primary key,
+     client_id text not null references clients(client_id) on delete cascade,
+     by        text not null,
+     at        timestamptz not null default now(),
+     prompt    text not null default '',
+     body      text not null default ''
+   )`,
+  `create table if not exists coverage (
+     slot_id   text primary key,
+     client_id text not null references clients(client_id) on delete cascade,
+     day       date not null,
+     part      text not null,
+     kind      text not null default 'with',
+     who       text not null default '',
+     note      text not null default '',
+     added_by  text not null default '',
+     unique (client_id, day, part, kind)
+   )`,
+  `create table if not exists time_log (
+     log_id    text primary key,
+     client_id text not null references clients(client_id) on delete cascade,
+     at        timestamptz not null default now(),
+     by        text not null default '',
+     minutes   integer not null default 0,
+     what      text not null default ''
+   )`,
+  `create table if not exists hospital_walks (
+     walk_id    text primary key,
+     name       text not null default '',
+     address    text not null default '',
+     maps_url   text not null default '',
+     phone      text not null default '',
+     notes      text not null default '',
+     steps      jsonb not null default '[]',
+     updated_by text not null default '',
+     updated_at timestamptz not null default now()
+   )`,
+  `create table if not exists explainers (
+     key        text primary key,
+     title      text not null default '',
+     summary    text not null default '',
+     simpler    text not null default '',
+     figure     text not null default 'body',
+     parts      jsonb not null default '[]',
+     updated_by text not null default '',
+     updated_at timestamptz not null default now()
+   )`,
+  `create table if not exists hospital_facts (
+     fact_id     text primary key,
+     hospital    text not null,
+     state       text not null default '',
+     category    text not null default '',
+     topic       text not null default '',
+     detail      text not null default '',
+     source_url  text not null default '',
+     source_type text not null default '',
+     access_date text not null default '',
+     flag        text not null default '',
+     ok          boolean not null default false
+   )`,
+  `create index if not exists hospital_facts_h on hospital_facts(hospital)`,
+  `create table if not exists hospital_docs (doc_id text primary key, hospital text not null, type text not null default '', title text not null default '', url text not null default '', version text not null default '', notes text not null default '')`,
+  `create table if not exists hospital_verify (verify_id text primary key, hospital text not null, issue text not null default '', sources text not null default '', done boolean not null default false)`,
+  `create table if not exists outside_resources (res_id text primary key, name text not null, category text not null default '', area text not null default '', what text not null default '', eligibility text not null default '', contact text not null default '', source_url text not null default '', source_type text not null default '', access_date text not null default '', flag text not null default '')`,
+  `alter table hospital_walks add column if not exists state text not null default ''`,
+  `alter table hospital_walks add column if not exists city text not null default ''`,
+  `create table if not exists held_mail (
+     item_id    text primary key,
+     to_email   text not null,
+     kind       text not null default '',
+     subject    text not null default '',
+     lead       text not null default '',
+     body       text not null default '',
+     cta        text not null default '',
+     url        text not null default '',
+     created_at timestamptz not null default now(),
+     sent_at    timestamptz
+   )`,
+  `create table if not exists checklist_ticks (
+     client_id text not null references clients(client_id) on delete cascade,
+     list_id   text not null,
+     item_id   text not null,
+     done_at   timestamptz not null default now(),
+     done_by   text not null default '',
+     primary key (client_id, list_id, item_id)
+   )`,
   // ---- updates as a timeline: what kind of moment, a longer note behind "More", a verse or quote (2026-09-25)
   `alter table updates add column if not exists kind text not null default 'Family'`,
   `alter table updates add column if not exists detail text not null default ''`,
@@ -109,6 +269,8 @@ const STEPS = [
 
 async function run() {
   for (const sql of STEPS) await db.q(sql);
+  try { await require('./handlers/guides').seed(); } catch (e) { console.error('seed explainers', e.message); }
+  try { await require('./handlers/hospitals').seed(); } catch (e) { console.error('seed hospitals', e.message); }
 }
 
 module.exports = { run, STEPS };

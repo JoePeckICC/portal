@@ -1,6 +1,6 @@
 'use strict';
 // The one API the page talks to: POST /api  { session, action, payload }  ->  { ok, ... } | { ok:false, error }
-// Plus: GET /health (not /healthz: Google's front end swallows that path), GET /files/:uploadId (documents, session-checked), POST /stripe/webhook.
+// Plus: GET /maps/* (campus maps, public), GET /health (not /healthz: Google's front end swallows that path), GET /files/:uploadId (documents, session-checked), POST /stripe/webhook.
 const http = require('http');
 const C = require('./config');
 const db = require('./db');
@@ -25,13 +25,15 @@ function reqInfo(req) {
   return { ip: viaPortal || fwd || req.socket.remoteAddress || '', ua: req.headers['user-agent'] || '' };
 }
 
-// ---- session cookies (added 2026-09-24)
-// When the page calls through the portal's own address (portal.incadencecare.com/api, where the Cloudflare
-// worker adds X-Portal-Proxy), the session and remembered-device tokens travel in HttpOnly cookies that no
-// script on the page can read, instead of sitting in the page's localStorage. Calls made straight to this
-// service keep the old way (token in the body), so an older copy of the page keeps working during a rollout.
+// ---- session cookies (added 2026-09-24; direct from the page since 2026-09-25)
+// The page calls this service at its own address (api.incadencecare.com, straight to Google: nothing a family
+// types passes through Cloudflare) with { cookies: true } in the body, and the session and remembered-device
+// tokens travel in HttpOnly cookies that no script on the page can read. api.incadencecare.com and
+// portal.incadencecare.com are the same site, so SameSite=Strict cookies still go along. The older path
+// through the portal's worker (X-Portal-Proxy) is honored too, and a call with neither keeps the token in the body.
 const SES_COOKIE = '__Host-ic_s', DEV_COOKIE = '__Host-ic_d';
 const isProxied = req => req.headers['x-portal-proxy'] === '1';
+const cookieMode = (req, b) => isProxied(req) || (b && b.cookies === true);
 function readCookies(req) {
   const out = {};
   String(req.headers.cookie || '').split(';').forEach(p => {
@@ -76,7 +78,7 @@ function send(res, status, body, headers) {
 function cors(req, res) {
   const origin = req.headers.origin || '';
   if (C.ALLOWED_ORIGINS.includes(origin) || (process.env.NODE_ENV !== 'production' && /^http:\/\/localhost/.test(origin))) {
-    res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type'); res.setHeader('Access-Control-Max-Age', '600');
     return true;
   }
@@ -93,6 +95,8 @@ async function api(session, action, payload, req) {
     if (action === 'login') return await auth.login(payload, req, core.audit);
     if (action === 'verifyCode') return await auth.verifyCode(payload, req, core.audit);
     if (action === 'setPassword') return await auth.setPassword(payload, req, core.audit);
+    // The shared link: no sign-in. Everything here is read-limited to what the family chose to share.
+    if (/^public(Page|React|Comment|Claim)$/.test(action)) { try { const out = wire(await require('./handlers/circle')[action](payload, req)); out.ok = true; return out; } catch (err) { return { ok: false, error: err.expected ? err.message : 'This link is not active.' }; } }
     const user = await auth.userForSession(session);
     if (!user) return { ok: false, error: 'signed_out' };
     const ctx = core.ctxFor(user, payload.clientId);
@@ -131,6 +135,10 @@ async function api(session, action, payload, req) {
 async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   const info = reqInfo(req);
+  if (url.pathname.startsWith('/maps/') || url.pathname === '/maps') {   // campus maps: public OpenStreetMap data, see maps.js
+    if (url.pathname === '/maps') { res.writeHead(301, { Location: '/maps/' + url.search }); return res.end(); }
+    return require('./maps').serve(req, res, url);
+  }
   if (!cors(req, res)) return send(res, 403, { ok: false, error: 'Origin not allowed' });
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   if (url.pathname === '/health') { try { await db.q('select 1'); return send(res, 200, { ok: true }); } catch (e) { return send(res, 503, { ok: false }); } }
@@ -138,7 +146,7 @@ async function handle(req, res) {
   if ((url.pathname === '/api' || url.pathname === '/') && req.method === 'POST') {
     if ((await auth.bump('api:' + info.ip, 60)) > C.RATE.apiPerMin) return send(res, 429, { ok: false, error: 'Slow down a little and try again.' });
     let b; try { b = JSON.parse((await readBody(req)).toString('utf8') || '{}'); } catch (e) { return send(res, e.status || 400, { ok: false, error: e.status === 413 ? 'That is too large to send.' : 'Bad request' }); }
-    if (isProxied(req)) return send(res, 200, await proxiedApi(req, res, b, info));
+    if (cookieMode(req, b)) return send(res, 200, await proxiedApi(req, res, b, info));
     return send(res, 200, await api(b.session || null, b.action, b.payload, info));
   }
 
@@ -161,13 +169,28 @@ async function handle(req, res) {
 async function serveFile(req, res, url, info) {
   const uploadId = url.pathname.slice('/files/'.length).split('/')[0];
   let user = null;
-  const k = url.searchParams.get('k');
+  const k = url.searchParams.get('k'), share = url.searchParams.get('p');
+  // A photo on a shared update, opened through the family's link (no sign-in): only approved photos, only shared updates.
+  if (share) {
+    const circle = require('./handlers/circle');
+    const cl = await circle.clientByShare(share); if (!cl) return send(res, 404, { ok: false, error: 'Not found' });
+    const up = await db.one(`select * from updates where client_id=$1 and extra->>'photo'=$2`, [cl.client_id, uploadId]);
+    if (!up || !circle.photoVisible(up, 'public')) return send(res, 404, { ok: false, error: 'Not found' });
+    const u = await db.one(`select * from uploads where upload_id=$1 and client_id=$2`, [uploadId, cl.client_id]); if (!u || !u.storage_key) return send(res, 404, { ok: false, error: 'Not found' });
+    const bytes = await require('./storage').get(u.storage_key);
+    res.writeHead(200, { 'Content-Type': /^image\//.test(String(u.mime)) ? u.mime : 'application/octet-stream', 'Content-Length': bytes.length, 'Cache-Control': 'private, max-age=600', ...SEC }); return res.end(bytes);
+  }
   if (k) { const t = auth.parseToken(k, 'file'); if (t && t.extra === uploadId) user = await auth.findUser(t.email); }
   else user = await auth.userForSession(url.searchParams.get('s') || '');
   if (!user) return send(res, 401, { ok: false, error: 'signed_out' });
   const ctx = core.ctxFor(user, url.searchParams.get('c') || '');
   const u = await db.one(`select * from uploads where upload_id=$1`, [uploadId]);
-  if (!u || (ctx.role !== 'coordinator' && u.client_id !== ctx.clientId) || ctx.role === 'supporter') return send(res, 404, { ok: false, error: 'Not found' });
+  if (!u || (ctx.role !== 'coordinator' && u.client_id !== ctx.clientId)) return send(res, 404, { ok: false, error: 'Not found' });
+  if (ctx.role === 'supporter') {   // the Circle sees approved photos on shared updates, nothing else
+    const circle = require('./handlers/circle');
+    const up = await db.one(`select * from updates where client_id=$1 and extra->>'photo'=$2`, [ctx.clientId, uploadId]);
+    if (!up || !circle.photoVisible(up, 'supporter')) return send(res, 404, { ok: false, error: 'Not found' });
+  }
   if (ctx.role === 'family' && u.shared === false) return send(res, 404, { ok: false, error: 'Not found' });
   if (!u.storage_key) return send(res, 409, { ok: false, error: 'This file still lives in Drive; it moves over in the file migration.' });
   const bytes = await require('./storage').get(u.storage_key);

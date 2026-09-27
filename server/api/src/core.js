@@ -17,7 +17,7 @@ const fam = ctx => ctx.role === 'client' || ctx.role === 'family';
 // bodies, notes or answers. Every row also goes to Cloud Logging as a structured line, where a locked log
 // bucket keeps a copy nothing in this app can edit or delete.
 const AUDIT_SKIP = {};
-const AUDIT_KEYS = ['topicId', 'taskId', 'apptId', 'medId', 'uploadId', 'resourceId', 'goalId', 'memberId', 'referralId', 'billId', 'programId', 'planId', 'updateId', 'circleId', 'invoiceId', 'email', 'status', 'stage', 'kind', 'shared', 'urgent', 'what', 'amount'];
+const AUDIT_KEYS = ['topicId', 'taskId', 'listId', 'itemId', 'escId', 'hospital', 'symptomId', 'mood', 'pain', 'dueAt', 'minutes', 'day', 'part', 'entryId', 'logId', 'walkId', 'key', 'factId', 'verifyId', 'ok', 'done', 'done', 'release', 'records', 'apptId', 'medId', 'uploadId', 'resourceId', 'goalId', 'memberId', 'referralId', 'billId', 'programId', 'planId', 'updateId', 'circleId', 'invoiceId', 'email', 'status', 'stage', 'kind', 'shared', 'urgent', 'what', 'amount'];
 async function audit(ctx, action, payload, error, req) {
   try {
     if (!error && AUDIT_SKIP[action]) return;
@@ -134,8 +134,25 @@ async function notifyFamily(clientId, kind, subject, lead, body, cta, skip) {
   for (const u of users) {
     if (normEmail(u.email) === normEmail(skip)) continue;
     if (!prefs(u)[kind]) continue;
+    if (kind !== 'urgent' && inQuiet()) { try { await db.insert('held_mail', { item_id: id(), to_email: u.email, kind, subject, lead, body: body || '', cta: cta || '', url: '' }); continue; } catch (e) { /* fall through and send */ } }
     await mail.notify(u.email, subject, lead, body, cta);
   }
 }
+// Quiet hours: nothing routine reaches a family between 10 pm and 7 am. It waits in held_mail and goes out as one
+// "while you were sleeping" note at 7. Urgent things (a coordinator marking a message urgent) still go at once.
+function inQuiet(d) { const h = require('./util').hourIn(C.TZ, d); const q = C.QUIET; if (q.from === q.to) return false; return q.from > q.to ? (h >= q.from || h < q.to) : (h >= q.from && h < q.to); }
+async function flushHeld() {
+  if (inQuiet()) return { sent: 0 };
+  const rows = await db.all(`select * from held_mail where sent_at is null order by created_at`);
+  const by = {}; rows.forEach(r => { (by[r.to_email] = by[r.to_email] || []).push(r); });
+  let sent = 0;
+  for (const to of Object.keys(by)) {
+    const list = by[to];
+    const body = list.map(r => r.subject + '\n' + r.lead + (r.body ? '\n' + String(r.body).slice(0, 400) : '')).join('\n\n');
+    await mail.notify(to, list.length === 1 ? list[0].subject : list.length + ' things overnight', list.length === 1 ? list[0].lead : 'Nothing here needed you in the night. Here is what came in:', list.length === 1 ? list[0].body : body, 'Open the portal');
+    await db.q(`update held_mail set sent_at=now() where item_id = any($1)`, [list.map(r => r.item_id)]); sent++;
+  }
+  return { sent };
+}
 
-module.exports = { securityAlert, ctxFor, fam, audit, clientById, usersFor, coordinatorFor, publicClient, prefs, coSettings, docPublic, fileUrl, msgPublic, topicsFor, topicById, recentMessages, autoMsg, notifyCo, notifyFamily, must, esc, first, byAsc, byDesc };
+module.exports = { securityAlert, ctxFor, fam, audit, clientById, usersFor, coordinatorFor, publicClient, prefs, coSettings, docPublic, fileUrl, msgPublic, topicsFor, topicById, recentMessages, autoMsg, notifyCo, notifyFamily, inQuiet, flushHeld, must, esc, first, byAsc, byDesc };
