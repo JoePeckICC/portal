@@ -8,7 +8,10 @@ const { id, must, clean, pick, famName, first } = require('../util');
 
 const coOnly = ctx => must(ctx.role === 'coordinator', 'Not allowed');
 const famOrCo = ctx => must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
-const medPublic = m => ({ ...m, refills_left: m.refills_left == null ? '' : String(m.refills_left), next_refill: m.next_refill || '' });
+const APAP = /acetaminophen|tylenol|apap|percocet|vicodin|norco|lortab|hydrocodone.{0,12}acetaminophen|oxycodone.{0,12}acetaminophen|excedrin|nyquil|dayquil/i;
+const HIGH = /oxycodone|hydrocodone|morphine|hydromorphone|dilaudid|fentanyl|tramadol|codeine|warfarin|coumadin|eliquis|apixaban|xarelto|rivaroxaban|heparin|enoxaparin|lovenox|insulin|methotrexate|digoxin/i;
+// The family sees two flags: "contains acetaminophen" (count every source) and "high-alert" (a confirm before each tick). Computed from the name, never stored.
+const medPublic = m => ({ ...m, refills_left: m.refills_left == null ? '' : String(m.refills_left), next_refill: m.next_refill || '', extra: m.extra || {}, apap: APAP.test(m.name + ' ' + (m.instructions || '')), high: HIGH.test(m.name) });
 
 // Anything the family enters is Pending review until the coordinator accepts it.
 async function saveMed(ctx, p, c) {
@@ -22,6 +25,14 @@ async function saveMed(ctx, p, c) {
   const row = { name, dose: clean(p.dose, 120), instructions: clean(p.instructions, 500), prescriber: clean(p.prescriber, 120), frequency: freq, times: times.join(','), refills_left: Number.isFinite(refills) ? refills : null,
     next_refill: /^\d{4}-\d{2}-\d{2}$/.test(p.next_refill || '') ? p.next_refill : null, notes: clean(p.notes, 500), status: ctx.role === 'coordinator' ? 'Accepted' : 'Pending review', updated_by: ctx.email };
   const existing = p.medId ? await db.one(`select * from medications where client_id=$1 and med_id=$2`, [ctx.clientId, String(p.medId)], c) : null;
+  // extra (2026-09-27): taper steps (dose by date), the pre-op hold, the count on hand for the run-out date. Flags are computed, never stored.
+  const ex = { ...((existing && existing.extra) || {}) };
+  if (p.taper !== undefined) ex.taper = (Array.isArray(p.taper) ? p.taper : []).map(t => ({ from: String(t.from || ''), dose: clean(t.dose, 80).trim() })).filter(t => /^\d{4}-\d{2}-\d{2}$/.test(t.from) && t.dose).sort((a, b) => a.from < b.from ? -1 : 1).slice(0, 12);
+  if (p.hold_days !== undefined) { const h = parseInt(p.hold_days, 10); ex.hold_days = Number.isFinite(h) && h > 0 ? Math.min(h, 60) : null; }
+  if (p.expect !== undefined) ex.expect = clean(p.expect, 300);   // from the papers or the pharmacist: expected side effects
+  if (p.report !== undefined) ex.report = clean(p.report, 300);   // and the ones that mean call
+  if (p.qty !== undefined) { const q = parseInt(p.qty, 10); ex.qty = Number.isFinite(q) && q >= 0 ? q : null; ex.qty_at = ex.qty == null ? null : new Date().toISOString().slice(0, 10); }
+  row.extra = JSON.stringify(ex);
   let saved;
   if (existing) { if (ctx.role === 'coordinator' && existing.status === 'Stopped') row.status = 'Stopped'; saved = (await db.update('medications', { med_id: existing.med_id }, row, c))[0]; }
   else saved = await db.insert('medications', { ...row, med_id: id(), client_id: ctx.clientId, added_by: ctx.email }, c);
@@ -61,6 +72,28 @@ async function takeDose(ctx, p, c) {
   await db.q(`insert into doses (dose_id,client_id,med_id,due_at,status,taken_at,by) values ($1,$2,$3,$4,'Taken',now(),$5)
     on conflict (med_id,due_at) do update set status='Taken', taken_at=now(), by=excluded.by`, [id(), ctx.clientId, med.med_id, due, ctx.email], c);
   return {};
+}
+// A note on one dose: vomited after taking it, or skipped on purpose. Logged, never re-dosed by us — the team says what to do.
+async function doseNote(ctx, p, c) {
+  famOrCo(ctx);
+  must(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(p.dueAt || '')), 'Bad time');
+  const status = ['Vomited', 'Skipped', 'Taken'].indexOf(p.status) >= 0 ? p.status : 'Vomited';
+  const med = await db.one(`select * from medications where client_id=$1 and med_id=$2`, [ctx.clientId, String(p.medId || '')], c); must(med, 'Not found');
+  const due = localToIso(p.dueAt);
+  await db.q(`insert into doses (dose_id,client_id,med_id,due_at,status,taken_at,by) values ($1,$2,$3,$4,$5,now(),$6)
+    on conflict (med_id,due_at) do update set status=excluded.status, taken_at=now(), by=excluded.by`, [id(), ctx.clientId, med.med_id, due, status, ctx.email], c);
+  if (status === 'Vomited') await core.autoMsg(ctx.clientId, 'Vomited after ' + med.name + (med.dose ? ' ' + med.dose : '') + ' (' + String(p.dueAt).replace('T', ' at ') + '). Do not take it again unless the team says to — call the post-op line and ask.', c);
+  return {};
+}
+// A dose taken hours late: the rest of today's doses of that medication slide by the same amount, today only.
+async function shiftDoses(ctx, p, c) {
+  famOrCo(ctx);
+  const med = await db.one(`select * from medications where client_id=$1 and med_id=$2`, [ctx.clientId, String(p.medId || '')], c); must(med, 'Not found');
+  must(/^\d{4}-\d{2}-\d{2}$/.test(String(p.day || '')), 'Bad day');
+  const minutes = Math.max(-720, Math.min(720, parseInt(p.minutes, 10) || 0));
+  const ex = { ...(med.extra || {}) }; ex.shift = minutes ? { day: String(p.day), minutes, after: /^\d{2}:\d{2}$/.test(String(p.after || '')) ? String(p.after) : '' } : null;
+  await db.q(`update medications set extra=$2 where med_id=$1`, [med.med_id, JSON.stringify(ex)], c);
+  return { shift: ex.shift };
 }
 // A missed dose can ask the coordinator to check in.
 async function missedDose(ctx, p, c) {
@@ -112,5 +145,6 @@ function parseMeds(text) {
   return out;
 }
 
-module.exports = { saveMed, addMeds, setMedStatus, takeDose, missedDose, readDischarge };
+module.exports = { saveMed, addMeds, setMedStatus, takeDose, missedDose, readDischarge, doseNote, shiftDoses };
+Object.defineProperty(module.exports, 'medPublic', { value: medPublic, enumerable: false });
 Object.defineProperty(module.exports, 'parseMeds', { value: parseMeds, enumerable: false });   // helper, not an action

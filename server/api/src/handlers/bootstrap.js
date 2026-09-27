@@ -18,8 +18,16 @@ async function bootstrap(ctx) {
   let client = await core.clientById(ctx.clientId);
   must(client, 'No family on file for this account yet.');
   out.client = core.publicClient(client);
+  const CIRCLE = require('./circle');
+  const withPhoto = (rows, role) => rows.map(u => { const e = u.extra || {}; const o = { ...u, extra: undefined }; if (e.photo) { o.photo = CIRCLE.photoVisible(u, role) ? core.fileUrl(ctx, { upload_id: e.photo, storage_key: 'x' }) : ''; o.photo_ok = isTrue(e.photo_ok); o.sensitive = isTrue(e.sensitive); o.photo_id = e.photo; } return o; });
+  const ce = client.extra || {};
   if (ctx.role === 'supporter') {
-    out.updates = await db.all(`select * from updates where client_id=$1 and visible_to_circle order by posted_at desc`, [ctx.clientId]);
+    out.updates = withPhoto(await db.all(`select * from updates where client_id=$1 and visible_to_circle order by posted_at desc`, [ctx.clientId]), 'supporter');
+    out.tracker = ce.tracker || null; out.trackerSteps = CIRCLE.TRACKER; out.reactions = CIRCLE.REACTIONS; out.what_i_need = ce.what_i_need || '';
+    out.comments = await CIRCLE.commentsFor(ctx.clientId, true); out.reactionCounts = await CIRCLE.reactionsFor(ctx.clientId);
+    out.myReactions = await db.all(`select r.update_id, r.kind from update_reactions r join updates u on u.update_id=r.update_id where u.client_id=$1 and r.who=$2`, [ctx.clientId, ctx.email]);
+    out.help = await db.all(`select item_id, title, detail, when_text, status, claimed_by, claimed_email from help_items where client_id=$1 and status<>'Removed' order by added_at`, [ctx.clientId]);
+    out.fund_url = ce.fund_url || ''; out.fund_note = ce.fund_note || ''; out.theme = ce.theme || 'ink'; out.story = ce.story && ce.story.shared ? { title: ce.story.title, body: ce.story.body } : null;
     return out;
   }
   const billing = require('../billing');
@@ -58,11 +66,30 @@ async function bootstrap(ctx) {
   out.intake = await intake.readIntake(cid); out.intakeSpec = intake.intakeSpec();
   if (ctx.role === 'coordinator') out.intakeFlags = intake.intakeFlags(out.intake.answers);
   out.tasks = tasks; out.topics = topics;
+  out.updates = withPhoto(updates, ctx.role);
+  out.tracker = ce.tracker || null; out.trackerSteps = CIRCLE.TRACKER; out.reactions = CIRCLE.REACTIONS; out.what_i_need = ce.what_i_need || '';
+  out.share_token = CIRCLE.canAct(ctx) || ctx.role === 'family' ? (ce.share_token || '') : '';
+  out.comments = await CIRCLE.commentsFor(ctx.clientId, false); out.reactionCounts = await CIRCLE.reactionsFor(ctx.clientId);
+  out.myReactions = await db.all(`select r.update_id, r.kind from update_reactions r join updates u on u.update_id=r.update_id where u.client_id=$1 and r.who=$2`, [ctx.clientId, ctx.email]);
+  out.help = await db.all(`select item_id, title, detail, when_text, status, claimed_by, claimed_email from help_items where client_id=$1 and status<>'Removed' order by added_at`, [ctx.clientId]);
+  out.delegate = (await db.one(`select email from users where client_id=$1 and lower(role)='family' and active and (extra->>'delegate')='true' limit 1`, [ctx.clientId]) || {}).email || '';
+  out.restrictions = ce.restrictions || {}; out.restrictionKeys = require('./recovery').RESTRICTIONS; out.red_flags = ce.red_flags || ''; out.red_flags_who = ce.red_flags_who || ''; out.reason = ce.reason || ''; out.disaster = ce.disaster || null;
+  if (ctx.role === 'client' || ctx.role === 'coordinator' || ctx.role === 'family') out.icant = ce.icant ? { text: ctx.role === 'client' || ctx.role === 'coordinator' ? ce.icant.text : '', at: ce.icant.at } : null;
+  out.checkins = await db.all(`select checkin_id, at, by, role, mood, pain, words, caregiver from checkins where client_id=$1 and at > now() - interval '60 days' order by at desc`, [cid]);
+  out.symptoms = await db.all(`select symptom_id, at, by, name, severity, note from symptoms where client_id=$1 order by at desc limit 200`, [cid]);
+  out.doseDays = await db.all(`select to_char(due_at at time zone $2, 'YYYY-MM-DD') as day, count(*)::int as due, count(taken_at)::int taken from doses where client_id=$1 and due_at > now() - interval '45 days' and due_at < now() group by 1 order by 1`, [cid, C.TZ]);
+  const G = require('./guides'); Object.assign(out, await G.guidesFor(client)); if (ctx.role === 'coordinator') { out.walks = await G.walks(); out.explainerList = await G.explainers(); out.walk_id = ce.walk_id || ''; out.explainer_key = ce.explainer_key || ''; const H = require('./hospitals'); out.hospitalStats = await H.hospitalStats(); if (out.walk) out.hospital = await H.factsFor(out.walk.name, true); }
+  const ST = require('./story'); out.story = ce.story || null; out.theme = ce.theme || 'ink'; out.peer = ce.peer || null; out.discharge = ce.discharge || null; out.dischargeQs = ST.DISCHARGE; out.themes = ST.THEMES;
+  const FAM = require('./family'); out.journal = await FAM.journalFor(ctx); out.journalPrompts = FAM.PROMPTS; out.coverage = await FAM.coverageFor(cid); out.coverageParts = FAM.PARTS; out.fund_url = ce.fund_url || ''; out.fund_note = ce.fund_note || '';
+  if (ctx.role === 'coordinator') out.time = await FAM.timeFor(cid);
+  out.escalations = await require('./safety').escalationsFor(cid); out.escKinds = require('./safety').KINDS;
+  out.checklists = require('../checklists').CHECKLISTS;
+  out.ticks = await db.all(`select list_id, item_id, done_at, done_by from checklist_ticks where client_id=$1`, [cid]);
   const rm = await core.recentMessages(ctx); out.messages = rm.messages; if (rm.trimmed) out.msgTrimmed = true;
-  out.updates = updates; out.circle = circle;
+   out.circle = circle;
   const co = await core.coordinatorFor(client); out.coordinator = pubCo(co);
   const { apptPublic, localStamp } = require('../time');
-  out.appointments = appointments.map(apptPublic); out.goals = goals; out.careTeam = careTeam; out.meds = meds; out.vendorBills = vendorBills; out.assistance = assistance;
+  out.appointments = appointments.map(apptPublic); out.goals = goals; out.careTeam = careTeam; out.meds = meds.map(require('./meds').medPublic); out.vendorBills = vendorBills; out.assistance = assistance;
   out.allergies = client.allergies || '';
   if (ctx.role === 'coordinator') out.coSettings = await require('./coordinator').coSettingsPublic(ctx.user);
   else if (co) out.blockedDates = core.coSettings(co).blocked;

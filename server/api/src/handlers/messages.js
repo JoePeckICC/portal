@@ -6,6 +6,11 @@ const mail = require('../mail');
 const { id, must, clean, pick, famName, normEmail, EMAIL_RE, isTrue, first } = require('../util');
 
 // Topics: every conversation has one. Either side can open a topic; presets or a name of their own.
+// What the family reads the moment they open a medical question. We are not the doctors; we get them to the right one.
+const MEDICAL_LANE = cf => 'Before you type: we are not your doctors, and we will not guess at a medical answer. What we will do is help you get it from the right person, fast.\n\n' +
+  'Chest pain, trouble breathing, heavy bleeding, a new weakness on one side, confusion, a fever the discharge papers said to call about — call 911 or go to the ER now. Use “We’re headed to the ER” on your Home page and ' + cf + ' will call ahead.\n\n' +
+  'Thoughts of hurting yourself, or someone in the house is not safe — call or text 988.\n\n' +
+  'Everything else about the body — a symptom, a medication question, “is this normal?” — belongs to the surgeon’s office or the after-hours line. Write it here and ' + cf + ' will help you ask it well, and follow up if nobody calls back.';
 async function newTopic(ctx, p, c) {
   must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
   must(ctx.clientId, 'Pick a family first');
@@ -14,6 +19,7 @@ async function newTopic(ctx, p, c) {
   const title = kind === 'other' ? clean(p.title, 120).trim() : C.TOPIC_KINDS[kind].replace('{CO}', first(co && co.name) || 'your coordinator');
   must(title, 'Give the topic a name');
   const t = await db.insert('topics', { topic_id: id(), client_id: ctx.clientId, title, kind, status: 'Active', created_by: ctx.email }, c);
+  if (kind === 'medical') await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: t.topic_id, sender_email: 'system', body: MEDICAL_LANE(first(co && co.name) || 'Your coordinator'), read_by_client: true, read_by_coordinator: true }, c);
   return { topic: t };
 }
 
@@ -43,7 +49,7 @@ async function sendMessage(ctx, p, c) {
   const after = async () => {
     if (core.fam(ctx)) {
       const co = await core.coordinatorFor(client);
-      await core.notifyCo(co, urgent ? 'urgent' : 'message', (urgent ? 'URGENT — ' : '') + topic.title + ' — ' + famName(client.family_name).toLowerCase(), ctx.user.name + ' wrote in "' + topic.title + '":', body, 'Open the portal');
+      await core.notifyCo(co, urgent ? 'urgent' : topic.kind === 'medical' ? 'medical' : 'message', (urgent ? 'URGENT — ' : topic.kind === 'medical' ? 'Medical question — ' : '') + topic.title + ' — ' + famName(client.family_name).toLowerCase(), ctx.user.name + ' wrote in "' + topic.title + '":', body, 'Open the portal');
       await core.notifyFamily(ctx.clientId, 'message', topic.title + ' — ' + ctx.user.name + ' wrote', ctx.user.name + ' wrote in "' + topic.title + '":', body, 'Open the portal', ctx.email);
     } else {
       await core.notifyFamily(ctx.clientId, 'message', topic.title + ' — a note from ' + (ctx.user.name || 'your coordinator'), (ctx.user.name || 'Your coordinator') + ' wrote in "' + topic.title + '":', body, 'Open the portal', ctx.email);
@@ -74,8 +80,19 @@ async function postUpdate(ctx, p, c) {
   const title = clean(p.title, 200), body = clean(p.body, 4000);
   must(title.trim(), 'Give it a title');
   const visible = !!p.visible && isTrue(client.circle_enabled);
+  // A photo, re-encoded by the page (so nothing like location data rides along), approved by the coordinator before
+  // the Circle sees it. The coordinator's own photos are approved as posted.
+  let extra = null;
+  if (p.photo && p.photo.b64) {
+    const bytes = Buffer.from(String(p.photo.b64).replace(/^data:[^,]*,/, ''), 'base64');
+    must(bytes.length > 0 && bytes.length <= 4 * 1024 * 1024, 'That photo is too large');
+    must(bytes[0] === 0xFF && bytes[1] === 0xD8, 'Photos need to be JPEG');
+    const row = await require('../storage').saveUpload(ctx, { clientId: ctx.clientId, kind: 'Photos', name: clean(p.photo.name, 80) || 'photo.jpg', mime: 'image/jpeg', bytes, note: 'On an update', shared: true }, c);
+    extra = { photo: row.upload_id, photo_ok: ctx.role === 'coordinator', sensitive: isTrue(p.sensitive) };
+  }
   const u = await db.insert('updates', { update_id: id(), client_id: ctx.clientId, posted_by: ctx.email, stage: pick(p.stage, C.STAGES, client.current_stage || ''), title, body, visible_to_circle: visible,
-    kind: pick(p.kind, C.UPDATE_KINDS, 'Family'), detail: clean(p.detail, 4000), quote: clean(p.quote, 600), quote_ref: clean(p.quote_ref, 120) }, c);
+    kind: pick(p.kind, C.UPDATE_KINDS, 'Family'), detail: clean(p.detail, 4000), quote: clean(p.quote, 600), quote_ref: clean(p.quote_ref, 120), extra: extra ? JSON.stringify(extra) : null }, c);
+  if (extra && !extra.photo_ok) { const co = await core.coordinatorFor(client); if (co) await core.notifyCo(co, 'upload', 'A photo to approve — ' + famName(client.family_name), (ctx.user.name || ctx.email) + ' put a photo on “' + title + '”. The Circle sees it once you approve it.', '', 'Open Updates'); }
   const after = async () => {
     if (!visible) return;
     for (const s of await db.all(`select supporter_email from circle where client_id=$1 and status='Active'`, [ctx.clientId]))
@@ -91,6 +108,7 @@ async function addCircle(ctx, p, c) {
   must(isTrue(client.circle_enabled), 'The Circle is not turned on for this family yet. That happens once the sharing authorization is signed.');
   const email = normEmail(p.email), name = clean(p.name, 120), rel = clean(p.relationship, 120);
   must(EMAIL_RE.test(email), 'That email does not look right');
+  must(!(await db.one(`select 1 from circle where client_id=$1 and lower(supporter_email)=$2 and status='Blocked'`, [ctx.clientId, email], c)), 'That person was blocked from this Circle. Unblock them first if that has changed.');
   must(name.trim(), 'Add their name');
   const existing = await db.one(`select * from users where email=$1`, [email], c);
   must(!existing || (existing.role === 'supporter' && existing.client_id === ctx.clientId), 'That email is already in use on another account');

@@ -5,7 +5,7 @@ const core = require('../core');
 const auth = require('../auth');
 const mail = require('../mail');
 const intake = require('../intake');
-const { must, clean, pick, normEmail, EMAIL_RE, esc, first, famName } = require('../util');
+const { isTrue, must, clean, pick, normEmail, EMAIL_RE, esc, first, famName } = require('../util');
 
 async function saveProfile(ctx, p, c) {
   must(ctx.role === 'client' || ctx.role === 'coordinator', 'Only the patient can change this');
@@ -19,6 +19,15 @@ async function saveProfile(ctx, p, c) {
   if (p.goes_by !== undefined) patch.extra = JSON.stringify({ ...(cl.extra || {}), goes_by: clean(p.goes_by, 240) });
   must(String(patch.patient_first_name === undefined ? cl.patient_first_name : patch.patient_first_name).trim(), 'First name is needed');
   if (Object.keys(patch).length) await db.update('clients', { client_id: cl.client_id }, patch, c);
+  // The date moved and the coordinator chose "hold everything and shift": every dated plan item and task moves by the
+  // same number of days (added 2026-09-27). Appointments are real bookings and never move on their own.
+  if (patch.surgery_date && cl.surgery_date && isTrue(p.shiftPlan)) {
+    const was = String(cl.surgery_date).slice(0, 10), days = Math.round((Date.parse(patch.surgery_date) - Date.parse(was)) / 864e5);
+    if (days) {
+      await db.q(`update plan_items set target_date = target_date + $2::int, updated_at=now() where client_id=$1 and target_date is not null and status<>'Done'`, [cl.client_id, days], c);
+      await db.q(`update tasks set due_date = due_date + $2::int, updated_at=now() where client_id=$1 and due_date is not null and status<>'Done'`, [cl.client_id, days], c);
+    }
+  }
   if (p.my_name !== undefined && clean(p.my_name, 120).trim()) await db.q(`update users set name=$2 where email=$1`, [ctx.email, clean(p.my_name, 120).trim()], c);
   return { client: core.publicClient(await core.clientById(ctx.clientId, c)) };
 }

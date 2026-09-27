@@ -22,6 +22,7 @@ async function saveIntake(ctx, p, c) {
   clientOrCo(ctx); needFamily(ctx);
   const answers = p.answers || {}, ok = {};
   Object.keys(answers).forEach(qid => { if (/^[A-Z0-9][A-Za-z0-9.]{0,12}$/.test(qid)) ok[qid] = intake.tidyAnswer(qid, answers[qid]); });
+  if (answers._full && String(answers._full.a) === 'yes') ok._full = { a: 'yes', n: '' };   // emergency family circling back for the rest of the form
   const cur = await intake.readIntake(ctx.clientId, c);
   // After submitting, keep a running list of what changed (first value -> latest value), so the
   // coordinator gets one email listing it all when they press "Save my changes" (submitIntake).
@@ -200,6 +201,16 @@ async function addCareTeam(ctx, p, c) {
   const row = await db.insert('care_team', { member_id: id(), client_id: ctx.clientId, name, role: clean(p.role, 120), org: clean(p.org, 160), phone: clean(p.phone, 40), address: clean(p.address, 240), notes: clean(p.notes, 500), kind: p.kind === 'vendor' ? 'vendor' : 'provider', added_by: ctx.email, status: 'Active' }, c);
   return { member: row };
 }
+// Records per provider: one release each, then the records themselves. Coordinator only. Kept in extra.
+async function setProviderRecords(ctx, p, c) {
+  coOnly(ctx); needFamily(ctx);
+  const m = await db.one(`select * from care_team where client_id=$1 and member_id=$2`, [ctx.clientId, String(p.memberId || '')], c); must(m, 'Not found');
+  const extra = { ...(m.extra || {}) };
+  if (p.release !== undefined) extra.release_signed = isTrue(p.release) ? new Date().toISOString().slice(0, 10) : '';
+  if (p.records !== undefined) extra.records_received = isTrue(p.records) ? new Date().toISOString().slice(0, 10) : '';
+  await db.update('care_team', { client_id: ctx.clientId, member_id: m.member_id }, { extra: JSON.stringify(extra) }, c);
+  return { ok: true };
+}
 async function removeCareTeam(ctx, p, c) {
   famOrCo(ctx);
   const r = await db.update('care_team', { client_id: ctx.clientId, member_id: String(p.memberId || '') }, { status: 'Removed' }, c); must(r.length, 'Not found');
@@ -220,6 +231,16 @@ async function setReferralStatus(ctx, p, c) {
 }
 
 // ---- goals
+// A checklist tick, on or off. Family or coordinator. The lists themselves are fixed text (checklists.js).
+async function tickChecklist(ctx, p, c) {
+  famOrCo(ctx); needFamily(ctx);
+  const { CHECKLISTS } = require('../checklists');
+  const list = CHECKLISTS.filter(l => l.id === String(p.listId || ''))[0]; must(list, 'No such list');
+  const item = list.items.filter(i => i.id === String(p.itemId || ''))[0]; must(item, 'No such item');
+  if (isTrue(p.done)) await db.q(`insert into checklist_ticks (client_id,list_id,item_id,done_by) values ($1,$2,$3,$4) on conflict (client_id,list_id,item_id) do update set done_at=now(), done_by=excluded.done_by`, [ctx.clientId, list.id, item.id, ctx.email], c);
+  else await db.q(`delete from checklist_ticks where client_id=$1 and list_id=$2 and item_id=$3`, [ctx.clientId, list.id, item.id], c);
+  return { ok: true };
+}
 async function addGoal(ctx, p, c) {
   needFamily(ctx);
   const title = clean(p.title, 200); must(title.trim(), 'Write the goal');
@@ -233,4 +254,4 @@ async function setGoalStatus(ctx, p, c) {
 
 // Only handlers are exported from this file: everything here becomes a callable action.
 module.exports = { saveIntake, signConsent, submitIntake, setPlanReady, setPaid, approvePlanItem, addPlanItem, setPlanStatus, addTask, setTaskStatus, addAppointment, cancelAppointment,
-  addCareTeam, removeCareTeam, addReferral, setReferralStatus, addGoal, setGoalStatus, editPlanItem, editTask };
+  addCareTeam, removeCareTeam, addReferral, setReferralStatus, addGoal, setGoalStatus, editPlanItem, editTask, tickChecklist, setProviderRecords };
