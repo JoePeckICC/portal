@@ -37,6 +37,9 @@ const INTAKE_STEPS_ = [
       alts: ["We're still waiting to find out", DISCUSS_] },
     { id: 'G.4', q: 'What surgery is planned?', type: 'text', req: true, alts: ["We don't have a name for it yet"] },
     { id: 'G.6', em: true, q: 'Surgery date', type: 'date', req: true, alts: ['Not scheduled yet', 'This is an emergency, or it has already happened'] },
+    { id: 'G.6h', em: true, q: 'Which hospital is the surgery at?', type: 'select', req: true, optsFrom: 'hospitals', ph: 'Choose the hospital',
+      alts: ['Somewhere else', "We don't know yet"], detailOn: 'Somewhere else', detailLabel: 'Which hospital, and which city?',
+      why: 'For the hospitals we know, this puts the campus map, parking, the entrance to use and help nearby on your plan.' },
     { id: 'G.6a', em: true, q: 'Where are things right now?', type: 'choice', showIf: { id: 'G.6', is: ['This is an emergency, or it has already happened'] },
       opts: ['Still in surgery', 'In the ICU', 'On a regular floor', 'Discharge is being discussed', 'Already home'] },
     { id: 'G.6b', em: true, q: "What's the most pressing thing in the next 48 hours?", type: 'text', long: true, showIf: { id: 'G.6', is: ['This is an emergency, or it has already happened'] } },
@@ -94,4 +97,5 @@ const CONSENT_ITEMS_ = [
   ['In an emergency, call 911.', 'For mental health crisis support, call or text 988.']
 ];
 
-module.exports = { DK_, DISCUSS_, INTAKE_STEPS_, CONSENT_ITEMS_, intakeSpec: () => ({ steps: INTAKE_STEPS_, consent: CONSENT_ITEMS_, dk: DK_, discuss: DISCUSS_ }) };
+// hospitals: the names for the hospital question (G.6h), from the hospital list; the API fills them in (intake.specFor).
+module.exports = { DK_, DISCUSS_, INTAKE_STEPS_, CONSENT_ITEMS_, intakeSpec: (hospitals) => ({ steps: INTAKE_STEPS_, consent: CONSENT_ITEMS_, dk: DK_, discuss: DISCUSS_, hospitals: hospitals || [] }) };

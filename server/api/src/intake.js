@@ -186,4 +186,10 @@ async function seedPlan(clientId, answers, client, by, c) {
   return made;
 }
 
-module.exports = { intakeSpec, readIntake, writeIntake, visibleQs, emergencyPath, missingRequired, phoneOk, initialsProblem, tidyAnswer, ans, has, isPatient, intakeFlags, seedPlan, DK_, DISCUSS_ };
+// The intake form as the page gets it: the hospital question's list comes from the hospitals the coordinator keeps.
+async function specFor() {
+  let names = [];
+  try { names = (await db.all(`select name from hospital_walks order by name`)).map(r => r.name); } catch (e) {}
+  return intakeSpec(names);
+}
+module.exports = { specFor, intakeSpec, readIntake, writeIntake, visibleQs, emergencyPath, missingRequired, phoneOk, initialsProblem, tidyAnswer, ans, has, isPatient, intakeFlags, seedPlan, DK_, DISCUSS_ };
