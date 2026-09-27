@@ -1,0 +1,18 @@
+{
+ "hospitals": [
+  {
+   "name": "Vanderbilt University Hospital (VUMC)",
+   "map": "vumc",
+   "pin": "",
+   "state": "TN",
+   "city": "Nashville"
+  },
+  {
+   "name": "Monroe Carell Jr. Children's Hospital at Vanderbilt (pediatric)",
+   "map": "vumc",
+   "pin": "9",
+   "state": "TN",
+   "city": "Nashville"
+  }
+ ]
+}
