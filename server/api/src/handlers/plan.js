@@ -268,7 +268,7 @@ async function tickChecklist(ctx, p, c) {
 async function addGoal(ctx, p, c) {
   needFamily(ctx);
   const title = clean(p.title, 200); must(title.trim(), 'Write the goal');
-  const row = await db.insert('goals', { goal_id: id(), client_id: ctx.clientId, title, detail: clean(p.detail, 500), status: 'Active', added_by: ctx.email }, c);
+  const row = await db.insert('goals', { goal_id: id(), client_id: ctx.clientId, title, detail: clean(p.detail, 500), status: 'Active', added_by: ctx.email, extra: JSON.stringify(/^\d{4}-\d{2}-\d{2}$/.test(String(p.day || '')) ? { day: String(p.day) } : {}) }, c);   // day: the one goal for that day, on Home
   return { goal: row };
 }
 async function setGoalStatus(ctx, p, c) {
