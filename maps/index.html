@@ -15,7 +15,7 @@
 @font-face{font-family:Manrope;font-weight:800;font-display:swap;src:url(fonts/files/manrope-latin-800-normal.woff2) format('woff2')}
 :root{--ink:#1C2A3A;--gold:#C09B36;--ground:#E4E9EE;--line:#D3DAE1;--muted:#5B6470;--panel:#FFFFFF;--tint:#F0E7CF}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--ground);color:var(--ink);font-family:Manrope,system-ui,sans-serif}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--ground);color:var(--ink);font-family:Manrope,system-ui,sans-serif}
 #map{position:absolute;inset:0}
 .top{position:absolute;left:12px;right:12px;top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;pointer-events:none;z-index:2}
 .top>*{pointer-events:auto}
@@ -96,7 +96,8 @@ function start(H){
   document.title = H.name + ' — campus map';
   document.getElementById('title').innerHTML = esc(H.name) + '<small>' + esc(H.subtitle || 'Tap a pin for the entrance and what to expect') + '</small>';
   var b = H.bounds, pad = 0.004;   // the file holds the whole cut area; the map will not wander off it
-  var map = new maplibregl.Map({ container:'map', style: styleFor(new URL(H.tiles, location.href).href), bounds: H.view || b, maxBounds:[[b[0]-pad,b[1]-pad],[b[2]+pad,b[3]+pad]], minZoom:13, maxZoom:19, attributionControl:{compact:false}, cooperativeGestures:false, dragRotate:false, pitchWithRotate:false });
+  var map = new maplibregl.Map({ container:'map', style: styleFor(new URL(H.tiles, location.href).href), bounds: H.view || b, maxBounds:[[b[0]-pad,b[1]-pad],[b[2]+pad,b[3]+pad]], minZoom:13, maxZoom:19, attributionControl:{compact:false}, cooperativeGestures: window.self !== window.top,   // inside the portal page, a plain scroll scrolls the page; ctrl/two fingers move the map
+     dragRotate:false, pitchWithRotate:false });
   map.touchZoomRotate.disableRotation();
   map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'bottom-right');
   map.addControl(new maplibregl.GeolocateControl({positionOptions:{enableHighAccuracy:true}, trackUserLocation:true}), 'bottom-right');
@@ -133,7 +134,7 @@ function start(H){
     var photos = (p.photos || []).map(function(ph){ return '<figure style="margin:0"><img src="' + esc(ph.src) + '" alt="' + esc(ph.caption||'') + '" loading="lazy"></figure>'; }).join('');
     card.innerHTML = '<button class="x" type="button" aria-label="Close">×</button><div class="k">' + esc(KIND1[p.kind] || 'Place') + (p.label ? ' ' + esc(p.kind==='parking' ? p.label : p.label) : '') + '</div><h2>' + esc(p.name) + '</h2>' +
       (p.note ? '<div class="note">' + esc(p.note) + '</div>' : '') + (p.flag ? '<div class="warn">' + esc(p.flag) + '</div>' : '') +
-      (photos ? '<div class="photos">' + photos + '</div>' : '<div class="soon">Our own photos of this entrance — the walk from the car to the door — go here.</div>');
+      (photos ? '<div class="photos">' + photos + '</div>' : '');
     card.querySelector('.x').onclick = function(){ choose(null); };
     card.classList.add('open');
     if (fly || !map.getBounds().contains(p.lngLat)) map.easeTo({center:p.lngLat, zoom:Math.max(map.getZoom(), 17), duration: fly ? 0 : 400});
