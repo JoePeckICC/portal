@@ -20,6 +20,17 @@ const { localToIso } = require('../time');
 // has not set hours shows every time, and can say they can't make it, as before.
 const HM = /^([01]\d|2[0-3]):[0-5]\d$/, DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MEET = { phone: 'phone call', 'in person': 'in person' };
+// Not every kind of help fits a clock time (2026-09-28, Joe). Meals, help at home and equipment are asked for by how
+// soon; lodging by check-in and check-out days. starts_at still holds a date (the "needed by", or the check-in) so
+// everything sorts and shows on calendars the same way.
+const SOON = { asap: ['As soon as possible', 0], days: ['In the next few days', 3], week: ['This week', 6], flex: ['No rush', 14] };
+const dayTxt = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
+function whenLabel(j, long) {
+  const x = j.extra || {};
+  if (x.soon && SOON[x.soon]) return 'needed ' + SOON[x.soon][0].toLowerCase();
+  if (x.until) return 'check in ' + dayTxt(x.from || require('../time').localStamp(j.starts_at).slice(0, 10)) + ', check out ' + dayTxt(x.until);
+  return new Date(j.starts_at).toLocaleString('en-US', { timeZone: C.TZ, weekday: long ? 'long' : 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
 const meetTxt = m => 'meet first (' + MEET[m] + ')';
 function normHours(h) {
   h = h || {}; const week = [];
@@ -68,7 +79,7 @@ const link = () => C.PORTAL_URL;
 async function vendorFor(ctx, c) { const vid = ctx.user && ctx.user.extra && ctx.user.extra.vendor_id; const v = vid ? await db.one(`select * from vendors where vendor_id=$1 and active`, [vid], c) : null; must(v, 'Your vendor account is not active. Ask your coordinator.'); return v; }
 // Reach a vendor where they are: a text if we have their cell, and an email as well.
 async function tellVendor(v, subject, text) { if (v.phone) await sms.send(v.phone, text); if (v.email) await mail.notify(v.email, subject, text, '', 'Open the portal'); }
-const jobPublicOpen = (j, cl) => ({ job_id: j.job_id, service: j.service, meet: (j.extra && j.extra.meet) || '', starts_at: j.starts_at, city: j.city, details: j.details, status: j.status, first_name: first(cl && cl.patient_first_name) || '', for_me: !!(j.extra && j.extra.for_vendor), family: j.extra && j.extra.for_vendor ? famName(cl && cl.family_name) : undefined });
+const jobPublicOpen = (j, cl) => ({ job_id: j.job_id, service: j.service, meet: (j.extra && j.extra.meet) || '', soon: (j.extra && j.extra.soon) || '', until: (j.extra && j.extra.until) || '', from: (j.extra && j.extra.from) || '', starts_at: j.starts_at, city: j.city, details: j.details, status: j.status, first_name: first(cl && cl.patient_first_name) || '', for_me: !!(j.extra && j.extra.for_vendor), family: j.extra && j.extra.for_vendor ? famName(cl && cl.family_name) : undefined });
 const jobPublicMine = (j, cl) => ({ ...jobPublicOpen(j, cl), family: famName(cl && cl.family_name), address: j.address, taken_at: j.taken_at, done_at: j.done_at, topic_id: (j.extra && j.extra.topic_id) || '' });
 
 // ---- the coordinator: invite a vendor from the list to sign in
@@ -91,7 +102,12 @@ async function inviteVendor(ctx, p, c) {
 async function requestJob(ctx, p, c) {
   must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed'); must(ctx.clientId, 'Pick a family first');
   const service = SERVICES.includes(p.service) ? p.service : 'Other';
-  const when = new Date(p.startsAt); must(!isNaN(when), 'When do you need it?'); must(when > new Date(Date.now() - 3600e3), 'Pick a time that has not passed');
+  const soon = !p.topicId && SOON[p.soon] ? p.soon : '';
+  const stay = !p.topicId && DAY.test(String(p.from || '')) && DAY.test(String(p.until || '')) ? { from: String(p.from), until: String(p.until) } : null;
+  if (stay) { const today = require('../time').localStamp(new Date()).slice(0, 10); must(stay.from >= today, 'Pick a check-in day that has not passed'); must(stay.until > stay.from, 'Check-out has to be after check-in'); }
+  const when = soon ? new Date(Date.now() + SOON[soon][1] * 86400e3) : stay ? new Date(localToIso(stay.from + 'T15:00')) : new Date(p.startsAt);
+  must(!isNaN(when), 'When do you need it?'); must(soon || stay || when > new Date(Date.now() - 3600e3), 'Pick a time that has not passed');
+  const timing = soon ? { soon } : stay ? stay : {};
   const client = await core.clientById(ctx.clientId, c), place = cityOf(client);
   // Asked from a conversation with a vendor: it goes to that vendor alone, and lives in that same thread.
   const vt = p.topicId ? await db.one(`select * from topics where client_id=$1 and topic_id=$2 and kind='vendor'`, [ctx.clientId, String(p.topicId)], c) : null;
@@ -101,7 +117,7 @@ async function requestJob(ctx, p, c) {
   if (direct) { const ok = await openTimes(direct, localStampDay(when), c); must(ok === null || ok.some(d => d.getTime() === when.getTime()), first(direct.name) + ' is not free then. Pick another time.'); }
   const svc = direct ? direct.service : service;
   const city = direct ? direct.city : (clean(p.city, 60).trim() || place.city); must(city, 'Which town is it in?');
-  const j = await db.insert('jobs', { job_id: id(), client_id: ctx.clientId, service: svc, city, state: direct ? direct.state : (clean(p.state, 4).toUpperCase() || place.state), starts_at: when, details: clean(p.details, 600), address: clean(p.address, 200).trim() || client.address || '', status: 'Open', created_by: ctx.email, extra: JSON.stringify(direct ? { for_vendor: direct.vendor_id, topic_id: vt.topic_id, ...(meet ? { meet } : {}) } : {}) }, c);
+  const j = await db.insert('jobs', { job_id: id(), client_id: ctx.clientId, service: svc, city, state: direct ? direct.state : (clean(p.state, 4).toUpperCase() || place.state), starts_at: when, details: clean(p.details, 600), address: clean(p.address, 200).trim() || client.address || '', status: 'Open', created_by: ctx.email, extra: JSON.stringify(direct ? { for_vendor: direct.vendor_id, topic_id: vt.topic_id, ...(meet ? { meet } : {}) } : timing) }, c);
   if (direct) {
     const whenTxt0 = when.toLocaleString('en-US', { timeZone: C.TZ, weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: vt.topic_id, sender_email: 'system', body: 'Asked ' + direct.name + (meet ? ' to ' + meetTxt(meet) : ' for ' + svc.toLowerCase()) + ', ' + whenTxt0 + (j.details ? ': ' + j.details : '') + '. Waiting for them to confirm.', read_by_client: true, read_by_coordinator: true }, c);
@@ -110,7 +126,7 @@ async function requestJob(ctx, p, c) {
   }
   const after = async () => {
     const vs = await db.all(`select v.* from vendors v join users u on lower(u.role)='vendor' and u.active and u.extra->>'vendor_id'=v.vendor_id where v.active and lower(v.city)=lower($1) and v.service=$2 and ($3='' or v.state='' or v.state=$3)`, [city, svc, j.state]);
-    const whenTxt = when.toLocaleString('en-US', { timeZone: C.TZ, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const whenTxt = whenLabel({ starts_at: when, extra: timing });
     for (const v of vs) await tellVendor(v, 'New job: ' + service + ' in ' + city, C.APP_NAME + ' — new job: ' + service.toLowerCase() + ', ' + whenTxt + ', ' + city + '. First to take it has it: ' + link());
     const co = await core.coordinatorFor(client);
     await core.notifyCo(co, 'message', service + ' requested — ' + famName(client.family_name), (ctx.user.name || 'The family') + ' asked for ' + service.toLowerCase() + ', ' + whenTxt + '. ' + (vs.length ? vs.length + ' vendor' + (vs.length === 1 ? ' was' : 's were') + ' told.' : 'No vendor in ' + city + ' offers it yet — it needs you.'), j.details, 'Open the chart');
@@ -140,7 +156,7 @@ async function takeJob(ctx, p, c) {
   const r = await db.q(`update jobs set status='Taken', vendor_id=$2, taken_at=now() where job_id=$1 and status='Open' and (extra->>'for_vendor'=$2 or (coalesce(extra->>'for_vendor','')='' and lower(city)=lower($3) and service=$4)) returning *`, [String(p.jobId || ''), v.vendor_id, v.city, v.service], c);
   const j = r.rows ? r.rows[0] : r[0]; must(j, 'Someone else already took this one.');
   const client = await core.clientById(j.client_id, c);
-  const whenTxt = new Date(j.starts_at).toLocaleString('en-US', { timeZone: C.TZ, weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const whenTxt = whenLabel(j, true);
   if (j.extra && j.extra.topic_id) {   // asked from their conversation: confirm it there
     await db.insert('messages', { message_id: id(), client_id: j.client_id, topic_id: j.extra.topic_id, sender_email: 'system', body: v.name + ' confirmed: ' + (j.extra.meet ? meetTxt(j.extra.meet) : j.service.toLowerCase()) + ', ' + whenTxt + '.', read_by_client: false, read_by_coordinator: true }, c);
     await db.q(`update topics set last_at=now() where topic_id=$1`, [j.extra.topic_id], c);
@@ -158,7 +174,7 @@ async function passJob(ctx, p, c) {
   must(ctx.role === 'vendor', 'Not allowed'); const v = await vendorFor(ctx, c);
   const j = await db.one(`select * from jobs where job_id=$1 and status='Open' and extra->>'for_vendor'=$2`, [String(p.jobId || ''), v.vendor_id], c); must(j, 'Not found');
   await db.q(`update jobs set status='Declined' where job_id=$1`, [j.job_id], c);
-  const whenTxt = new Date(j.starts_at).toLocaleString('en-US', { timeZone: C.TZ, weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const whenTxt = whenLabel(j, true);
   if (j.extra && j.extra.topic_id) await db.insert('messages', { message_id: id(), client_id: j.client_id, topic_id: j.extra.topic_id, sender_email: 'system', body: v.name + ' can’t make ' + whenTxt + '. Try another time, or ask for help on Find Care.', read_by_client: false, read_by_coordinator: true }, c);
   return { _after: () => core.notifyFamily(j.client_id, 'message', v.name + ' can’t make that time', v.name + ' can’t make ' + whenTxt + '.', '', 'Open the portal') };
 }
@@ -188,7 +204,7 @@ async function vendorBoot(ctx, out) {
 // Jobs for a family's own pages (and the coordinator's view of that family).
 async function jobsFor(clientId) {
   const rows = await db.all(`select j.*, v.name as vendor_name, v.phone as vendor_phone from jobs j left join vendors v on v.vendor_id=coalesce(j.vendor_id, j.extra->>'for_vendor') where j.client_id=$1 and j.status <> 'Cancelled' order by j.starts_at desc limit 40`, [clientId]);
-  return rows.map(j => ({ job_id: j.job_id, service: j.service, meet: (j.extra && j.extra.meet) || '', starts_at: j.starts_at, city: j.city, details: j.details, status: j.status, vendor_name: j.vendor_name || '', direct: !!(j.extra && j.extra.for_vendor), topic_id: (j.extra && j.extra.topic_id) || '', taken_at: j.taken_at, done_at: j.done_at }));
+  return rows.map(j => ({ job_id: j.job_id, service: j.service, meet: (j.extra && j.extra.meet) || '', soon: (j.extra && j.extra.soon) || '', until: (j.extra && j.extra.until) || '', from: (j.extra && j.extra.from) || '', address: j.address || '', starts_at: j.starts_at, city: j.city, details: j.details, status: j.status, vendor_name: j.vendor_name || '', direct: !!(j.extra && j.extra.for_vendor), topic_id: (j.extra && j.extra.topic_id) || '', taken_at: j.taken_at, done_at: j.done_at }));
 }
 // Only handlers are enumerable: everything enumerable here becomes a callable action.
 module.exports = { inviteVendor, requestJob, saveCareNote, cancelJob, takeJob, passJob, finishJob, saveHours, vendorTimes };
