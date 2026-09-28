@@ -347,6 +347,33 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   assert.match((await api(coord, 'lendEquipment', { equipId: eq.item.equip_id, clientId: 'x' })).error, /already out/);
   { const r = await api(coord, 'returnEquipment', { equipId: eq.item.equip_id }); assert.equal(r.ok, true, r.error); }
   assert.equal((await api(pat, 'bootstrap', {})).borrowed.length, 0); assert.equal(pj.find(j => j.job_id === meal.job.job_id).soon, 'week'); assert.equal(pj.find(j => j.job_id === stay.job.job_id).from, ci);
+  // what they do: Sarah only walks, so she can't be booked for a ride; once she ticks rides too, she can, and ride requests reach her
+  const at = localToIso(day2 + 'T10:00');
+  const nr = await api(pat, 'requestJob', { topicId: vt.topic_id, startsAt: at, service: 'Rides' });
+  assert.equal(nr.ok, true, nr.error); assert.equal(nr.job.service, 'Pet care', 'booked only for what she does');
+  await api(pat, 'cancelJob', { jobId: nr.job.job_id });
+  assert.equal((await api(pat, 'saveServices', { services: ['Rides'] })).error, 'Not allowed');
+  assert.match((await api(sarah, 'saveServices', { services: ['Medical equipment'] })).error, /at least one/);
+  { const r = await api(sarah, 'saveServices', { services: ['Pet care', 'Rides', 'Medical equipment'] }); assert.equal(r.ok, true, r.error); assert.deepEqual(r.services, ['Rides', 'Pet care']); }
+  assert.deepEqual((await api(pat, 'bootstrap', {})).topics.find(t => t.topic_id === vt.topic_id).extra.vendor_services, ['Rides', 'Pet care']);
+  const r2 = await api(pat, 'requestJob', { topicId: vt.topic_id, startsAt: at, service: 'Rides' }); assert.equal(r2.job.service, 'Rides');
+  await api(pat, 'cancelJob', { jobId: r2.job.job_id });
+  const n4 = sms.sent.length;
+  const openRide = await api(pat, 'requestJob', { service: 'Rides', startsAt: localToIso(day2 + 'T13:00') }); assert.equal(openRide.ok, true, openRide.error);
+  assert.deepEqual(sms.sent.slice(n4).map(x => x.to), ['+16155550199'], 'Sarah hears about rides now; Paws does not');
+  assert.ok(!(await api(paws, 'bootstrap', {})).openJobs.some(x => x.job_id === openRide.job.job_id));
+  { const r = await api(sarah, 'takeJob', { jobId: openRide.job.job_id }); assert.equal(r.ok, true, r.error); }
+  assert.deepEqual((await api(sarah, 'bootstrap', {})).vendor.services, ['Rides', 'Pet care']);
+  // the family's pets: from intake first (the names they gave), then their own saved list
+  await db.q(`delete from intake_answers where client_id='c1' and question_id in ('M.4','M.4p','M.4g')`);
+  await db.q(`insert into intake_answers (client_id, question_id, answer) values ('c1','M.4','Dog; Cat'),('c1','M.4p','Biscuit (dog), Pepper (cat) and Moose'),('c1','M.4g','Pulls on the leash')`);
+  assert.deepEqual((await api(pat, 'bootstrap', {})).pets.map(q => [q.name, q.kind, q.notes]), [['Biscuit', 'Dog', 'Pulls on the leash'], ['Pepper', 'Cat', ''], ['Moose', 'Other', '']]);
+  { const r = await api(pat, 'savePets', { pets: [{ name: 'Biscuit', kind: 'Dog', notes: 'Pulls on the leash' }, { name: '', kind: 'Cat' }] }); assert.equal(r.ok, true, r.error); assert.equal(r.pets.length, 1); assert.ok(r.pets[0].id); }
+  assert.equal((await api(sarah, 'savePets', { pets: [] })).error, 'Not allowed');
+  const pets = (await api(pat, 'bootstrap', {})).pets; assert.equal(pets[0].name, 'Biscuit');
+  const pw = await api(pat, 'requestJob', { topicId: vt.topic_id, startsAt: localToIso(day2 + 'T16:00'), service: 'Pet care', info: [{ l: 'Pets', v: 'Biscuit (dog) — Pulls on the leash' }] });
+  assert.equal(pw.ok, true, pw.error);
+  assert.equal((await api(sarah, 'bootstrap', {})).openJobs.find(x => x.job_id === pw.job.job_id).info[0].v, 'Biscuit (dog) — Pulls on the leash', 'she sees the dog');
 });
 
 test('supporters only get updates', async () => {
