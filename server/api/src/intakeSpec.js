@@ -95,7 +95,7 @@ const MOBILITY = { any: [has('I.3', 'No bending, lifting, or twisting', 'Dizzine
 
 const INTAKE_STEPS_ = [
   // ---------------------------------------------------------------- Section 0
-  { id: '0', title: "Who's filling this out", lead: 'Two quick questions about how you want to do this.', qs: [
+  { id: '0', title: "Who's filling this out", lead: 'A few quick questions about how you want to do this.', qs: [
     ch('0.1', "Who's filling this out?", ["I'm the person having surgery", "I'm a family member or friend", "We're doing it together"], { req: true, em: true, nodk: true, quick: true }),
     ch('0.1a', 'How would you like to do this?', ["Quick — just the essentials, we'll sort the details out when we talk", "Thorough — ask me everything, I'd rather get it right on paper", "Let me decide as I go — I'll go deep on the parts that matter to me"],
       { req: true, nodk: true, quick: true, why: "There's no right answer. Some people want to spell everything out; others would rather hand it over. Both work fine for us, and you can change your mind at any point." }),
@@ -104,14 +104,12 @@ const INTAKE_STEPS_ = [
     ch('0.3', 'May we talk with them directly about arrangements?', ['Yes, anything', 'Only certain things', "I'd rather you go through me"],
       { when: all(role('patient'), is('0.2', 'Yes')), details: { 'Only certain things': 'Which things?' } }),
     lt('0.4', "Is there anything you'd rather we didn't discuss with your family?", { when: role('patient'), tier: 3 }),
-    ch('0.5', "Does {NAME} know you're filling this out?", ['Yes', 'Not yet'],
-      { when: role('family'), quick: true, why: "If not yet: we'd just want to loop them in before we contact them directly." }),
     ch('0.6', 'When we need to reach someone, who should we start with?', ['Either of us', '{NAME}', 'The family member'], { when: role('together') }),
   ] },
   // ---------------------------------------------------------------- Section A
   { id: 'A', title: 'About {NAME}', lead: 'The basics we need before anything else.', catchAll: false, qs: [
     tx('A.name', "{NAME_CAP_S} legal name", { req: true, em: true, quick: true, ph: 'First, middle, last' }),
-    tx('A.pref', 'Preferred name', { ph: 'What they like to be called' }),
+    tx('A.pref', 'Preferred name', { ph: '[[What they like to be called|What you like to be called]]' }),
     q('A.dob', 'Date of birth', 'date', { quick: true, dob: true, alts: ["I'd rather give it later"],
       why: "Hospitals and doctors' offices match medical records by name and birth date. If you'd rather give it later, or only if we end up requesting records, that's completely fine. We do not ask for a Social Security number and never will." }),
     tx('A.addr', 'Street address', { quick: true, ph: 'Street address', alts: [DISCUSS_] }),
@@ -121,9 +119,9 @@ const INTAKE_STEPS_ = [
     tx('A.email', 'Email', { ph: 'name@example.com' }),
     ch('A.1', 'Preferred language', ['English', 'Other', 'An interpreter would help'], { quick: true, details: { Other: 'Which language?', 'An interpreter would help': 'Which language?' } }),
     ch('A.2', '{DOES} live alone?', ['Lives with others', 'Lives alone'], { req: true, quick: true, noteOpen: true,
-      why: 'We need this one. Most procedures require someone to be with the patient the first night, so it changes what has to be arranged before surgery.' }),
+      why: 'We need this one. Many hospitals ask that someone stay the first night — the surgeon’s office will tell you what yours requires — so it changes what has to be arranged.' }),
     ch('A.2a', 'Is there someone who could stay the first night or two?', ['Yes', 'No', "Maybe, I'd need to ask"], { when: is('A.2', 'Lives alone'), quick: true, details: { Yes: 'Who?' },
-      why: "Most procedures require someone present for the first stretch. If there's nobody, that's usually the first thing we solve — and it's very solvable. Don't worry about it before we talk." }),
+      why: "The surgeon's office will tell you whether someone needs to be there the first night or two. If there's nobody, that's the first thing we solve — and it's very solvable. Don't worry about it before we talk." }),
   ] },
   // ---------------------------------------------------------------- Section B
   { id: 'B', title: 'About you', lead: 'The person filling this out.', when: not(role('patient')), catchAll: false, qs: [
@@ -197,7 +195,7 @@ const INTAKE_STEPS_ = [
     ch('G.3', "Is this a first occurrence, or something that's come back or progressed?", ['First time', "It's come back", "It's progressed or changed", 'Not sure', 'Rather discuss in person']),
     lt('G.4', 'What surgery is planned?', { req: true, quick: true, alts: ["We don't have a name for it yet"] }),
     ch('G.4a', 'Did they mention whether it’s an open operation or a smaller, minimally invasive one?', ['Open', 'Minimally invasive or endoscopic', 'Both / not sure', 'Nobody said'],
-      { why: 'The same operation done two different ways can mean one night in the hospital or five.' }),
+      { why: 'How it is done can change how long the hospital stay is. The surgeon’s office can tell you which applies.' }),
     mu('G.5', 'Is anything else part of the treatment plan?', ['Radiation', 'Chemotherapy or infusions', 'Physical or occupational therapy', 'Another surgery later', 'Ongoing scans or monitoring', 'Just this surgery', 'Not sure yet']),
     q('G.6', 'Surgery date', 'date', { req: true, em: true, quick: true, alts: ['Not scheduled yet', EMERGENCY_] }),
     ch('G.6a', 'Where are things right now?', ['Still in surgery', 'In the ICU', 'On a regular floor', 'Discharge is being discussed', 'Already home'], { when: is('G.6', EMERGENCY_), em: true, quick: true }),
@@ -216,7 +214,7 @@ const INTAKE_STEPS_ = [
     ch('G.9', 'Expected hospital stay', ['Home the same day', 'One night', '2–3 nights', '4–7 nights', 'More than a week', DK_], { req: true, quick: true, nodk: true }),
     ch('G.9a', 'On the day of surgery, who is the specific adult picking {NAME} up?', ['Someone named', "We haven't sorted this out"],
       { when: is('G.9', 'Home the same day', 'One night'), quick: true, details: { 'Someone named': NP },
-        why: "The hospital won't discharge to a taxi or rideshare on its own — they need a named adult. This is usually the first thing we solve." }),
+        why: "Many hospitals ask for a named adult to take [[them|you]] home — the surgeon's office will tell you what yours requires. It is often the first thing we solve." }),
     ch('G.9b', 'Can that person stay overnight afterward?', ['Yes', 'No', 'Not sure'], { when: is('G.9', 'Home the same day', 'One night'), quick: true }),
     lt('G.9c', "That's several days where the household runs without {HELPER}. Which days worry you most?", { when: is('G.9', '4–7 nights', 'More than a week') }),
     ch('G.10', 'After the hospital, {IS} expected to go straight home?', ['Straight home', 'To rehab or a nursing facility first', 'Not sure yet', DK_],
@@ -248,12 +246,12 @@ const INTAKE_STEPS_ = [
   ] },
   // ---------------------------------------------------------------- Section H2
   { id: 'H2', title: 'Surgery day readiness', when: not(is('G.6', EMERGENCY_)),
-    lead: "A surgery getting cancelled or postponed on the day costs a family a great deal. Most cancellations come down to something simple that nobody confirmed. We're only checking that instructions were given and understood — we don't give medical instructions and we don't change any your team has given you.", qs: [
+    lead: "A surgery getting cancelled or postponed on the day costs a family a great deal. We're only checking that instructions were given and understood — we don't give medical instructions and we don't change any your team has given you.", qs: [
     ch('H2.1', 'Have you been given fasting instructions — when to stop eating and drinking?', ['Yes', "Told, but we don't remember the times", 'Not yet', DK_],
       { head: 'Before the day', quick: true, tier: 2, nodk: true, details: { Yes: [f('eat', 'Stop eating at'), f('drink', 'Stop drinking at')] } }),
     ch('H2.2', 'Does everyone in the house know those times?', ['Yes', 'Not really', "We'll need reminders"],
-      { why: 'Eating or drinking when you shouldn’t is the single most common reason a surgery gets cancelled on the day. We’ll set reminders for you and for anyone else at home who might hand over a coffee.' }),
-    ch('H2.3', 'Has anyone told you to stop any medications before surgery?', ['Yes', "Yes, but we're not clear on the timing", 'No', DK_],
+      { why: 'Eating or drinking when the team said not to can cancel a surgery on the day. We’ll set reminders for you and for anyone else at home who might hand over a coffee.' }),
+    ch('H2.3', '[[Has anyone told {NAME} to stop|Has anyone told you to stop]] any medications before surgery?', ['Yes', "Yes, but we're not clear on the timing", 'No', DK_],
       { quick: true, tier: 2, nodk: true, details: { Yes: 'When do they stop?' }, why: "If there's a stop date, we'll put it on the calendar and remind you. What to stop and when is entirely your care team's call — we only track the dates they gave you." }),
     ch('H2.4', 'Have you been given any requirements about smoking, vaping, or alcohol before surgery?', ['Yes', 'No', "Doesn't apply", 'Rather discuss in person'], { details: { Yes: 'What, and by when?' } }),
     mu('H2.5', 'Are there pre-op tests, labs, or clearances that need doing?', ['Bloodwork', 'Imaging or scans', 'Heart or cardiac clearance', 'Clearance from another doctor', 'COVID or other testing', 'None that we know of', DK_], { quick: true, nodk: true }),
@@ -274,7 +272,7 @@ const INTAKE_STEPS_ = [
     ch('H2.14', 'Has anyone in the family ever had a serious reaction to anesthesia?', ['Yes', 'No', 'Not sure', DISCUSS_], { tier: 2, nodk: true }),
     tx('H2.14a', 'Do you know what happened?', { when: is('H2.14', 'Yes'), why: 'Please make sure the anesthesia team knows. Some reactions run in families and they’ll want to plan for it.' }),
     ch('H2.15', 'Do you know what time to arrive?', ['Yes', 'We have one time but not the other', 'Not yet'],
-      { head: 'The day itself', quick: true, details: { Yes: [f('report', 'Report time'), f('surgery', 'Surgery time')] }, why: "These are usually different, often by two hours or more. We'll confirm both and build the morning backward from the report time." }),
+      { head: 'The day itself', quick: true, details: { Yes: [f('report', 'Report time'), f('surgery', 'Surgery time')] }, why: "These are often two different times. We'll confirm both and build the morning backward from the report time." }),
     ch('H2.16', 'Do you know which building and entrance?', ['Yes', 'No', "It's a big campus and we're not sure"]),
     ch('H2.17', 'Has anyone told you what to leave at home or remove?', ['Yes', 'No', 'Not sure']),
     mu('H2.18', 'Is any of this going to be a problem?', ["Jewelry or piercings that don't come out easily", 'Contact lenses — and no glasses as a backup', 'Nail polish or gel nails', 'Hearing aids or a device [[they rely|you rely]] on', 'Dentures or a partial', 'None of these']),
@@ -292,7 +290,7 @@ const INTAKE_STEPS_ = [
     mu('I.3', 'Were any of these mentioned?', ['No bending, lifting, or twisting', 'Needs to sleep propped up, head elevated', 'Will wear a brace, collar, or helmet', "Can't get the incision or dressing wet", 'No nose-blowing, no straws, no bending over', 'Dizziness or balance problems expected', 'Weakness in an arm or leg', 'Trouble with speech or finding words', 'Trouble swallowing, or changes to what [[they|you]] can eat', 'Vision or hearing changes', 'Something about seizures and driving', 'None of these', DK_],
       { quick: true, tier: 2, nodk: true, why: "Tick anything the care team has raised as a possibility. We're not asking you to predict — just to tell us what you've been warned about." }),
     tx('I.3a', 'For no bending, lifting, or twisting — did they give a time frame?', { when: has('I.3', 'No bending, lifting, or twisting'), ph: 'For example: 6 weeks', alts: ['Nobody said'] }),
-    ch('I.3b', 'No nose-blowing, straws or bending usually runs about four weeks. Is there anyone small at home who’d normally get picked up?', ['Yes', 'No'], { when: has('I.3', 'No nose-blowing, no straws, no bending over') }),
+    ch('I.3b', 'While the no-bending rule lasts, is there anyone small at home who’d normally get picked up?', ['Yes', 'No'], { when: has('I.3', 'No nose-blowing, no straws, no bending over') }),
     tx('I.3c', "Who'll handle anything involving bending — pet bowls, laundry, low cupboards?", { when: has('I.3', 'No nose-blowing, no straws, no bending over') }),
     ch('I.3d', 'Are there stairs [[they’d|you’d]] need to use daily?', ['Yes', 'No'], { when: has('I.3', 'Dizziness or balance problems expected') }),
     ch('I.3e', 'Throw rugs or loose cords in the main walking paths?', ['Yes', 'No', 'Not sure'], { when: has('I.3', 'Dizziness or balance problems expected'), area: 'house', detail: true }),
@@ -375,7 +373,7 @@ const INTAKE_STEPS_ = [
   { id: 'L', title: 'Getting around', qs: [
     ch('L.1', 'Who will drive {NAME} home from the hospital?', ['Someone named', "We haven't sorted this out yet"],
       { req: true, quick: true, noteOpen: true, nodk: true, details: { 'Someone named': NP },
-        why: "We need this one. For most procedures with anesthesia or sedation, the hospital requires a specific adult to escort [[them|you]] home — a taxi or rideshare on its own usually isn't allowed, even if someone waits at the house. If it isn't settled, say so and we'll solve it." }),
+        why: "We need this one. Many hospitals require a specific adult to take [[them|you]] home after anesthesia or sedation, and may not allow a taxi or rideshare on its own — the surgeon's office will tell you what yours requires. If it isn't settled, say so and we'll solve it." }),
     ch('L.2', 'Is there a licensed driver at home besides {NAME}?', ['Yes', 'No', 'Yes, but not always available'], { quick: true }),
     ch('L.3', 'Is there a car available?', ['Yes', 'No'], { quick: true }),
     ch('L.3a', 'Is it high up like an SUV or truck, or low like a sedan?', ['High', 'Low', 'In between'], { when: is('L.3', 'Yes'), area: 'rides', detail: true }),
@@ -549,7 +547,7 @@ const INTAKE_STEPS_ = [
   ] },
   // ---------------------------------------------------------------- Section Q
   { id: 'Q', title: 'Budget (optional)', when: not(is('G.6', EMERGENCY_)), catchAll: false,
-    lead: 'Personal and entirely optional. Skip them and we’ll talk it through if and when it matters. We find and set up services, and you pay those providers directly. We never handle your money.', qs: [
+    lead: 'Personal and entirely optional. Skip any of these and we’ll talk it through if and when it matters. We find and set up services, and you pay those providers directly. We never handle your money.', qs: [
     ch('Q.1', 'Are you managing this mostly on your own?', ['Several of us share it', 'One other person', 'Mostly on my own', RNS_], { tier: 3, nodk: true }),
     ch('Q.2', "A rough budget you'd want us to stay within for meals, rides, pet care, or extra help?", ['Under $500', '$500–1,500', '$1,500–3,000', 'More than $3,000', 'Start with low-cost and free options', "Let's discuss", RNS_], { tier: 3, nodk: true }),
     ch('Q.3', 'Who approves spending before we commit to a cost?', ['The person filling this out', 'Someone else'], { details: { 'Someone else': 'Who?' }, nodk: true }),

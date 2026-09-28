@@ -7,7 +7,7 @@
 // when: the stage the list belongs to (it sorts to the top when the family is there). fridge: printable.
 const CHECKLISTS = [
   { id: 'ready', title: 'Ready for surgery day', when: 'The last week', lead: 'The things that cancel surgeries on the day. Tick each one once the whole household knows it.', items: [
-    { id: 'fast', text: 'Everyone in the house knows the fasting cut-off — food and drink, and from when', note: 'From the pre-op call. Eating when you should not is the most common same-day cancellation.' },
+    { id: 'fast', text: 'Everyone in the house knows the fasting cut-off — food and drink, and from when', note: 'From the pre-op call. Write the stop times down; they are the team’s rules.' },
     { id: 'stop', text: 'Medication stop dates are on the calendar, exactly as the team wrote them', note: 'Blood thinners, supplements, some pain medicines. The team decides; you track.' },
     { id: 'tests', text: 'Pre-op tests are done and the results were confirmed back to the surgeon', note: 'Ask the office: “Do you have everything you need from us?”' },
     { id: 'auth', text: 'Insurance authorization is confirmed', note: 'Call the number on the card and ask for the authorization number.' },

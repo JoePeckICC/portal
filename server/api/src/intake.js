@@ -69,6 +69,8 @@ function tidyAnswer(qid, v) {
 }
 
 const ans = (answers, qid) => (answers[qid] ? String(answers[qid].a || '') : '');
+// A typed answer on one line, for titles and short lines: line breaks become sentence breaks.
+const flat = t => String(t || '').replace(/([^.!?;:,\s])[ \t]*\n+\s*/g, '$1. ').replace(/\s*\n+\s*/g, ' ').trim();
 const has = (answers, qid, v) => ans(answers, qid).split('; ').indexOf(v) >= 0;
 // Where a question's extra box is saved: the detail under an option (qid_d, or qid_d.k when it has several
 // boxes) and the boxes of a fields question (qid.k, with every box joined into qid as well).
@@ -244,6 +246,8 @@ const FLAG_RULES = [
 ];
 function intakeFlags(all) {
   const answers = visibleAnswers(all), out = [];
+  // Filled in on an older version of the form: the answers the current form needs are listed, so nothing is assumed.
+  const sent = /Submitted|Updated after submitting/.test(String((all._status && all._status.a) || '')); const miss = sent ? missingRequired(all) : []; if (miss.length) out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'Required answers still blank (the form changed after they filled it in): ' + miss.join(', '), id: miss[0].split(' ')[0] });
   FLAG_RULES.forEach(r => { try { if (r.test(answers)) out.push({ tier: r.tier, label: r.label, id: r.id }); } catch {} });
   // Decide-as-I-go: the areas they went deep on are their priorities (better signal than O3.14).
   if (modeOf(answers) === 'decide') {
@@ -272,14 +276,14 @@ function seedRules(all, client) {
   const add = (cat, item, detail) => items.push({ stage, category: cat, item, detail: detail || '' });
   const said = id => (a[id] && a[id].n ? ' They added: “' + String(a[id].n).slice(0, 200) + '”' : '');
   const svc = servicesOf(a), wants = k => svc.indexOf(k) >= 0;
-  const f1 = ans(a, 'F.1');
-  if (f1) add(CC, 'First thing off your plate: “' + f1.slice(0, 120) + (f1.length > 120 ? '…' : '') + '”', 'The one thing the family asked for first. In their words.');
+  const f1 = flat(ans(a, 'F.1'));
+  if (f1) add(CC, 'First thing off your plate: “' + (f1.length > 140 ? f1.slice(0, 140).replace(/\s+\S*$/, '') + '…' : f1) + '”', 'The one thing the family asked for first. In their words.');
   if (cond({ lodgingNeeded: true }, a)) add(CC, 'Find a place to stay near the hospital', 'Hospital family housing first (many have it and never mention it), then Ronald McDonald-type houses if they qualify, then the hotels with medical rates.' + [ans(a, 'L.5a') && ' Nights: ' + ans(a, 'L.5a') + '.', ans(a, 'L.5b') && ' People: ' + ans(a, 'L.5b') + '.', ans(a, 'L.5e') && ' ' + ans(a, 'L.5e') + '.'].filter(Boolean).join(''));
   if (!ans(a, 'L.1') || /haven't sorted/.test(ans(a, 'L.1'))) add(CC, 'Name the adult who drives ' + name + ' home', 'The hospital will not discharge to a taxi or rideshare on its own; they need a named adult. Usually the first thing we solve.' + said('L.1'));
   else add(CC, 'Confirm the ride home' + (det(a, 'L.1') ? ': ' + det(a, 'L.1').slice(0, 80) : ''), 'Check the day and time once the report time is known.' + said('L.1'));
   if (ans(a, 'A.2') === 'Lives alone') {
     if (/^Yes/.test(ans(a, 'A.2a'))) add(FS, 'Confirm who stays the first night or two', det(a, 'A.2a'));
-    else add(FS, 'Someone with ' + name + ' the first night or two', 'Lives alone. Most procedures require someone present for the first stretch.' + said('A.2'));
+    else add(FS, 'Someone with ' + name + ' the first night or two', 'Lives alone. Ask the surgeon’s office whether someone needs to be there the first night or two.' + said('A.2'));
   }
   if (ans(a, 'G.6') === 'Not scheduled yet') add(CC, 'Surgery date — hold the plan until it is set', 'Nothing gets booked against a date that does not exist yet.');
   if (emergency) add(UA, 'Where things stand today', [ans(a, 'G.6a'), ans(a, 'G.6b'), ans(a, 'G.6e') && 'With them: ' + ans(a, 'G.6e'), ans(a, 'G.6f') && 'Call first: ' + ans(a, 'G.6f')].filter(Boolean).join(' — '));

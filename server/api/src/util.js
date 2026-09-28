@@ -30,4 +30,6 @@ function ymd(d, tz) {
 }
 function hourIn(tz, d) { return Number(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', hour12: false }).format(d || new Date()).replace(/\D/g, '')) % 24; }
 
-module.exports = { normEmail, isTrue, id, now, esc, famName, must, pick, clean, first, ms, byAsc, byDesc, EMAIL_RE, wire, safeEqual, ymd, hourIn };
+// A local date-time as people say it: "2026-10-20T06:00" → "Tuesday, October 20 at 6:00 AM".
+const niceWhen = v => { const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(String(v || '')); if (!m) return String(v || ''); const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12)); const day = d.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric' }) + (+m[1] !== new Date().getFullYear() ? ', ' + m[1] : ''); if (m[4] === undefined) return day; const h = +m[4], mi = m[5]; return day + ' at ' + ((h % 12) || 12) + ':' + mi + ' ' + (h < 12 ? 'AM' : 'PM'); };
+module.exports = { niceWhen, normEmail, isTrue, id, now, esc, famName, must, pick, clean, first, ms, byAsc, byDesc, EMAIL_RE, wire, safeEqual, ymd, hourIn };
