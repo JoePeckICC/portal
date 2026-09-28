@@ -69,7 +69,9 @@ async function bootstrap(ctx) {
   out.intake = await intake.readIntake(cid); out.intakeSpec = await intake.specFor();
   if (ctx.role === 'coordinator') out.intakeFlags = intake.intakeFlags(out.intake.answers);
   out.tasks = tasks; out.topics = topics;
-  out.jobs = await require('./jobs').jobsFor(cid); out.jobServices = require('./market').SERVICES;
+  { const vids = [...new Set(out.topics.filter(t => t.kind === 'vendor').map(t => t.extra && t.extra.vendor_id).filter(Boolean))];   // the vendor's number, for the call button in their conversation
+    if (vids.length) { const ph = {}; (await db.all(`select vendor_id, phone from vendors where vendor_id = any($1)`, [vids])).forEach(v => { ph[v.vendor_id] = v.phone; }); out.topics = out.topics.map(t => t.kind === 'vendor' ? { ...t, extra: { ...t.extra, vendor_phone: ph[t.extra && t.extra.vendor_id] || '' } } : t); } }
+  out.jobs = await require('./jobs').jobsFor(cid); out.careNotes = ce.care_notes || {}; out.jobServices = require('./market').SERVICES;
   out.updates = withPhoto(updates, ctx.role);
   out.tracker = ce.tracker || null; out.trackerSteps = CIRCLE.TRACKER; out.reactions = CIRCLE.REACTIONS; out.what_i_need = ce.what_i_need || '';
   out.share_token = CIRCLE.canAct(ctx) || ctx.role === 'family' ? (ce.share_token || '') : '';
