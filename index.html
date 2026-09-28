@@ -1315,11 +1315,11 @@ function vendorJobs(){
   var d=S.data,v=d.vendor||{},now=new Date(),mine=(d.myJobs||[]),up=mine.filter(function(j){return j.status==='Taken'}),done=mine.filter(function(j){return j.status==='Done'}).slice(0,10);
   var w=el('<div class="vj"><section class="hsec"><h2 class="k">Open near you</h2><div class="vopen"></div></section><section class="hsec"><h2 class="k">Your jobs</h2><div class="vmine"></div></section></div>');
   var o=$('.vopen',w);if(!(d.openJobs||[]).length)o.appendChild(el('<p class="muted hnone">Nothing open right now. When a family near you needs '+esc(String(v.service||'help').toLowerCase())+', you get a text.</p>'));
-  (d.openJobs||[]).forEach(function(j){var c=el('<div class="vcard'+(j.for_me?' asked':'')+'">'+(j.for_me?'<div class="vask">'+esc(j.family)+' asked for you</div>':'')+'<div class="vwhen">'+esc(jobWhen(j))+'</div><div class="vwhat">'+esc(vjWhat(j))+' · '+esc(j.city)+'</div>'+(j.details?'<p>'+esc(j.details)+'</p>':'')+'<div class="vacts"><button type="button" class="btn tk">'+(j.for_me?'Accept':'Take it')+'</button>'+(j.for_me?'<button type="button" class="btn quiet ps">Can’t make it</button>':'')+'</div><p class="err"></p></div>');
+  (d.openJobs||[]).forEach(function(j){var c=el('<div class="vcard'+(j.for_me?' asked':'')+'">'+(j.for_me?'<div class="vask">'+esc(j.family)+' asked for you</div>':'')+'<div class="vwhen">'+esc(jobWhen(j))+'</div><div class="vwhat">'+esc(vjWhat(j))+' · '+esc(j.city)+'</div>'+jobInfoHtml(j)+(j.details?'<p>'+esc(j.details)+'</p>':'')+'<div class="vacts"><button type="button" class="btn tk">'+(j.for_me?'Accept':'Take it')+'</button>'+(j.for_me?'<button type="button" class="btn quiet ps">Can’t make it</button>':'')+'</div><p class="err"></p></div>');
     var ps=$('.ps',c);if(ps)ps.onclick=function(){call('passJob',{jobId:j.job_id}).then(function(){toast('The family has been told.');return refresh()}).catch(alertErr)};
     $('.tk',c).onclick=function(){var b=this;busy(b,true,'Taking…');call('takeJob',{jobId:j.job_id}).then(function(){toast('It is yours. The family can see you have it.');return refresh()}).catch(function(e){$('.err',c).textContent=e.message;busy(b,false,j.for_me?'Accept':'Take it');refresh()})};o.appendChild(c)});
   var m=$('.vmine',w);if(!up.length)m.appendChild(el('<p class="muted hnone">Jobs you take show here, with the address and a way to message the family.</p>'));
-  up.forEach(function(j){var q=encodeURIComponent(j.address||'');var c=el('<div class="vcard mine"><div class="vwhen">'+esc(jobWhen(j))+'</div><div class="vwhat">'+esc(vjWhat(j))+' for '+esc(j.family)+'</div>'+(j.address?'<a class="small" href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noopener">'+esc(j.address)+'</a>':'')+(j.details?'<p>'+esc(j.details)+'</p>':'')+'<div class="vacts"><button type="button" class="btn quiet msg">Message the family</button><button type="button" class="btn quiet dn">Mark done</button></div></div>');
+  up.forEach(function(j){var q=encodeURIComponent(j.address||'');var c=el('<div class="vcard mine"><div class="vwhen">'+esc(jobWhen(j))+'</div><div class="vwhat">'+esc(vjWhat(j))+' for '+esc(j.family)+'</div>'+(j.address?'<a class="small" href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noopener">'+esc(j.address)+'</a>':'')+jobInfoHtml(j)+(j.details?'<p>'+esc(j.details)+'</p>':'')+'<div class="vacts"><button type="button" class="btn quiet msg">Message the family</button><button type="button" class="btn quiet dn">Mark done</button></div></div>');
     $('.msg',c).onclick=function(){var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t);else{S.view='messages';render()}};
     $('.dn',c).onclick=function(){if(!uiOk('Mark this job done?',this,arguments))return;call('finishJob',{jobId:j.job_id}).then(function(){toast('Marked done. Thank you.');return refresh()}).catch(alertErr)};m.appendChild(c)});
   if(done.length){var dd=el('<details class="vdone"><summary class="small muted">Done ('+done.length+')</summary></details>');done.forEach(function(j){dd.appendChild(el('<div class="small" style="padding:6px 0">'+esc(fmtWhen(j.starts_at))+' — '+esc(vjWhat(j))+' for '+esc(j.family)+'</div>'))});m.appendChild(dd)}
@@ -1339,7 +1339,7 @@ function vendorCalendar(){
   var sel=S.vcd.split('-'),sd=new Date(+sel[0],+sel[1]-1,+sel[2]),list=byDay[S.vcd]||[];
   $('.vdayh',w).textContent=sd.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
   var dl=$('.vday',w);if(!list.length)dl.appendChild(el('<p class="muted hnone">Nothing on this day.</p>'));
-  list.forEach(function(j){var q=encodeURIComponent(j.address||'');var c=el('<div class="vcard mine'+(j.status==='Done'?' done':'')+'"><div class="vwhen">'+esc(hasTime(j.starts_at)?fmtTime(toDate(j.starts_at)):'')+(j.status==='Done'?' · done':'')+'</div><div class="vwhat">'+esc(vjWhat(j))+' for '+esc(j.family)+'</div>'+(j.address?'<a class="small" href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noopener">'+esc(j.address)+'</a>':'')+(j.details?'<p>'+esc(j.details)+'</p>':'')+(j.status==='Taken'?'<div class="vacts"><button type="button" class="btn quiet msg">Message the family</button></div>':'')+'</div>');var mg=$('.msg',c);if(mg)mg.onclick=function(){var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t)};dl.appendChild(c)});
+  list.forEach(function(j){var q=encodeURIComponent(j.address||'');var c=el('<div class="vcard mine'+(j.status==='Done'?' done':'')+'"><div class="vwhen">'+esc(hasTime(j.starts_at)?fmtTime(toDate(j.starts_at)):'')+(j.status==='Done'?' · done':'')+'</div><div class="vwhat">'+esc(vjWhat(j))+' for '+esc(j.family)+'</div>'+(j.address?'<a class="small" href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noopener">'+esc(j.address)+'</a>':'')+jobInfoHtml(j)+(j.details?'<p>'+esc(j.details)+'</p>':'')+(j.status==='Taken'?'<div class="vacts"><button type="button" class="btn quiet msg">Message the family</button></div>':'')+'</div>');var mg=$('.msg',c);if(mg)mg.onclick=function(){var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t)};dl.appendChild(c)});
   $('.ics',w).onclick=function(){var L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//InCadence Care//Jobs//EN','CALSCALE:GREGORIAN'];function z(v){return new Date(v).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'')}function e(x){return String(x||'').replace(/[\\,;]/g,' ').replace(/[\r\n]+/g,' ')}
     jobs.filter(function(j){return j.status==='Taken'}).forEach(function(j){L.push('BEGIN:VEVENT','UID:'+j.job_id+'@incadencecare.com','DTSTAMP:'+z(Date.now()),'DTSTART:'+z(j.starts_at),'DURATION:PT1H','SUMMARY:'+e(vjWhat(j)+' — '+j.family),'LOCATION:'+e(j.address),'DESCRIPTION:'+e(j.details)+' — details and messages in the portal','END:VEVENT')});
     L.push('END:VCALENDAR');var a=document.createElement('a');a.href='data:text/calendar;charset=utf-8,'+encodeURIComponent(L.join('\r\n'));a.download='incadence-jobs.ics';document.body.appendChild(a);a.click();a.remove()};
@@ -1371,18 +1371,58 @@ function findPick(){
   else if(w.indexOf('v:')===0){var t=vts.filter(function(x){return x.topic_id===w.slice(2)})[0];b.appendChild(imSchedPop(t,true))}
   else b.appendChild(helpForm(w.slice(4)));
   return c}
-// Asking for help at home. Not everything fits a clock time (Joe): pet care, childcare, rides and "other" get the
-// calendar and a time; lodging gets check-in and check-out days; meals, help at home and equipment ask how soon.
+// Asking for help at home (Joe, 2026-09-28): each kind of help asks what it actually needs to know.
+// Rides: where from and where to. Meals: a meal or a grocery run, for how many, delivered where. Childcare: how long,
+// how many, where. Lodging: check-in to check-out, near what, what kind of place. Medical equipment is borrowed from
+// the coordinator's loan closet. Help at home asks how soon. Addresses stay private until someone takes the job.
 var HELP_SOON={asap:'As soon as possible',days:'In the next few days',week:'This week',flex:'No rush'};
-function helpMode(svc){return svc==='Lodging'?'stay':(svc==='Meals'||svc==='Help at home'||svc==='Medical equipment')?'soon':'time'}
+function helpMode(svc){return svc==='Lodging'?'stay':(svc==='Help at home'||svc==='Medical equipment')?'soon':'time'}
+function jobInfoHtml(j){return (j.info||[]).map(function(x){return'<div class="small"><b>'+esc(x.l)+':</b> '+esc(x.v)+'</div>'}).join('')}
 function jobWhen(j){if(j.soon&&HELP_SOON[j.soon])return 'Needed: '+HELP_SOON[j.soon].toLowerCase();if(j.until){var f=function(k){var p=String(k).split('-');return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})};return f(j.from||dayKey(toDate(j.starts_at)))+' – '+f(j.until)}return fmtWhen(j.starts_at)}
+// The questions for each kind of help. k: key; t: text | addr | num | sel | area | check; p: private (an address).
+function helpQs(svc,st){
+  var d=S.data,home=(d.client&&d.client.address)||'',hosp=(d.walk&&d.walk.name)||'';
+  var n=function(a,b){var o=[];for(var i=a;i<=b;i++)o.push(String(i));return o};
+  if(svc==='Rides')return[
+    {k:'from',l:'Pick up at',t:'addr',p:1,def:home,req:1},
+    {k:'to',l:'Going to',t:'addr',p:1,def:hosp,ph:'The hospital, a clinic, the pharmacy…',req:1},
+    {k:'rt',l:'Round trip?',t:'sel',o:['One way','Round trip — wait and bring us back','Round trip — come back for us later']},
+    {k:'riders',l:'How many riding',t:'sel',o:n(1,4)},
+    {k:'hand',l:'Needs a hand getting in and out of the car',t:'check'}];
+  if(svc==='Meals'){var q=[{k:'kind',l:'What kind',t:'sel',o:['A meal delivered','A grocery run']}];
+    if((st.f.kind||'A meal delivered')==='A grocery run')q.push({k:'list',l:'The grocery list',t:'area',req:1,ph:'Milk, eggs, bread, bananas…'});
+    else q.push({k:'people',l:'How many people',t:'sel',o:n(1,8)},{k:'food',l:'Foods to avoid or likes',t:'text',ph:'No nuts, the kids love pasta'});
+    q.push({k:'to',l:'Deliver to',t:'addr',p:1,def:home,req:1});return q}
+  if(svc==='Childcare')return[
+    {k:'long',l:'For how long',t:'sel',o:['1–2 hours','Half a day','A full day','Overnight']},
+    {k:'kids',l:'How many children',t:'sel',o:n(1,6)},
+    {k:'ages',l:'Their ages',t:'text',ph:'4 and 7',req:1},
+    {k:'where',l:'Where',t:'addr',p:1,def:home,req:1}];
+  if(svc==='Pet care')return[{k:'pets',l:'Which pets',t:'text',ph:'Biscuit, a lab mix'}];
+  if(svc==='Lodging')return[
+    {k:'near',l:'Where do you want to be near?',t:'text',def:hosp,req:1,ph:'The hospital'},
+    {k:'type',l:'What kind of place',t:'sel',o:['Either is fine','A hotel','A rental with a kitchen','A room near the hospital (family housing)']},
+    {k:'guests',l:'How many staying',t:'sel',o:n(1,6)},
+    {k:'budget',l:'Budget a night',t:'sel',o:['Not sure','Under $100','$100–150','$150–200','Over $200']},
+    {k:'acc',l:'Needs to be accessible (no stairs, walk-in shower)',t:'check'}];
+  if(svc==='Medical equipment')return[
+    {k:'item',l:'What to borrow',t:'sel',o:['Walker','Wheelchair','Shower chair','Raised toilet seat','Bedside commode','Crutches','Knee scooter','Something else']},
+    {k:'other',l:'What is it?',t:'text',req:1,show:function(){return st.f.item==='Something else'}},
+    {k:'long',l:'For how long',t:'sel',o:['A few weeks','About a month','A few months','Not sure']},
+    {k:'get',l:'Getting it',t:'sel',o:['Bring it to us','We will pick it up']},
+    {k:'to',l:'Bring it to',t:'addr',p:1,def:home,req:1,show:function(){return (st.f.get||'Bring it to us')==='Bring it to us'}}];
+  return[]}
 function helpForm(service){
-  var d=S.data,co=d.me.role==='coordinator',cn=d.careNotes||{},t0=new Date(),mode=helpMode(service);t0.setHours(0,0,0,0);
-  if(!S.hst||S.hst.svc!==service)S.hst={m:0,day:null,out:null,slot:'',soon:'',svc:service,note:null,touched:false};
+  var d=S.data,co=d.me.role==='coordinator',cn=d.careNotes||{},t0=new Date(),mode=helpMode(service),loan=service==='Medical equipment';t0.setHours(0,0,0,0);
+  if(!S.hst||S.hst.svc!==service)S.hst={m:0,day:null,out:null,slot:'',soon:'',svc:service,note:null,touched:false,f:{}};
   var st=S.hst,card=el('<div><div class="hb"></div></div>');
-  function keep(){var ta=$('.hb textarea',card);if(ta)st.note=ta.value}
+  function keep(){var ta=$('.hb textarea.hn',card);if(ta)st.note=ta.value;$all('.hb [data-q]',card).forEach(function(i){st.f[i.getAttribute('data-q')]=i.type==='checkbox'?(i.checked?'Yes':''):i.value})}
+  function qEl(q){var v=st.f[q.k];if(v===undefined){v=q.t==='sel'?q.o[0]:(q.def||'');st.f[q.k]=v}
+    if(q.t==='check')return el('<label class="small" style="display:flex;gap:8px;align-items:center;margin:4px 0 10px;font-weight:400"><input type="checkbox" data-q="'+q.k+'" style="width:auto"'+(v?' checked':'')+'> '+esc(q.l)+'</label>');
+    var inp=q.t==='sel'?'<select data-q="'+q.k+'">'+q.o.map(function(o){return'<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select>':q.t==='area'?'<textarea data-q="'+q.k+'" style="min-height:70px" placeholder="'+esc(q.ph||'')+'">'+esc(v)+'</textarea>':'<input data-q="'+q.k+'" value="'+esc(v)+'" placeholder="'+esc(q.ph||'')+'"'+(q.t==='addr'?' autocomplete="street-address"':'')+'>';
+    return el('<div class="field"><label>'+esc(q.l)+(q.p?' <span class="small muted" style="font-weight:400">(shared once someone takes it)</span>':'')+'</label>'+inp+'</div>')}
   function draw(){keep();var b=$('.hb',card);b.innerHTML='';
-    var saved=cn[st.svc]||'';if(st.note===null||!st.touched)st.note=saved;
+    var saved=cn[st.svc]||'';if(st.note===null||!st.touched)st.note=loan?'':saved;
     var f=el('<form class="schf"></form>');
     if(mode==='soon'){
       var sf=el('<div class="field" style="margin-top:10px"><label>How soon?</label><select name="soon"><option value="">Pick one</option>'+Object.keys(HELP_SOON).map(function(k){return'<option value="'+k+'"'+(st.soon===k?' selected':'')+'>'+HELP_SOON[k]+'</option>'}).join('')+'</select></div>');
@@ -1399,17 +1439,23 @@ function helpForm(service){
       b.appendChild(c);
       if(mode==='time'){if(!st.day)f.appendChild(el('<p class="small muted" style="margin:6px 0 0">Pick the day.</p>'));
         else{var ts=imTimes(st.day);var tf=el('<div class="field"><label>Time on '+esc(st.day.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}))+'</label><select name="t" required><option value="">Pick a time</option>'+ts.map(function(w){var k=w.toISOString();return'<option value="'+k+'"'+(st.slot===k?' selected':'')+'>'+esc(fmtTime(w))+'</option>'}).join('')+'</select></div>');$('select',tf).onchange=function(){st.slot=this.value};f.appendChild(tf)}}}
-    var nf=el('<div class="field"><label>'+(saved&&!co?'Your usual note (loaded — change it for this time if you need to)':mode==='soon'?'What do you need?':'Anything they should know')+'</label><textarea maxlength="600" style="min-height:70px" placeholder="'+(mode==='soon'?(st.svc==='Meals'?'Dinners for four this week — no nuts':st.svc==='Medical equipment'?'A shower chair and a raised toilet seat':'Laundry and a grocery run'):mode==='stay'?'Two adults, close to the hospital':'Biscuit needs two walks. The key is under the mat.')+'">'+esc(st.note||'')+'</textarea>'+(co?'':'<label class="small" style="display:flex;gap:8px;align-items:center;margin-top:6px;font-weight:400"><input type="checkbox" class="keep" style="width:auto"'+(saved?'':' checked')+'> Keep this as my usual note</label>')+'<div class="small muted" style="margin-top:4px">Leave out anything medical — this goes to your support team.</div></div>');
+    // the questions for this kind of help
+    var qs=helpQs(st.svc,st).filter(function(q){return !q.show||q.show()});
+    qs.forEach(function(q){var e=qEl(q);f.appendChild(e);var i=$('[data-q]',e);if(q.k==='kind'||q.k==='item'||q.k==='get')i.onchange=function(){keep();draw()}});
+    var nf=el('<div class="field"><label>'+(saved&&!co&&!loan?'Your usual note (loaded — change it for this time if you need to)':'Anything else they should know')+'</label><textarea class="hn" maxlength="600" style="min-height:64px">'+esc(st.note||'')+'</textarea>'+(co||loan?'':'<label class="small" style="display:flex;gap:8px;align-items:center;margin-top:6px;font-weight:400"><input type="checkbox" class="keep" style="width:auto"'+(saved?'':' checked')+'> Keep this as my usual note</label>')+(loan?'':'<div class="small muted" style="margin-top:4px">Leave out anything medical — this goes to your support team.</div>')+'</div>');
     $('textarea',nf).oninput=function(){st.touched=true};f.appendChild(nf);
-    f.appendChild(el('<button class="btn block" type="submit">Ask for help</button>'));
-    f.appendChild(el('<p class="small muted" style="margin:10px 0 0">'+(co?'Trusted people near the family are told by text; the first to take it has it.':'Trusted people near you are told right away. The first to take it has it, and you will see who.')+'</p>'));
+    f.appendChild(el('<button class="btn block" type="submit">'+(loan?'Ask to borrow it':'Ask for help')+'</button>'));
+    f.appendChild(el('<p class="small muted" style="margin:10px 0 0">'+(loan?esc(first(d.coordinator&&d.coordinator.name)||'Your coordinator')+' lends equipment from the loan closet near you and sets up the drop-off.':co?'Trusted people near the family are told by text; the first to take it has it.':'Trusted people near you are told right away. The first to take it has it, and you will see who.')+'</p>'));
     f.appendChild(el('<p class="err"></p>'));
     f.onsubmit=function(ev){ev.preventDefault();keep();var err=$('.err',f),q={service:st.svc,details:st.note||''};
       if(mode==='soon'){if(!st.soon){err.textContent='Pick how soon.';return}q.soon=st.soon}
       else if(mode==='stay'){if(!st.day||!st.out){err.textContent=st.day?'Tap the check-out day.':'Tap the check-in day.';return}q.from=dayKey(st.day);q.until=dayKey(st.out)}
       else{if(!st.day||!st.slot){err.textContent=st.day?'Pick a time.':'Pick the day.';return}q.startsAt=st.slot}
+      var miss=qs.filter(function(x){return x.req&&!String(st.f[x.k]||'').trim()})[0];if(miss){err.textContent='Fill in: '+miss.l.toLowerCase()+'.';return}
+      q.info=qs.filter(function(x){return String(st.f[x.k]||'').trim()}).map(function(x){return{l:x.l,v:x.t==='check'?'Yes':String(st.f[x.k]).trim(),p:!!x.p}});
+      if(q.service==='Rides'||q.service==='Childcare'||q.service==='Meals'){var a=qs.filter(function(x){return x.t==='addr'&&(x.k==='from'||x.k==='where'||x.k==='to')})[0];if(a)q.address=String(st.f[a.k]||'')}
       var kp=$('.keep',f),note=q.details;busy($('button[type=submit]',f),true,'Sending…');
-      (kp&&kp.checked&&note.trim()!==saved.trim()?call('saveCareNote',{service:st.svc,text:note}):Promise.resolve()).then(function(){return call('requestJob',q)}).then(function(){S.hst=null;toast('Sent. We will show you who takes it.');return refresh()}).catch(function(e){err.textContent=e.message;busy($('button[type=submit]',f),false,'Ask for help')})};
+      (kp&&kp.checked&&note.trim()!==saved.trim()?call('saveCareNote',{service:st.svc,text:note}):Promise.resolve()).then(function(){return call('requestJob',q)}).then(function(){S.hst=null;toast(loan?'Sent to '+(first(d.coordinator&&d.coordinator.name)||'your coordinator')+'.':'Sent. We will show you who takes it.');return refresh()}).catch(function(e){err.textContent=e.message;busy($('button[type=submit]',f),false,loan?'Ask to borrow it':'Ask for help')})};
     b.appendChild(f)}
   draw();return card}
 // Coming up: calls with the coordinator, visits, and help that is booked or asked for, soonest first.
@@ -1424,7 +1470,7 @@ function comingUp(){
   if(!items.length)ul.appendChild(el('<div class="small muted" style="padding:8px 0">Nothing set up yet.</div>'));
   items.forEach(function(it){var r;
     if(it.a){var a=it.a;r=el('<a href="#" class="ap cuit" style="flex-direction:column;align-items:flex-start;gap:2px;text-decoration:none;color:inherit"><b>'+esc(fmtWhen(a.starts_at))+'</b><span>'+esc(a.title)+(a.location?' · '+esc(a.location):'')+'</span><span class="small cumore">Details ›</span></a>');r.onclick=function(ev){ev.preventDefault();S.sheet='cu:a:'+a.appt_id;render()}}
-    else{var j=it.j,stx=j.status==='Open'?(j.direct&&j.vendor_name?'Waiting for '+esc(j.vendor_name)+' to confirm':'Waiting for someone to take it'):'<b>'+esc(j.vendor_name)+'</b> has this covered';
+    else{var j=it.j,stx=j.loan&&j.status==='Open'?'Waiting for '+esc(first(d.coordinator&&d.coordinator.name)||'your coordinator'):j.status==='Open'?(j.direct&&j.vendor_name?'Waiting for '+esc(j.vendor_name)+' to confirm':'Waiting for someone to take it'):'<b>'+esc(j.vendor_name)+'</b> has this covered';
       r=el('<a href="#" class="ap cuit" style="flex-direction:column;align-items:flex-start;gap:2px;text-decoration:none;color:inherit"><b>'+esc(jobWhen(j))+'</b><span>'+esc(j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':j.service)+'</span><span class="small muted">'+stx+'</span><span class="small cumore">Details ›</span></a>');r.onclick=function(ev){ev.preventDefault();S.sheet='cu:j:'+j.job_id;render()}}
     ul.appendChild(r)});
   return c}
@@ -1441,8 +1487,8 @@ function cuSheet(){
     else if(a.location&&!/^(phone|video)$/i.test(a.location)){var mc=el('<div class="card"><span class="k">Where</span></div>');mc.appendChild(placeMap(a.location));b.appendChild(mc)}
     return sheetEl(a.title,b)}
   if(p[1]==='j'){var j=(d.jobs||[]).filter(function(x){return String(x.job_id)===p[2]})[0];if(!j)return null;
-    var what=j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':j.service,stx=j.status==='Open'?(j.direct&&j.vendor_name?'Waiting for '+esc(j.vendor_name)+' to confirm':'Waiting for someone to take it'):'<b>'+esc(j.vendor_name)+'</b> has this covered';
-    var jc=el('<div class="card"><span class="k">'+esc(jobWhen(j))+'</span><h2 style="margin:8px 0 4px">'+esc(what)+'</h2><p style="margin:0">'+stx+'</p>'+(j.details?'<p class="small" style="margin:8px 0 0">'+esc(j.details)+'</p>':'')+'<p style="margin:12px 0 0;display:flex;gap:14px">'+(j.topic_id?'<a href="#" class="small msg">Message '+esc(first(j.vendor_name)||'them')+'</a>':'')+'<a href="#" class="small cx" style="color:var(--muted)">Cancel this</a></p></div>');
+    var what=j.loan?'Borrow: '+(((j.info||[]).filter(function(x){return/borrow|what is it/i.test(x.l)})[0]||{}).v||'equipment'):j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':j.service,stx=j.loan&&j.status==='Open'?'Waiting for '+esc(first(d.coordinator&&d.coordinator.name)||'your coordinator'):j.status==='Open'?(j.direct&&j.vendor_name?'Waiting for '+esc(j.vendor_name)+' to confirm':'Waiting for someone to take it'):'<b>'+esc(j.vendor_name)+'</b> has this covered';
+    var jc=el('<div class="card"><span class="k">'+esc(jobWhen(j))+'</span><h2 style="margin:8px 0 4px">'+esc(what)+'</h2><p style="margin:0">'+stx+'</p><div style="margin-top:8px;display:grid;gap:2px">'+jobInfoHtml(j)+'</div>'+(j.details?'<p class="small" style="margin:8px 0 0">'+esc(j.details)+'</p>':'')+'<p style="margin:12px 0 0;display:flex;gap:14px">'+(j.topic_id?'<a href="#" class="small msg">Message '+esc(first(j.vendor_name)||'them')+'</a>':'')+'<a href="#" class="small cx" style="color:var(--muted)">Cancel this</a></p></div>');
     var mg=$('.msg',jc);if(mg)mg.onclick=function(ev){ev.preventDefault();S.sheet=null;var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t)};
     $('.cx',jc).onclick=function(ev){ev.preventDefault();if(!uiOk('Cancel this?'+(j.status==='Taken'?' '+j.vendor_name+' is told.':''),this,arguments))return;call('cancelJob',{jobId:j.job_id}).then(function(){S.sheet=null;return refresh()}).catch(alertErr)};
     b.appendChild(jc);
