@@ -377,8 +377,13 @@ test('record: visit notes, allergies, pharmacy, documents, help', async () => {
   assert.equal((await api(co, 'saveAllergies', { clientId: 'c1', allergies: 'Penicillin' })).ok, true);
   const ph = await api(pat, 'savePharmacy', { pharmacy_name: 'Walgreens', pharmacy_phone: '615-555-0199' });
   assert.equal(ph.client.pharmacy_name, 'Walgreens');
-  const vn = await api(co, 'saveVisitNote', { clientId: 'c1', apptId: 'a1', note: 'BP fine. Cleared for surgery.' });
+  const fut = await db.one(`select starts_at from appointments where appt_id='a1'`);
+  await db.q(`update appointments set starts_at=now() + interval '3 days' where appt_id='a1'`);
+  assert.match((await api(co, 'saveVisitNote', { clientId: 'c1', apptId: 'a1', note: 'Too early.' })).error, /once the visit has happened/);
+  await db.q(`update appointments set starts_at=now() - interval '1 day' where appt_id='a1'`);
+  const vn = await api(co, 'saveVisitNote', { clientId: 'c1', apptId: 'a1', note: 'BP fine. Cleared for surgery.', shared: true });
   assert.equal(vn.ok, true);
+  await db.q(`update appointments set starts_at=$1 where appt_id='a1'`, [fut.starts_at]);
   const bp = await api(pat, 'bootstrap', {});
   assert.equal(bp.allergies, 'Penicillin'); assert.equal(bp.appointments.find(a => a.appt_id === 'a1').visit_note, 'BP fine. Cleared for surgery.');
   // documents: upload, family visibility, served through the API with a session check
