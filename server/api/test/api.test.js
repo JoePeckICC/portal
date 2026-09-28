@@ -312,7 +312,15 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   const stay = await api(pat, 'requestJob', { service: 'Lodging', from: ci, until: co2 });
   assert.equal(stay.ok, true, stay.error); assert.equal(stay.job.extra.until, co2);
   assert.match((await api(pat, 'requestJob', { service: 'Lodging', from: co2, until: ci })).error, /after check-in/);
-  const pj = (await api(pat, 'bootstrap', {})).jobs; assert.equal(pj.find(j => j.job_id === meal.job.job_id).soon, 'week'); assert.equal(pj.find(j => j.job_id === stay.job.job_id).from, ci);
+  // questions: the pickup address stays private until someone takes it; equipment goes to the coordinator, not vendors
+  const ride = await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 4 * 86400e3).toISOString(), info: [{ l: 'Pickup', v: '12 Oak St', p: true }, { l: 'Dogs', v: '2' }] });
+  assert.equal(ride.ok, true, ride.error);
+  const oj = (await api(sarah, 'bootstrap', {})).openJobs.find(x => x.job_id === ride.job.job_id);
+  assert.deepEqual(oj.info, [{ l: 'Dogs', v: '2' }], 'addresses wait until the job is taken');
+  const loan = await api(pat, 'requestJob', { service: 'Medical equipment', soon: 'days', info: [{ l: 'Item', v: 'Walker' }] });
+  assert.equal(loan.ok, true, loan.error); assert.equal(loan.job.extra.loan, true);
+  const pj = (await api(pat, 'bootstrap', {})).jobs;
+  assert.equal(pj.find(j => j.job_id === ride.job.job_id).info.length, 2, 'the family sees all their own answers'); assert.equal(pj.find(j => j.job_id === meal.job.job_id).soon, 'week'); assert.equal(pj.find(j => j.job_id === stay.job.job_id).from, ci);
 });
 
 test('supporters only get updates', async () => {
