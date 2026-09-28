@@ -609,7 +609,7 @@ test('changes after submitting: one email to the coordinator, listing what chang
   await db.q(`delete from digest`);
   await api(q, 'saveIntake', { answers: { 'G.10': { a: "I don't know", n: '' } } });
   await api(q, 'saveIntake', { answers: { 'G.10': { a: 'To rehab or a nursing facility first', n: 'Son wants rehab' } } });
-  const r = await api(q, 'saveIntake', { answers: { 'G.11': { a: 'Medicare; VA or TRICARE', n: '' } } });
+  const r = await api(q, 'saveIntake', { answers: { 'K.5': { a: 'Ramp; Raised toilet seat', n: '' } } });
   assert.equal(r.intake.status, 'Updated after submitting');
   const done = await api(q, 'submitIntake', {});
   assert.equal(done.intake.status, 'Submitted'); assert.deepEqual(done.intake.changed, {});
@@ -618,7 +618,7 @@ test('changes after submitting: one email to the coordinator, listing what chang
   assert.match(got[0].subject, /changed their intake answers/);
   const body = got[0].body + ' ' + (got[0].lead || '');
   assert.match(body, /Straight home" → "To rehab or a nursing facility first" \(note changed too\)/);
-  assert.match(body, /What health insurance covers they\?: "—" → "Medicare; VA or TRICARE"/);
+  assert.match(body, /What's already installed\?: "—" → "Ramp; Raised toilet seat"/);
 });
 
 test('through the portal, sign-in lives in HttpOnly cookies, never in the page', async () => {
@@ -685,9 +685,9 @@ test('consent initials must match the signature; phones are checked and tidied; 
   assert.equal(intake.phoneOk('615-555-0100'), '(615) 555-0100');
   assert.equal(intake.phoneOk('+1 (615) 555-0100 ext. 22'), '(615) 555-0100 ext. 22');
   assert.equal(intake.phoneOk('000-000-0000'), ''); assert.equal(intake.phoneOk('61555501001234'), ''); assert.equal(intake.phoneOk('(615) 555'), '');
-  let s = await api(r, 'saveIntake', { answers: { 'A.phone': { a: '6155550100 x22', n: '' }, 'G.11': { a: 'Medicare; None; I don\'t know; VA or TRICARE', n: '' }, 'M.4': { a: 'No; Dog', n: '' } } });
+  let s = await api(r, 'saveIntake', { answers: { 'A.phone': { a: '6155550100 x22', n: '' }, 'K.5': { a: 'Ramp; None of these; I don\'t know; Raised toilet seat', n: '' }, 'M.4': { a: 'No; Dog', n: '' } } });
   assert.equal(s.intake.answers['A.phone'].a, '(615) 555-0100 ext. 22');
-  assert.equal(s.intake.answers['G.11'].a, 'Medicare; VA or TRICARE');
+  assert.equal(s.intake.answers['K.5'].a, 'Ramp; Raised toilet seat');
   assert.equal(s.intake.answers['M.4'].a, 'Dog');
   const answers = {};
   spec.steps.forEach(st => st.qs.forEach(q => { if (q.req && !q.showIf) answers[q.id] = { a: q.type === 'choice' ? q.opts[0] : q.type === 'date' ? '2026-11-03' : q.id === 'A.phone' ? '(615) 555-0100' : 'x' }; }));
@@ -915,17 +915,58 @@ test('the hospital question puts that hospital (facts, walk, campus map) on the 
   await db.q(`insert into hospital_walks (walk_id,name,steps) values ('hw2','Other Test Hospital','[]') on conflict (walk_id) do nothing`);
   const s = await signIn('hana@example.com');
   const spec = (await api(s, 'bootstrap', {})).intakeSpec;
-  const hq = spec.steps.flatMap(st => st.qs).find(q => q.id === 'G.6h');
+  const hq = spec.steps.flatMap(st => st.qs).find(q => q.id === 'G.7');
   assert.ok(hq && hq.type === 'select'); assert.ok(spec.hospitals.includes('Test General Hospital'));
-  assert.equal((await api(s, 'saveIntake', { answers: { 'G.6h': { a: 'Test General Hospital', n: '' } } })).ok, true);
+  assert.equal((await api(s, 'saveIntake', { answers: { 'G.7': { a: 'Test General Hospital', n: '' } } })).ok, true);
   let cl = await db.one(`select extra from clients where client_id='c2'`); assert.equal(cl.extra.walk_id, w1); assert.equal(cl.extra.walk_by, 'intake');
-  await api(s, 'saveIntake', { answers: { 'G.6h': { a: "We don't know yet", n: '' } } });
+  await api(s, 'saveIntake', { answers: { 'G.7': { a: "We don't know yet", n: '' } } });
   cl = await db.one(`select extra from clients where client_id='c2'`); assert.equal(cl.extra.walk_id, undefined, 'a changed answer takes it back');
   await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) || '{"walk_id":"hw2","walk_by":"coordinator"}' where client_id='c2'`);
-  await api(s, 'saveIntake', { answers: { 'G.6h': { a: 'Test General Hospital', n: '' } } });
+  await api(s, 'saveIntake', { answers: { 'G.7': { a: 'Test General Hospital', n: '' } } });
   cl = await db.one(`select extra from clients where client_id='c2'`); assert.equal(cl.extra.walk_id, 'hw2', 'the coordinator pick stays');
   await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) - 'walk_id' - 'walk_by' where client_id='c2'`);
   await db.q(`delete from hospital_walks where walk_id in ('hw1','hw2')`);
+});
+
+test
+
+test('the master intake: modes, per-area depth, the emergency path, flags and plan drafts', () => {
+  const intake = require('../src/intake');
+  const S = require('../src/intakeSpec');
+  const A = o => { const r = {}; for (const k in o) r[k] = { a: o[k], n: '' }; return r; };
+  const ids = a => intake.visibleQs(A(a)).map(q => q.id);
+  const fam = { '0.1': "I'm a family member or friend" };
+  const quick = { ...fam, '0.1a': S.INTAKE_STEPS_[0].qs[1].opts[0] }, thorough = { ...fam, '0.1a': S.INTAKE_STEPS_[0].qs[1].opts[1] };
+  const n = ids(quick).length; assert.ok(n >= 55 && n <= 75, 'quick mode is about 55–70 questions, got ' + n);
+  assert.ok(!ids(quick).includes('O3.12'), 'quick skips the standards layer');
+  assert.ok(ids({ ...quick, 'Z.O3': 'yes' }).includes('O3.12'), '"ask me more about this" opens a skipped section');
+  // Gated: insurance only when they asked for help with bills, records or authorizations.
+  assert.ok(!ids(thorough).includes('E.carrier'));
+  assert.ok(ids({ ...thorough, F: S.SVC_TEXT.bills }).includes('E.carrier'));
+  // Per-area depth: "just handle it" drops that area's precision questions, not the base ones.
+  const dec = { ...fam, '0.1a': S.INTAKE_STEPS_[0].qs[1].opts[2], F: S.SVC_TEXT.pets, 'M.4': 'Dog' };
+  assert.ok(ids(dec).includes('F.d.pets') && ids(dec).includes('M.4e'));
+  assert.ok(!ids({ ...dec, 'F.d.pets': S.JUST_HANDLE }).includes('M.4e'));
+  assert.ok(ids({ ...dec, 'F.d.pets': S.JUST_HANDLE }).includes('M.4a'));
+  // Children by age, from the box under M.1.
+  const kids = { ...thorough, F: S.SVC_TEXT.childcare, 'M.1': 'Yes', 'M.1_d': '18 months and 7' };
+  assert.ok(ids(kids).includes('M.1a') && ids(kids).includes('M.1e') && !ids(kids).includes('M.1h'));
+  // The patient filling it out: no "About you" or "Contacting them".
+  assert.ok(!ids({ '0.1': "I'm the person having surgery" }).some(x => /^(B|D)\./.test(x)));
+  // Emergency: only the em questions until they circle back.
+  const em = ids({ ...fam, 'G.6': S.EMERGENCY_ });
+  assert.ok(em.includes('G.6b') && em.includes('G.7') && !em.includes('K.1'));
+  assert.ok(ids({ ...fam, 'G.6': S.EMERGENCY_, _full: 'yes' }).includes('K.1'));
+  // An answer to a question that is now hidden opens nothing.
+  assert.ok(!ids({ ...thorough, 'L.3': 'No', 'L.3a': 'High' }).includes('L.3a'));
+  // Flags, per the register.
+  const flags = intake.intakeFlags(A({ ...thorough, 'H2.1': 'Not yet', 'I.3': 'No bending, lifting, or twisting', 'M.1': 'Yes', 'M.1_d': '3', 'N.1': 'Yes — mixed', 'N.1b': "Commercial driver's license (CDL)", 'P.1': S.RNS_, 'O3.15': 'Her garden' }));
+  const has = re => flags.some(f => re.test(f.label));
+  assert.ok(has(/Fasting times/) && has(/LIFTING CONFLICT/) && has(/Licensed job/) && has(/return to work is far out/) && has(/No named escort/) && has(/rather we didn't touch/));
+  assert.ok(flags.some(f => f.tier === 'Declined' && f.id === 'P.1'), 'a decline reaches the reviewer as a decline');
+  // Every choice question offers "I don't know" unless it has its own way to say it, or is marked nodk.
+  const g3 = S.INTAKE_STEPS_.flatMap(st => st.qs).find(q => q.id === 'K.4');
+  assert.ok(g3.opts.includes(S.DK_));
 });
 
 test('marketplace step 1: vendors by city, booked on a plan item, the family sees only that one; the needs log waits for 11 families', async () => {
@@ -960,4 +1001,33 @@ test('marketplace step 1: vendors by city, booked on a plan item, the family see
   r.rows.forEach(x => assert.equal(x.median_day === null, x.families < 11, 'a day shows only with 11 or more families'));
   await db.q(`delete from need_events where event_id like 'fake%'`);
   await db.q(`delete from plan_items where plan_id=$1`, [pid]); await db.q(`delete from vendors`);
+});
+
+test('recordings: pieces join, the clinician OK is required, the transcript reaches the coordinator first and the family only when shared', async () => {
+  process.env.TRANSCRIBE_FAKE = '1';
+  const { execSync } = require('child_process');
+  const f = require('os').tmpdir() + '/memo-test.m4a'; execSync(`ffmpeg -loglevel error -y -f lavfi -i sine=frequency=440:duration=3 -c:a aac ${f}`); const m4a = require('fs').readFileSync(f);
+  const co = await signIn('joe@incadencecare.com');
+  const half = Math.ceil(m4a.length / 2), sid = 'abcdefgh12345';
+  const p1 = await api(co, 'addRecording', { clientId: 'c2', sessionId: sid, part: 0, parts: 2, b64: m4a.subarray(0, half).toString('base64'), name: 'memo.m4a', type: 'audio/mp4', title: 'Pre-op visit' });
+  assert.equal(p1.ok, true, p1.error); assert.equal(p1.part, 0);
+  const p2 = await api(co, 'addRecording', { clientId: 'c2', sessionId: sid, part: 1, parts: 2, b64: m4a.subarray(half).toString('base64'), name: 'memo.m4a', type: 'audio/mp4', size: m4a.length, title: 'Pre-op visit' });
+  assert.equal(p2.ok, true, p2.error); assert.equal(p2.upload.kind, 'Recording'); assert.equal(p2.upload.shared, false);
+  const uid = p2.upload.upload_id;
+  assert.equal((await require('../src/storage').get((await db.one(`select storage_key from uploads where upload_id=$1`, [uid])).storage_key)).length, m4a.length, 'the pieces join in order');
+  assert.match((await api(co, 'transcribe', { clientId: 'c2', uploadId: uid })).error, /clinician agreed/);
+  const t = await api(co, 'transcribe', { clientId: 'c2', uploadId: uid, consent: true, title: 'Pre-op with Dr. Smith', apptDate: '2026-10-01' });
+  assert.equal(t.ok, true, t.error); assert.equal(t.transcript.status, 'Working'); assert.ok(t.transcript.seconds >= 2, 'the length is measured');
+  assert.match((await api(co, 'transcribe', { clientId: 'c2', uploadId: uid, consent: true })).error, /already has a transcript/);
+  await require('../src/handlers/recordings').checkTranscripts();
+  let b = await api(co, 'bootstrap', { clientId: 'c2' });
+  const tr = b.transcripts.find(x => x.transcript_id === t.transcript.transcript_id);
+  assert.equal(tr.status, 'Ready'); assert.match(tr.text, /good morning/i);
+  const sam = await signIn('sam@example.com');
+  assert.equal((await api(sam, 'bootstrap', {})).transcripts.length, 0, 'the family sees nothing until it is shared');
+  assert.match((await api(sam, 'saveTranscript', { transcriptId: tr.transcript_id, shared: true })).error, /Not allowed/);
+  await api(co, 'saveTranscript', { clientId: 'c2', transcriptId: tr.transcript_id, text: tr.text + '\n\n(Checked by Joe.)', shared: true });
+  b = await api(sam, 'bootstrap', {});
+  assert.equal(b.transcripts.length, 1); assert.match(b.transcripts[0].text, /Checked by Joe/); assert.equal(b.transcripts[0].upload_id, undefined);
+  delete process.env.TRANSCRIBE_FAKE;
 });
