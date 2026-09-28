@@ -103,6 +103,7 @@ async function api(session, action, payload, req) {
     const h = H[action];
     if (typeof h !== 'function') return { ok: false, error: 'Unknown action' };
     if (ctx.role === 'supporter' && !H.SUPPORTER_OK[action]) return { ok: false, error: 'Not allowed' };
+    if (ctx.role === 'vendor' && !H.VENDOR_OK[action]) return { ok: false, error: 'Not allowed' };
     let out;
     try {
       if (core.fam(ctx) && H.OPEN_BEFORE_PAID.indexOf(action) < 0) {

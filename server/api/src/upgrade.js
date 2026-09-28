@@ -272,6 +272,18 @@ const STEPS = [
   `do $$ begin if not exists (select 1 from pg_trigger where tgname = 'record_history_scrub') then
       create trigger record_history_scrub before insert on record_history for each row execute function scrub_history_fn(); end if; end $$`,
 
+  // ---- vendors in the app, and the jobs families send them (2026-09-28): see handlers/jobs.js
+  `create table if not exists jobs (
+     job_id text primary key, client_id text not null references clients(client_id) on delete cascade,
+     service text not null default 'Other', city text not null default '', state text not null default '',
+     starts_at timestamptz not null, details text not null default '', address text not null default '',
+     status text not null default 'Open', vendor_id text, created_by text not null default '',
+     created_at timestamptz not null default now(), taken_at timestamptz, done_at timestamptz, extra jsonb not null default '{}'::jsonb)`,
+  `create index if not exists jobs_open_idx on jobs(status, city, service)`,
+  `create index if not exists jobs_client_idx on jobs(client_id)`,
+  `do $$ begin if not exists (select 1 from pg_constraint where conname='users_role_chk' and pg_get_constraintdef(oid) like '%vendor%') then
+      alter table users drop constraint if exists users_role_chk;
+      alter table users add constraint users_role_chk check (role in ('client','family','supporter','coordinator','vendor')); end if; end $$`,
   // ---- the audit tables are append-only. The one exception: purging a family after its retention period
   // may delete that family's history rows (they hold the record contents), and only inside a purge.
   // The copy in Cloud Logging is the record nothing here can touch.
