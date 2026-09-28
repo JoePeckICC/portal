@@ -259,14 +259,32 @@ function allergyMentions(all) {
 }
 // Medical questions in their own words: we pass these to the care team, we never answer them.
 const MED_Q = /\b(should (i|we|he|she|they) (stop|start|take|keep|skip)|is (that|it|this) (bad|normal|safe|okay|ok|serious|dangerous)|(might|may|have to|need to) (cancel|postpone)|stop (taking )?(my |his |her |their )?(metformin|insulin|aspirin|blood thinner|eliquis|warfarin|plavix|meds|medication)|how (long|much) (will|should) (it|the) (hurt|bleed|swell)|what (dose|should (i|we) take))/i;
+// Distress in their own words: a person to reach out to today, not a medical question. We never assess; we call, and point to 988 or 911.
+const DISTRESS = /\b(hopeless|no hope|can'?t go on|cannot go on|give up on (everything|life)|want to die|wish i (was|were) dead|end (it|my life)|kill (my|him|her)self|suicid|self[- ]harm|hurt (my|him|her)self|not safe at home|afraid (of|for) my (life|safety)|nobody cares|falling apart|breaking down|can'?t cope|cannot cope|overwhelmed and alone)\b/i;
+function distressMentions(all) {
+  const out = [];
+  writtenBits(all).forEach(b => { const m = DISTRESS.exec(b.text); if (m) out.push({ id: b.id, text: snip(b.text, m.index) }); });
+  return out.slice(0, 6);
+}
 function medicalQuestions(all) {
   const out = [];
-  writtenBits(all).forEach(b => { const m = MED_Q.exec(b.text); if (m) out.push({ id: b.id, text: snip(b.text, m.index) }); });
+  writtenBits(all).forEach(b => { if (DISTRESS.test(b.text)) return; const m = MED_Q.exec(b.text); if (m) out.push({ id: b.id, text: snip(b.text, m.index) }); });
   return out.slice(0, 6);
 }
 function intakeFlags(all) {
   const answers = visibleAnswers(all), out = [];
   allergyMentions(all).forEach(x => out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'Allergy mentioned — make sure it is on the chart: “' + x.text + '”', id: x.id }));
+  // Other things they wrote that change how we work: questions to us, a rideshare home, contact instructions, language.
+  { const seen = new Set(medicalQuestions(all).map(x => x.text));
+    writtenBits(all).forEach(bt => {
+      const t = bt.text;
+      if (/\b(uber|lyft|taxi|cab|rideshare|ride share)\b/i.test(t) && /home|discharge|pick/i.test(t)) out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'They mention a rideshare or taxi for the ride home: “' + snip(t, t.search(/uber|lyft|taxi|cab|ride ?share/i)) + '”', id: bt.id });
+      else if (/\b(copy|cc)\b.{0,40}\b(me|my|him|her)\b|\bnot on (the )?billing\b|\bdon'?t (call|email|text)\b|\bonly (call|email|text)\b|paper cop|by (mail|post)\b|print(ed)? (copies|out)|hard of hearing|\bdeaf|hearing aid|interpreter|large print|sign language|can'?t see well|low vision/i.test(t)) out.push({ tier: 'Mode', label: 'How to reach them, in their words: “' + snip(t, 0) + '”', id: bt.id });
+      else if (t.indexOf('?') > 0 && !seen.has(snip(t, t.indexOf('?')))) out.push({ tier: 'Mode', label: 'A question they asked us in the form: “' + snip(t, Math.max(0, t.lastIndexOf('.', t.indexOf('?')) + 1)) + '”', id: bt.id });
+    });
+    const lang = ans(all, 'A.1'); if (lang && lang !== 'English') out.push({ tier: 'Mode', label: 'Language: ' + lang + (det(all, 'A.1') ? ' — ' + det(all, 'A.1') : ''), id: 'A.1' });
+  }
+  distressMentions(all).forEach(x => out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'DISTRESS in their words — reach out today; if there is any risk, 988 (or 911 if someone is in danger): “' + x.text + '”', id: x.id }));
   medicalQuestions(all).forEach(x => out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'Medical question in their words — pass it to the surgeon’s office, do not answer it: “' + x.text + '”', id: x.id }));
   // Filled in on an older version of the form: the answers the current form needs are listed, so nothing is assumed.
   const sent = /Submitted|Updated after submitting/.test(String((all._status && all._status.a) || '')); const miss = sent ? missingRequired(all) : []; if (miss.length) out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'Required answers still blank (the form changed after they filled it in): ' + miss.join(', '), id: miss[0].split(' ')[0] });
@@ -361,4 +379,4 @@ async function specFor() {
   try { names = (await db.all(`select name from hospital_walks order by name`)).map(r => r.name); } catch (e) {}
   return intakeSpec(names);
 }
-module.exports = { allergyMentions, medicalQuestions, specFor, intakeSpec, readIntake, writeIntake, visibleQs, visibleAnswers, walk, cond, emergencyPath, missingRequired, phoneOk, initialsProblem, tidyAnswer, ans, has, det, detailId, isPatient, roleOf, modeOf, servicesOf, intakeFlags, seedPlan, DK_, DISCUSS_, RNS_, EMERGENCY_ };
+module.exports = { allergyMentions, medicalQuestions, distressMentions, DISTRESS, specFor, intakeSpec, readIntake, writeIntake, visibleQs, visibleAnswers, walk, cond, emergencyPath, missingRequired, phoneOk, initialsProblem, tidyAnswer, ans, has, det, detailId, isPatient, roleOf, modeOf, servicesOf, intakeFlags, seedPlan, DK_, DISCUSS_, RNS_, EMERGENCY_ };

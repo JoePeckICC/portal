@@ -8,7 +8,7 @@
 const CHECKLISTS = [
   { id: 'ready', title: 'Ready for surgery day', when: 'The last week', lead: 'The things that cancel surgeries on the day. Tick each one once the whole household knows it.', items: [
     { id: 'fast', text: 'Everyone in the house knows the fasting cut-off — food and drink, and from when', note: 'From the pre-op call. Write the stop times down; they are the team’s rules.' },
-    { id: 'stop', text: 'Medication stop dates are on the calendar, exactly as the team wrote them', note: 'Blood thinners, supplements, some pain medicines. The team decides; you track.' },
+    { id: 'stop', text: 'Medication stop dates are on the calendar, exactly as the team wrote them', note: 'The team decides which, and when; you track the dates they gave.' },
     { id: 'tests', text: 'Pre-op tests are done and the results were confirmed back to the surgeon', note: 'Ask the office: “Do you have everything you need from us?”' },
     { id: 'auth', text: 'Insurance authorization is confirmed', note: 'Call the number on the card and ask for the authorization number.' },
     { id: 'sick', text: 'You know what to do if anyone in the house gets sick this week', note: 'A cold, a fever, a dental or skin problem — tell the team, do not hide it.' },
@@ -44,7 +44,7 @@ const CHECKLISTS = [
     { id: 'meds', text: 'The exact medication schedule — what, how much, when, and what to do if a dose is missed', note: 'On paper. Photograph it too.' },
     { id: 'call', text: 'Who to call once you are home, at what number, and what counts as “call now”', note: 'The post-op line, the after-hours number, and the team’s own list of warning signs.' },
     { id: 'follow', text: 'When the follow-up appointments are and who books them', note: 'If “someone will call you,” ask who and when.' },
-    { id: 'escort', text: 'The named adult escort is here, with the car', note: 'Rideshare alone is usually not allowed.' },
+    { id: 'escort', text: 'The named adult escort is here, with the car', note: 'Many hospitals will not release to a rideshare alone — the surgeon’s office can tell you theirs.' },
     { id: 'equip', text: 'Equipment is at home or in the car — walker, shower chair, whatever the team ordered' },
     { id: 'rx', text: 'Prescriptions are filled, or you know which pharmacy has them and its hours today' },
     { id: 'papers', text: 'The discharge papers are in the bag', note: 'Upload them in the portal once home — that is how the medication list gets built.' }
