@@ -205,6 +205,28 @@ test('coordinator picks a family; messaging round-trip notifies the right people
   assert.equal(row.read_by_client, true);
 });
 
+test('a family writes to their own circle; the coordinator never sees it; delete hides it only for the one who deleted', async () => {
+  const pat = await signIn('pat@example.com'), sis = await signIn('sis@example.com'), co = await signIn('joe@incadencecare.com');
+  const t = await api(pat, 'newTopic', { to: ['sis@example.com'] });
+  assert.equal(t.ok, true); assert.equal(t.topic.kind, 'family');
+  const n = mail.sent.length;
+  const m = await api(pat, 'sendMessage', { topicId: t.topic.topic_id, body: 'Can you drive Tuesday?' });
+  assert.equal(m.ok, true);
+  assert.deepEqual(mail.sent.slice(n).map(x => x.to), ['sis@example.com'], 'only the sister hears about it');
+  const bs = await api(sis, 'bootstrap', {}); assert.ok(bs.topics.some(x => x.topic_id === t.topic.topic_id));
+  const bc = await api(co, 'bootstrap', { clientId: 'c1' });
+  assert.ok(!bc.topics.some(x => x.topic_id === t.topic.topic_id), 'coordinator does not see it');
+  assert.ok(!bc.messages.some(x => x.topic_id === t.topic.topic_id));
+  assert.equal((await api(co, 'topicMessages', { clientId: 'c1', topicId: t.topic.topic_id })).ok, false);
+  assert.equal((await api(co, 'sendMessage', { clientId: 'c1', topicId: t.topic.topic_id, body: 'x' })).ok, false);
+  const h = await api(pat, 'hideTopic', { topicId: t.topic.topic_id, hidden: true }); assert.equal(h.ok, true);
+  const row = await db.one(`select extra from topics where topic_id=$1`, [t.topic.topic_id]);
+  assert.deepEqual(row.extra.hidden, ['pat@example.com'], 'kept on record, hidden for the patient only');
+  await api(sis, 'sendMessage', { topicId: t.topic.topic_id, body: 'Yes' });
+  const row2 = await db.one(`select extra from topics where topic_id=$1`, [t.topic.topic_id]);
+  assert.equal(row2.extra.hidden, undefined, 'a new line brings it back');
+});
+
 test('supporters only get updates', async () => {
   const s = await signIn('aunt@example.com').catch(() => null);
   assert.equal(s, null, 'aunt is in the circle table but has no user row yet');
