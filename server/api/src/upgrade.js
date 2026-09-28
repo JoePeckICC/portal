@@ -4,6 +4,14 @@
 const db = require('./db');
 
 const STEPS = [
+  // ---- appointment recordings into text (2026-09-27): see handlers/recordings.js
+  `create table if not exists transcripts (
+     transcript_id text primary key, client_id text not null references clients(client_id) on delete cascade, upload_id text not null default '',
+     title text not null default '', appt_date date, status text not null default 'Working', op_name text not null default '', speech_key text not null default '',
+     seconds integer not null default 0, billed_seconds integer not null default 0, text text not null default '', error text not null default '',
+     shared boolean not null default false, consent_by text not null default '', consent_at timestamptz, created_by text not null default '',
+     created_at timestamptz not null default now(), updated_at timestamptz not null default now())`,
+  `create index if not exists transcripts_client_idx on transcripts(client_id)`,
   // ---- the marketplace, step 1, and the needs log (2026-09-27): see handlers/market.js
   `create table if not exists vendors (
      vendor_id text primary key, name text not null, city text not null default '', state text not null default '',
@@ -246,7 +254,7 @@ const STEPS = [
        values (who, r, ip, TG_TABLE_NAME, rid, cid, lower(tg_op), b, a);
      return null;
    end $$`,
-  ...[['clients','client_id'],['users','email'],['plan_items','plan_id'],['tasks','task_id'],['goals','goal_id'],['topics','topic_id'],['messages','message_id'],['updates','update_id'],['circle','circle_id'],['intake_answers','question_id'],['appointments','appt_id'],['care_team','member_id'],['referrals','referral_id'],['medications','med_id'],['doses','dose_id'],['uploads','upload_id'],['vendor_bills','bill_id'],['assistance','program_id'],['recommendations','rec_id']]
+  ...[['clients','client_id'],['users','email'],['plan_items','plan_id'],['tasks','task_id'],['goals','goal_id'],['topics','topic_id'],['messages','message_id'],['updates','update_id'],['circle','circle_id'],['intake_answers','question_id'],['appointments','appt_id'],['care_team','member_id'],['referrals','referral_id'],['medications','med_id'],['doses','dose_id'],['uploads','upload_id'],['vendor_bills','bill_id'],['assistance','program_id'],['recommendations','rec_id'],['transcripts','transcript_id']]
     .map(([t, k]) => `do $$ begin
       if not exists (select 1 from pg_trigger where tgname = '${t}_history') then
         create trigger ${t}_history after insert or update or delete on ${t} for each row execute function record_history_fn('${k}');

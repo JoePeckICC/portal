@@ -82,7 +82,7 @@ function fileUrl(ctx, u) {
 }
 function docPublic(u, ctx) {
   let k = String(u.kind || 'Other'); k = k === 'discharge' ? 'Discharge' : k === 'other' ? 'Other' : k;
-  return { upload_id: u.upload_id, kind: C.DOC_KINDS.indexOf(k) >= 0 ? k : 'Other', name: u.name, url: ctx ? fileUrl(ctx, u) : (u.storage_key ? '' : u.url), file_id: u.file_id || '', uploaded_by: u.uploaded_by, uploaded_at: u.uploaded_at, note: u.note || '', shared: u.shared === null || u.shared === undefined ? true : isTrue(u.shared) };
+  return { upload_id: u.upload_id, mime: u.mime || '', kind: C.DOC_KINDS.indexOf(k) >= 0 ? k : 'Other', name: u.name, url: ctx ? fileUrl(ctx, u) : (u.storage_key ? '' : u.url), file_id: u.file_id || '', uploaded_by: u.uploaded_by, uploaded_at: u.uploaded_at, note: u.note || '', shared: u.shared === null || u.shared === undefined ? true : isTrue(u.shared) };
 }
 const msgPublic = (m, ctx) => ({ ...m, attachments: (Array.isArray(m.attachments) ? m.attachments : []).map(a => (ctx && a.id && !/^https?:\/\/(drive|docs)\.google\.com/.test(a.url || '') ? { ...a, url: fileUrl(ctx, { upload_id: a.id, storage_key: 'x' }) } : a)) });
 

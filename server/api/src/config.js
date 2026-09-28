@@ -32,7 +32,7 @@ module.exports = {
   CO_KINDS: { urgent: 'Urgent messages', missed: 'Missed-dose check-ins', billing: 'Declined cards and payment problems', bookingSoon: 'Bookings for today or tomorrow', message: 'Messages', booking: 'Bookings further out', upload: 'Uploads', meds: 'Medications to review', intake: 'Intake finished or changed', assist: 'Assistance asks and payments in', comment: 'Circle comments to approve', quiet: 'A family gone quiet', medical: 'Medical questions', er: 'ER and 911 alerts', checkin: 'Low check-ins' },
   CO_DEFAULTS: { urgent: 'instant', missed: 'instant', billing: 'instant', bookingSoon: 'instant', message: 'digest', booking: 'digest', upload: 'digest', meds: 'digest', intake: 'digest', assist: 'digest', comment: 'digest', quiet: 'instant', medical: 'instant', er: 'instant', checkin: 'instant' },
   MED_STATUSES: ['Pending review', 'Accepted', 'Stopped'],
-  DOC_KINDS: ['Discharge', 'Insurance', 'Forms', 'Letters', 'Living will', 'Other'],
+  DOC_KINDS: ['Discharge', 'Insurance', 'Forms', 'Letters', 'Living will', 'Recording', 'Other'],
   DEFAULT_MONTHLY: 599,
   BILL_STATUSES: ['Estimate', 'Due', 'Paid', 'Covered', 'Waiting on insurance', 'Needs prior auth', 'Looks like a duplicate', 'Disputed'],
   ASSIST_STATUSES: ['Suggested', 'Coordinator is on it', 'Applied', 'Approved', 'Not a fit'],

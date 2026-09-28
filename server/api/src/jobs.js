@@ -14,6 +14,7 @@ const { localToIso } = require('./time');
 async function medReminders() {
   try { await core.flushHeld(); } catch (e) { console.error('flushHeld', e.message); }
   try { await reflections(); } catch (e) { console.error('reflections', e.message); }
+  try { await require('./handlers/recordings').checkTranscripts(); } catch (e) { console.error('transcripts', e.message); }
   const now = new Date(), today = ymd(now, C.TZ);
   const meds = await db.all(`select m.*, c.status client_status from medications m join clients c on c.client_id=m.client_id where m.status='Accepted' and m.frequency<>'As needed' and trim(m.times)<>'' and c.status<>'Archived'`);
   const byClient = {};
