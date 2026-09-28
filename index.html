@@ -54,12 +54,12 @@ input,select,textarea,button{scroll-margin-top:110px}
 .ic-cta--sm:hover{background:var(--gold);color:var(--ink)}
 
 /* welcome band + tiles */
-.hero{position:relative;background:var(--ink) linear-gradient(160deg,#1A2736 0%,#1F3144 50%,#28425D 100%);padding:34px 20px 0;text-align:center;overflow:visible;overflow-x:clip}
+.hero{position:relative;background:var(--ink) linear-gradient(160deg,#1A2736 0%,#1F3144 50%,#28425D 100%);padding:62px 20px 0;text-align:center;overflow:visible;overflow-x:clip}
 .hero .curve{position:absolute;left:0;right:0;bottom:-1px;height:120px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120' preserveAspectRatio='none'%3E%3Cpath fill='%23F6F4EF' d='M0 120 L0 100 L230 100 C560 100 880 40 1210 40 L1440 40 L1440 120 Z'/%3E%3C/svg%3E") bottom/100% 100% no-repeat;pointer-events:none}
 @media (max-width:760px){.hero .curve{height:60px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 60' preserveAspectRatio='none'%3E%3Cpath fill='%23F6F4EF' d='M0 60 L0 52 L90 52 C160 52 240 24 310 24 L400 24 L400 60 Z'/%3E%3C/svg%3E")}}
 .hero .hero-in{position:relative;min-height:96px}
-.hero .hello{font-family:'Fraunces',Georgia,serif;font-size:40px;font-weight:500;letter-spacing:-.01em;color:#fff;margin:8px 0 0}
-.tiles{position:relative;display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin:26px auto 0;transform:translateY(46px);max-width:1400px}
+.hero .hello{font-family:'Fraunces',Georgia,serif;font-size:46px;font-weight:500;letter-spacing:-.01em;color:#fff;margin:8px 0 0}
+.tiles{position:relative;display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin:-4px auto 0;transform:translateY(46px);max-width:1400px}
 .tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;width:112px;height:116px;background:#fff;border-radius:10px;box-shadow:0 8px 24px rgba(28,42,58,.18);text-decoration:none;color:var(--ink);font-size:14px;font-weight:700;position:relative;border-top:4px solid transparent}
 .tile svg{width:34px;height:34px;fill:none;stroke:var(--ink);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tile:hover{color:var(--ink);transform:translateY(-2px)}
@@ -408,8 +408,9 @@ input,select,textarea,button{scroll-margin-top:110px}
   .lockup svg{height:26px}
   .ic-cta--sm{padding:8px 12px;font-size:13px;white-space:nowrap}
   .hero .hero-in{min-height:0;padding-bottom:6px}
-  .hero{padding-top:24px}
-  .hero .hello{font-size:28px}
+  .hero{padding-top:52px}
+  .hero .hello{font-size:34px;margin-top:4px}
+  .hero .tiles{margin-top:-8px}
   .tiles{gap:10px;max-width:100%;padding:0 8px}
   .tile{width:calc(33.33% - 8px);height:96px;font-size:12px;gap:8px}
   .tile svg{width:26px;height:26px}
@@ -785,13 +786,19 @@ function refresh(){
 }
 
 // ---------------------------------------------------------------- render
+// Someone in a family's circle gives their ZIP code once, so the family can ask the people who live nearby for a hand.
+function zipAsk(pg){var d=S.data;if(d.me.zip||S.zipLater)return;var fam=famName((d.client&&d.client.family_name)||'')||'the family';
+  var c=el('<form class="card" style="margin:16px auto;max-width:640px"><span class="k">One quick thing</span><p style="margin:8px 0 10px">What ZIP code do you live in? When '+esc(fam)+' needs a ride or a meal, they can ask the people in their circle who live nearby. People far away are never asked.</p><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input name="zip" inputmode="numeric" maxlength="5" placeholder="37203" style="max-width:120px" aria-label="ZIP code"><button class="btn" type="submit">Save</button><a href="#" class="small later">Not now</a></div><p class="err"></p></form>');
+  $('.later',c).onclick=function(ev){ev.preventDefault();S.zipLater=true;render()};
+  c.onsubmit=function(ev){ev.preventDefault();var z=$('input',c).value.trim();busy($('button',c),true,'Saving…');call('savePrefs',{zip:z}).then(function(){d.me.zip=z;toast('Saved.');render()}).catch(function(e){$('.err',c).textContent=e.message;busy($('button',c),false,'Save')})};
+  var host=$('#view',pg)||$('.wrap',pg)||$('.main',pg)||pg;host.insertBefore(c,host.firstChild)}
 function render(){
   var app=$('#app');
   if(!S.session){app.innerHTML='';app.appendChild(gate());return}
   if(!S.data){app.innerHTML='<div class="gate"><div class="muted">Opening your portal&hellip;</div></div>';return}
   if(S.data.error){app.innerHTML='';app.appendChild(el('<div class="gate"><div class="card"><div class="k">'+esc(BOOT.appName)+'</div><h1 style="margin:12px 0">Something is off.</h1><p class="muted">'+esc(S.data.error)+'</p><p><button class="btn quiet" id="so">Sign out</button></p></div></div>'));$('#so').onclick=signOut;return}
-  if(S.data.me.role==='supporter'){app.innerHTML='';app.appendChild(supporterPage());return}
-  app.innerHTML='';app.appendChild(S.data.me.role==='coordinator'?coShell():S.data.me.role==='vendor'?vendorShell():shell());
+  if(S.data.me.role==='supporter'){app.innerHTML='';var sp=supporterPage();zipAsk(sp);app.appendChild(sp);return}
+  app.innerHTML='';var pg=S.data.me.role==='coordinator'?coShell():S.data.me.role==='vendor'?vendorShell():shell();if(S.data.me.role==='family'&&(S.view||'home')==='home')zipAsk(pg);app.appendChild(pg);
   syncRoute();
 }
 // Each screen has its own address (#plan, #record:docs, #co-library), so refresh and Back keep your place.
@@ -1378,6 +1385,12 @@ function findPick(){
 var HELP_SOON={asap:'As soon as possible',days:'In the next few days',week:'This week',flex:'No rush'};
 function helpMode(svc){return svc==='Lodging'?'stay':(svc==='Help at home'||svc==='Medical equipment')?'soon':'time'}
 function jobInfoHtml(j){return (j.info||[]).map(function(x){return'<div class="small"><b>'+esc(x.l)+':</b> '+esc(x.v)+'</div>'}).join('')}
+// Where a request stands, in a line: the circle's casting call, a loan, a vendor.
+function jobStatus(j){var d=S.data,cf=first(d.coordinator&&d.coordinator.name)||'your coordinator',c=j.circle;
+  if(j.loan)return j.status==='Open'?'Waiting for '+esc(cf):'<b>'+esc(j.lent_by||cf)+'</b> is lending it';
+  if(j.circle_by)return '<b>'+esc(j.circle_by)+'</b> stepped up';
+  if(j.status==='Open'&&c&&!c.released)return 'Asked your circle'+(c.until?' — until '+esc(fmtTime(c.until))+', then the support team':'');
+  return j.status==='Open'?(j.direct&&j.vendor_name?'Waiting for '+esc(j.vendor_name)+' to confirm':'Waiting for someone to take it'):'<b>'+esc(j.vendor_name)+'</b> has this covered'}
 function jobWhen(j){if(j.soon&&HELP_SOON[j.soon])return 'Needed: '+HELP_SOON[j.soon].toLowerCase();if(j.until){var f=function(k){var p=String(k).split('-');return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})};return f(j.from||dayKey(toDate(j.starts_at)))+' – '+f(j.until)}return fmtWhen(j.starts_at)}
 // The questions for each kind of help. k: key; t: text | addr | num | sel | area | check; p: private (an address).
 function helpQs(svc,st){
@@ -1444,6 +1457,9 @@ function helpForm(service){
     qs.forEach(function(q){var e=qEl(q);f.appendChild(e);var i=$('[data-q]',e);if(q.k==='kind'||q.k==='item'||q.k==='get')i.onchange=function(){keep();draw()}});
     var nf=el('<div class="field"><label>'+(saved&&!co&&!loan?'Your usual note (loaded — change it for this time if you need to)':'Anything else they should know')+'</label><textarea class="hn" maxlength="600" style="min-height:64px">'+esc(st.note||'')+'</textarea>'+(co||loan?'':'<label class="small" style="display:flex;gap:8px;align-items:center;margin-top:6px;font-weight:400"><input type="checkbox" class="keep" style="width:auto"'+(saved?'':' checked')+'> Keep this as my usual note</label>')+(loan?'':'<div class="small muted" style="margin-top:4px">Leave out anything medical — this goes to your support team.</div>')+'</div>');
     $('textarea',nf).oninput=function(){st.touched=true};f.appendChild(nf);
+    // Quiet by default: our support team. Asking the circle first is a box to tick, and only when someone in it lives nearby.
+    if(!loan&&!co&&d.circleNear){var ws=el('<div class="field" style="margin-top:4px"><label class="small" style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" class="askc" style="width:auto"'+(st.circle?' checked':'')+'> <span>Ask people in my circle who live nearby first <span class="muted">· '+d.circleNear+' nearby</span></span></label>'+(st.circle?'<select name="circle" style="margin-top:6px"><option value="1">1 hour, then our support team</option><option value="2">2 hours, then our support team</option><option value="4">4 hours, then our support team</option><option value="only">Only my circle</option></select>':'')+'</div>');
+      $('.askc',ws).onchange=function(){keep();st.circle=this.checked?'2':'';draw()};var cs=$('select',ws);if(cs){cs.value=st.circle;cs.onchange=function(){st.circle=this.value}}f.appendChild(ws)}
     f.appendChild(el('<button class="btn block" type="submit">'+(loan?'Ask to borrow it':'Ask for help')+'</button>'));
     f.appendChild(el('<p class="small muted" style="margin:10px 0 0">'+(loan?esc(first(d.coordinator&&d.coordinator.name)||'Your coordinator')+' lends equipment from the loan closet near you and sets up the drop-off.':co?'Trusted people near the family are told by text; the first to take it has it.':'Trusted people near you are told right away. The first to take it has it, and you will see who.')+'</p>'));
     f.appendChild(el('<p class="err"></p>'));
@@ -1452,10 +1468,10 @@ function helpForm(service){
       else if(mode==='stay'){if(!st.day||!st.out){err.textContent=st.day?'Tap the check-out day.':'Tap the check-in day.';return}q.from=dayKey(st.day);q.until=dayKey(st.out)}
       else{if(!st.day||!st.slot){err.textContent=st.day?'Pick a time.':'Pick the day.';return}q.startsAt=st.slot}
       var miss=qs.filter(function(x){return x.req&&!String(st.f[x.k]||'').trim()})[0];if(miss){err.textContent='Fill in: '+miss.l.toLowerCase()+'.';return}
-      q.info=qs.filter(function(x){return String(st.f[x.k]||'').trim()}).map(function(x){return{l:x.l,v:x.t==='check'?'Yes':String(st.f[x.k]).trim(),p:!!x.p}});
+      if(st.circle)q.circle=st.circle;q.info=qs.filter(function(x){return String(st.f[x.k]||'').trim()}).map(function(x){return{l:x.l,v:x.t==='check'?'Yes':String(st.f[x.k]).trim(),p:!!x.p}});
       if(q.service==='Rides'||q.service==='Childcare'||q.service==='Meals'){var a=qs.filter(function(x){return x.t==='addr'&&(x.k==='from'||x.k==='where'||x.k==='to')})[0];if(a)q.address=String(st.f[a.k]||'')}
       var kp=$('.keep',f),note=q.details;busy($('button[type=submit]',f),true,'Sending…');
-      (kp&&kp.checked&&note.trim()!==saved.trim()?call('saveCareNote',{service:st.svc,text:note}):Promise.resolve()).then(function(){return call('requestJob',q)}).then(function(){S.hst=null;toast(loan?'Sent to '+(first(d.coordinator&&d.coordinator.name)||'your coordinator')+'.':'Sent. We will show you who takes it.');return refresh()}).catch(function(e){err.textContent=e.message;busy($('button[type=submit]',f),false,loan?'Ask to borrow it':'Ask for help')})};
+      (kp&&kp.checked&&note.trim()!==saved.trim()?call('saveCareNote',{service:st.svc,text:note}):Promise.resolve()).then(function(){return call('requestJob',q)}).then(function(){S.hst=null;toast(loan?'Sent to '+(first(d.coordinator&&d.coordinator.name)||'your coordinator')+'.':q.circle?'Sent to your circle. We will show you who steps up.':'Sent. We will show you who takes it.');return refresh()}).catch(function(e){err.textContent=e.message;busy($('button[type=submit]',f),false,loan?'Ask to borrow it':'Ask for help')})};
     b.appendChild(f)}
   draw();return card}
 // Coming up: calls with the coordinator, visits, and help that is booked or asked for, soonest first.
@@ -1467,10 +1483,12 @@ function comingUp(){
   (d.jobs||[]).forEach(function(j){var w=toDate(j.starts_at);if(w&&(w>=t0||j.soon)&&(j.status==='Open'||j.status==='Taken'))items.push({w:w,j:j})});
   items.sort(function(x,y){return x.w-y.w});
   var c=el('<div class="card"><span class="k">Coming up</span><div class="ul"></div></div>'),ul=$('.ul',c);
-  if(!items.length)ul.appendChild(el('<div class="small muted" style="padding:8px 0">Nothing set up yet.</div>'));
+  (d.borrowed||[]).forEach(function(e){ul.appendChild(el('<div class="ap" style="flex-direction:column;align-items:flex-start;gap:2px"><b>Borrowed: '+esc(e.label||e.kind)+'</b><span class="small muted">From the loan closet'+(e.due_back?' · due back '+esc(fmtDate(toDate(e.due_back+'T12:00')))+'':'')+'</span></div>'))});
+  if((d.borrowed||[]).length)items=items.filter(function(it){return !(it.j&&it.j.loan&&it.j.status==='Taken')});
+  if(!items.length&&!(d.borrowed||[]).length)ul.appendChild(el('<div class="small muted" style="padding:8px 0">Nothing set up yet.</div>'));
   items.forEach(function(it){var r;
     if(it.a){var a=it.a;r=el('<a href="#" class="ap cuit" style="flex-direction:column;align-items:flex-start;gap:2px;text-decoration:none;color:inherit"><b>'+esc(fmtWhen(a.starts_at))+'</b><span>'+esc(a.title)+(a.location?' · '+esc(a.location):'')+'</span><span class="small cumore">Details ›</span></a>');r.onclick=function(ev){ev.preventDefault();S.sheet='cu:a:'+a.appt_id;render()}}
-    else{var j=it.j,stx=j.loan&&j.status==='Open'?'Waiting for '+esc(first(d.coordinator&&d.coordinator.name)||'your coordinator'):j.status==='Open'?(j.direct&&j.vendor_name?'Waiting for '+esc(j.vendor_name)+' to confirm':'Waiting for someone to take it'):'<b>'+esc(j.vendor_name)+'</b> has this covered';
+    else{var j=it.j,stx=jobStatus(j);
       r=el('<a href="#" class="ap cuit" style="flex-direction:column;align-items:flex-start;gap:2px;text-decoration:none;color:inherit"><b>'+esc(jobWhen(j))+'</b><span>'+esc(j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':j.service)+'</span><span class="small muted">'+stx+'</span><span class="small cumore">Details ›</span></a>');r.onclick=function(ev){ev.preventDefault();S.sheet='cu:j:'+j.job_id;render()}}
     ul.appendChild(r)});
   return c}
@@ -1487,10 +1505,11 @@ function cuSheet(){
     else if(a.location&&!/^(phone|video)$/i.test(a.location)){var mc=el('<div class="card"><span class="k">Where</span></div>');mc.appendChild(placeMap(a.location));b.appendChild(mc)}
     return sheetEl(a.title,b)}
   if(p[1]==='j'){var j=(d.jobs||[]).filter(function(x){return String(x.job_id)===p[2]})[0];if(!j)return null;
-    var what=j.loan?'Borrow: '+(((j.info||[]).filter(function(x){return/borrow|what is it/i.test(x.l)})[0]||{}).v||'equipment'):j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':j.service,stx=j.loan&&j.status==='Open'?'Waiting for '+esc(first(d.coordinator&&d.coordinator.name)||'your coordinator'):j.status==='Open'?(j.direct&&j.vendor_name?'Waiting for '+esc(j.vendor_name)+' to confirm':'Waiting for someone to take it'):'<b>'+esc(j.vendor_name)+'</b> has this covered';
+    var what=j.loan?'Borrow: '+(((j.info||[]).filter(function(x){return/borrow|what is it/i.test(x.l)})[0]||{}).v||'equipment'):j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':j.service,stx=jobStatus(j);
     var jc=el('<div class="card"><span class="k">'+esc(jobWhen(j))+'</span><h2 style="margin:8px 0 4px">'+esc(what)+'</h2><p style="margin:0">'+stx+'</p><div style="margin-top:8px;display:grid;gap:2px">'+jobInfoHtml(j)+'</div>'+(j.details?'<p class="small" style="margin:8px 0 0">'+esc(j.details)+'</p>':'')+'<p style="margin:12px 0 0;display:flex;gap:14px">'+(j.topic_id?'<a href="#" class="small msg">Message '+esc(first(j.vendor_name)||'them')+'</a>':'')+'<a href="#" class="small cx" style="color:var(--muted)">Cancel this</a></p></div>');
     var mg=$('.msg',jc);if(mg)mg.onclick=function(ev){ev.preventDefault();S.sheet=null;var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t)};
     $('.cx',jc).onclick=function(ev){ev.preventDefault();if(!uiOk('Cancel this?'+(j.status==='Taken'?' '+j.vendor_name+' is told.':''),this,arguments))return;call('cancelJob',{jobId:j.job_id}).then(function(){S.sheet=null;return refresh()}).catch(alertErr)};
+    if(j.status==='Open'&&j.circle&&!j.circle.released){var an=el('<p style="margin:10px 0 0"><button type="button" class="btn sm">Ask our support team now</button></p>');$('button',an).onclick=function(){var bb=this;busy(bb,true,'Sending…');call('askUsNow',{jobId:j.job_id}).then(function(){toast('Sent to the support team.');return refresh()}).catch(alertErr)};jc.appendChild(an)}
     b.appendChild(jc);
     return sheetEl(what,b)}
   return null}
@@ -2477,7 +2496,7 @@ function libraryView(){
   else side.appendChild(el('<div class="pn"><div class="ph">The two tracks</div><div style="padding:12px;font-size:13px;line-height:1.5"><b>Open</b> pieces are the same things the public site carries. <b>Members</b> pieces live only here — the surgeon Q&amp;As, the living-will guide, the pharmacist walk-throughs. Families see the whole library, sorted for their stage.<div style="margin-top:8px" class="muted">Videos: paste an unlisted YouTube or Vimeo link. Files: a Google Drive link from the shared drive. Articles and guides: write them in the box — they never leave the portal.</div></div></div>'));
   side.appendChild(el('<div class="pn" style="margin-top:12px"><div class="ph">Recommend to a family</div><div style="padding:12px;font-size:13px;line-height:1.5">Open any family’s chart and press <b>Recommend</b>. Pick a piece, add a line, send. It pins to the top of their Resources page and lands in their Automated messages.</div></div>'));
   side.appendChild(shelvesEl());
-  side.appendChild(vendorsEl());side.appendChild(needsEl());
+  side.appendChild(vendorsEl());side.appendChild(closetEl());side.appendChild(needsEl());
   return v;
 }
 function resForm(){
@@ -3202,6 +3221,36 @@ function vendorForm(v,svc){
   var f=el('<form class="card" style="margin:8px 12px"><span class="k">'+(v.vendor_id?'Edit vendor':'New vendor')+'</span><div class="two" style="margin-top:8px"><div class="field"><label>Name</label><input name="name" required maxlength="160" value="'+esc(v.name||'')+'"></div><div class="field"><label>Service</label><select name="service">'+svc.map(function(x){return '<option'+(x===(v.service||'Rides')?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></div></div><div class="two"><div class="field"><label>City</label><input name="city" required maxlength="60" value="'+esc(v.city||'')+'"></div><div class="field"><label>State</label><input name="state" maxlength="4" value="'+esc(v.state||'')+'" style="max-width:80px"></div></div><div class="two"><div class="field"><label>Phone</label><input name="phone" maxlength="40" value="'+esc(v.phone||'')+'"></div><div class="field"><label>Email</label><input name="email" type="email" maxlength="160" value="'+esc(v.email||'')+'"></div></div><div class="field"><label>Website (https://…)</label><input name="website" maxlength="300" value="'+esc(v.website||'')+'"></div><div class="field"><label>Price, in their words</label><input name="price" maxlength="120" value="'+esc(v.price||'')+'" placeholder="$45 each way within 20 miles"></div><div style="display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 10px"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="insured"'+(v.insured?' checked':'')+' style="width:auto"> Insured</label><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="checked"'+(v.checked?' checked':'')+' style="width:auto"> Background-checked</label><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="active"'+(v.vendor_id&&!v.active?'':' checked')+' style="width:auto"> In use</label></div><div class="field"><label>Your notes (never shown to families)</label><textarea name="notes" maxlength="2000">'+esc(v.notes||'')+'</textarea></div><div style="display:flex;gap:8px;align-items:center"><button class="btn sm" type="submit">Save</button><a href="#" class="small cancel">Cancel</a></div><p class="err"></p></form>');
   $('.cancel',f).onclick=function(ev){ev.preventDefault();S.vEdit=null;render()};
   f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f);fd.vendorId=v.vendor_id||'';var b=$('button',f);b.disabled=true;call('saveVendor',fd).then(function(){S.vEdit=null;return refresh()}).catch(function(e){$('.err',f).textContent=e.message;b.disabled=false})};
+  return f}
+// The loan closet: equipment kept in each city and lent to families. Requests to borrow come first, each with
+// the pieces in that city's closet that could answer it; then the closet itself, by city.
+function closetEl(){
+  var d=S.data,all=d.equipment||[],asks=d.loanAsks||[],KINDS=d.equipmentKinds||['Walker','Wheelchair','Shower chair','Other'];
+  var w=el('<div class="pn" style="margin-top:12px"><div class="ph"><span>Loan closet <span class="wpill gray">'+all.filter(function(e){return e.status==='In closet'}).length+' in</span> <span class="wpill gray">'+all.filter(function(e){return e.status==='On loan'}).length+' out</span></span><a href="#" class="btn sm ne">+ Add equipment</a></div><div style="padding:8px 12px;font-size:12px;color:var(--muted)">Walkers, wheelchairs, shower chairs — kept in each city and lent to families, so no one buys something they use for a month. Nothing is deleted; worn-out pieces are retired.</div><div class="cl"></div></div>'),l=$('.cl',w);
+  $('.ne',w).onclick=function(ev){ev.preventDefault();S.eEdit={};render()};
+  if(S.eEdit)l.appendChild(equipForm(S.eEdit,KINDS));
+  // Requests to borrow
+  if(asks.length){l.appendChild(el('<div class="small" style="padding:8px 12px 2px;font-weight:700">Asked to borrow</div>'));
+    asks.forEach(function(a){var want=((a.info||[]).filter(function(x){return/borrow|what is it/i.test(x.l)}).map(function(x){return x.v})[0])||'Equipment',rest=(a.info||[]).filter(function(x){return!/borrow|what is it/i.test(x.l)}).map(function(x){return esc(x.l)+': '+esc(x.v)}).join(' · ');
+      var fit=all.filter(function(e){return e.status==='In closet'&&String(e.city).toLowerCase()===String(a.city).toLowerCase()}).sort(function(x,y){return (y.kind===want)-(x.kind===want)});
+      var due=new Date(Date.now()+30*864e5),r=el('<div class="wr" style="grid-template-columns:1fr;gap:6px"><div><b>'+esc(want)+'</b> for '+esc(a.family)+' · '+esc(a.city)+(a.soon?' · '+esc((HELP_SOON[a.soon]||'').toLowerCase()):'')+(rest?'<div class="small muted">'+rest+'</div>':'')+(a.details?'<div class="small">'+esc(a.details)+'</div>':'')+'</div>'+(fit.length?'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><select class="pick" style="max-width:220px">'+fit.map(function(e){return'<option value="'+esc(e.equip_id)+'">'+esc(e.label||e.kind)+'</option>'}).join('')+'</select><label class="small">Due back <input type="date" class="due" value="'+dayKey(due)+'" style="width:auto"></label><button type="button" class="btn sm lend">Lend it</button></div>':'<div class="small" style="color:var(--gold-ink)">Nothing in the '+esc(a.city)+' closet yet. Add a piece there, then lend it.</div>')+'<p class="err" style="margin:0"></p></div>');
+      var lb=$('.lend',r);if(lb)lb.onclick=function(){busy(lb,true,'Lending…');call('lendEquipment',{equipId:$('.pick',r).value,jobId:a.job_id,dueBack:$('.due',r).value}).then(function(){toast('Lent. The family has been told.');return refresh()}).catch(function(e){$('.err',r).textContent=e.message;busy(lb,false,'Lend it')})};
+      l.appendChild(r)})}
+  if(!all.length&&!S.eEdit)l.appendChild(el('<div class="wempty" style="padding:12px">Nothing in the closet yet. Add the first walker or chair.</div>'));
+  var byCity={};all.forEach(function(e){var k=(e.city||'')+(e.state?', '+e.state:'');(byCity[k]=byCity[k]||[]).push(e)});
+  Object.keys(byCity).sort().forEach(function(k){l.appendChild(el('<div class="small" style="padding:8px 12px 2px;font-weight:700">'+esc(k)+'</div>'));
+    byCity[k].forEach(function(e){var late=e.status==='On loan'&&e.due_back&&e.due_back<dayKey(new Date());
+      var r=el('<div class="wr" style="grid-template-columns:1fr auto'+(e.status==='Retired'?';opacity:.55':'')+'"><div><b>'+esc(e.label||e.kind)+'</b> <span class="small muted">'+esc(e.kind)+'</span><div class="small">'+(e.status==='On loan'?'With '+esc(e.family)+(e.due_back?' · due back '+esc(e.due_back):'')+(late?' <b style="color:#9b2c2c">· overdue</b>':''):esc(e.status))+'</div>'+(e.notes?'<div class="small muted">'+esc(e.notes)+'</div>':'')+'</div><div style="display:flex;gap:10px;align-items:center">'+(e.status==='On loan'?'<a href="#" class="small back">Returned</a>':'')+'<a href="#" class="small ed">Edit</a></div></div>');
+      var bk=$('.back',r);if(bk)bk.onclick=function(ev){ev.preventDefault();if(!uiOk('Mark '+(e.label||e.kind)+' returned to the closet?',this,arguments))return;call('returnEquipment',{equipId:e.equip_id}).then(function(){toast('Back in the closet.');return refresh()}).catch(alertErr)};
+      $('.ed',r).onclick=function(ev){ev.preventDefault();S.eEdit=e;render()};l.appendChild(r)})});
+  return w}
+function equipForm(e,KINDS){
+  var f=el('<form class="card" style="margin:8px 12px"><span class="k">'+(e.equip_id?'Edit equipment':'Add equipment')+'</span><div class="two" style="margin-top:8px"><div class="field"><label>What it is</label><select name="kind">'+KINDS.map(function(k){return'<option'+(k===e.kind?' selected':'')+'>'+esc(k)+'</option>'}).join('')+'</select></div><div class="field"><label>Label</label><input name="label" maxlength="120" value="'+esc(e.label||'')+'" placeholder="Walker #3, folding"></div></div><div class="two"><div class="field"><label>City it is kept in</label><input name="city" required maxlength="60" value="'+esc(e.city||'')+'" placeholder="Nashville"></div><div class="field"><label>State</label><input name="state" maxlength="4" value="'+esc(e.state||'TN')+'"></div></div><div class="field"><label>Notes</label><input name="notes" maxlength="400" value="'+esc(e.notes||'')+'" placeholder="Where it is stored, its condition"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="submit">Save</button><button type="button" class="btn quiet cancel">Cancel</button>'+(e.equip_id&&e.status!=='Retired'?'<button type="button" class="btn quiet ret">Retire it</button>':'')+(e.status==='Retired'?'<button type="button" class="btn quiet unret">Put back in service</button>':'')+'</div><p class="err"></p></form>');
+  $('.cancel',f).onclick=function(){S.eEdit=null;render()};
+  function save(extra){var fd=formData(f);fd.equipId=e.equip_id||'';Object.assign(fd,extra||{});call('saveEquipment',fd).then(function(){S.eEdit=null;return refresh()}).catch(function(x){$('.err',f).textContent=x.message})}
+  var rt=$('.ret',f);if(rt)rt.onclick=function(){if(uiOk('Retire '+(e.label||e.kind)+'? It stays in the history.',this,arguments))save({retire:true})};
+  var ur=$('.unret',f);if(ur)ur.onclick=function(){save({unretire:true})};
+  f.onsubmit=function(ev){ev.preventDefault();save()};
   return f}
 // What families needed and when, by hospital. A number shows only once 11 families are behind it.
 function needsEl(){
