@@ -14,6 +14,7 @@ async function bootstrap(ctx) {
     if (!ctx.clientId && out.families.length) ctx.clientId = String(out.families[0].client_id);
     if (ctx.clientId && ctx.user._session) db.q(`update sessions set picked_client_id=$2 where session_id=$1`, [ctx.user._session.id, ctx.clientId]).catch(() => {});
   }
+  if (ctx.role === 'vendor') return require('./jobs').vendorBoot(ctx, out);
   if (!ctx.clientId) return out;
   let client = await core.clientById(ctx.clientId);
   must(client, 'No family on file for this account yet.');
@@ -63,11 +64,12 @@ async function bootstrap(ctx) {
   // The coordinator's notes on an item (the vendor, the in-depth version) are theirs alone.
   if (ctx.role !== 'coordinator') out.plan = out.plan.map(p => { const e = { ...(p.extra || {}) }; delete e.note; delete e.coordinated; return { ...p, extra: e }; });
   { const MK = require('./market'); const vmap = await MK.vendorsFor(out.plan); out.plan.forEach(p => { if (p.extra && p.extra.vendor_id && vmap[p.extra.vendor_id]) p.vendor = vmap[p.extra.vendor_id]; });
-    if (ctx.role === 'coordinator') { out.vendors = await MK.vendors(); out.vendorServices = MK.SERVICES; } }
+    if (ctx.role === 'coordinator') { out.vendors = await MK.vendors(); out.vendorServices = MK.SERVICES; { const vu = {}; (await db.all(`select extra->>'vendor_id' as vid from users where lower(role)='vendor' and active`)).forEach(r => { vu[r.vid] = 1; }); out.vendors.forEach(v => { v.invited = !!vu[v.vendor_id]; }); } } }
   out.inner = inner; out.patientUser = patient ? patient.email : '';
   out.intake = await intake.readIntake(cid); out.intakeSpec = await intake.specFor();
   if (ctx.role === 'coordinator') out.intakeFlags = intake.intakeFlags(out.intake.answers);
   out.tasks = tasks; out.topics = topics;
+  out.jobs = await require('./jobs').jobsFor(cid); out.jobServices = require('./market').SERVICES;
   out.updates = withPhoto(updates, ctx.role);
   out.tracker = ce.tracker || null; out.trackerSteps = CIRCLE.TRACKER; out.reactions = CIRCLE.REACTIONS; out.what_i_need = ce.what_i_need || '';
   out.share_token = CIRCLE.canAct(ctx) || ctx.role === 'family' ? (ce.share_token || '') : '';
@@ -119,6 +121,7 @@ async function latestRec(clientId) {
 
 // The rest of a conversation, fetched when someone opens a topic that the first load trimmed.
 async function topicMessages(ctx, p) {
+  if (ctx.role === 'vendor') { const vt = await db.one(`select * from topics where topic_id=$1 and kind='vendor'`, [String(p.topicId || '')]); must(vt && vt.extra && vt.extra.vendor_email === ctx.email, 'Not found'); ctx.clientId = String(vt.client_id).trim(); return { messages: (await db.all(`select * from messages where topic_id=$1 order by sent_at, message_id`, [vt.topic_id])).map(m => ({ ...core.msgPublic(m, null), attachments: [] })) }; }
   must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
   const t = await core.topicById(ctx.clientId, p.topicId);
   must(!(t && t.kind === 'family' && (ctx.role === 'coordinator' || !((t.extra && t.extra.to) || []).includes(ctx.email))), 'Not found');

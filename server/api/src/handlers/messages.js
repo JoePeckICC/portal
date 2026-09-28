@@ -12,6 +12,14 @@ const MEDICAL_LANE_UNUSED = cf => 'Before you type: we are not your doctors, and
   'If your discharge papers or your team told you to call them about something, call the number they gave you now.\n\n' +
   'If you are having thoughts of hurting yourself, call or text 988. If anyone in the house is in danger, call 911.\n\n' +
   'Everything else — a question about a symptom, a medication, “is this normal?” — belongs to the surgeon’s office or their after-hours line. Write it here and ' + cf + ' will help you ask it well, and follow up if nobody calls back.';
+// A vendor has no family of their own: each call finds the family through the vendor's own job thread.
+async function vendorTopic(ctx, p, c) {
+  if (ctx.role !== 'vendor') return null;
+  const t = await db.one(`select * from topics where topic_id=$1 and kind='vendor'`, [String(p.topicId || '')], c);
+  must(t && t.extra && t.extra.vendor_email === ctx.email, 'Not found');
+  ctx.clientId = String(t.client_id).trim();
+  return t;
+}
 async function newTopic(ctx, p, c) {
   must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
   must(ctx.clientId, 'Pick a family first');
@@ -33,7 +41,8 @@ async function newTopic(ctx, p, c) {
 }
 
 async function sendMessage(ctx, p, c) {
-  must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
+  await vendorTopic(ctx, p, c);
+  must(core.fam(ctx) || ctx.role === 'coordinator' || ctx.role === 'vendor', 'Not allowed');
   must(ctx.clientId, 'Pick a family first');
   let body = clean(p.body, 4000); const files = (p.files || []).slice(0, 4);
   must(body.trim() || files.length, 'Write something first');
@@ -51,9 +60,10 @@ async function sendMessage(ctx, p, c) {
     }
   }
   const urgent = topic.kind === 'urgent' || !!p.urgent;
-  const famOnly = topic.kind === 'family';
+  const famOnly = topic.kind === 'family', vend = topic.kind === 'vendor';
+  if (ctx.role === 'vendor') must(!files.length, 'Photos go through your coordinator for now');
   must(!(famOnly && ctx.role === 'coordinator'), 'Not found');
-  const msg = await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: topic.topic_id, sender_email: ctx.email, body, read_by_client: ctx.role === 'client', read_by_coordinator: ctx.role === 'coordinator' || famOnly, urgent: !!p.urgent, attachments: JSON.stringify(atts) }, c);
+  const msg = await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: topic.topic_id, sender_email: ctx.email, body, read_by_client: ctx.role === 'client', read_by_coordinator: ctx.role === 'coordinator' || famOnly || vend, urgent: !!p.urgent, attachments: JSON.stringify(atts) }, c);
   if (atts.length) body = (body.trim() ? body + '\n\n' : '') + 'Attached: ' + atts.map(a => a.name).join(', ');
   await db.q(`update topics set last_at=now(), status='Active', extra=coalesce(extra,'{}'::jsonb)-'hidden' where topic_id=$1`, [topic.topic_id], c);   // a new line brings a deleted conversation back, as on a phone
   // Replying is reading: everything before it in this topic is read by whoever replied.
@@ -61,6 +71,12 @@ async function sendMessage(ctx, p, c) {
   else if (ctx.role === 'client') await db.q(`update messages set read_by_client=true where topic_id=$1 and client_id=$2`, [topic.topic_id, ctx.clientId], c);
   const client = await core.clientById(ctx.clientId, c);
   const after = async () => {
+    if (vend) {   // a job thread: the vendor hears from the family by text; the family hears from the vendor by email
+      const vv = await db.one(`select * from vendors where vendor_id=$1`, [topic.extra && topic.extra.vendor_id]);
+      if (ctx.role === 'vendor') await core.notifyFamily(ctx.clientId, 'message', ((vv && vv.name) || 'Your vendor') + ' wrote', ((vv && vv.name) || 'Your vendor') + ' wrote:', body, 'Open the portal', ctx.email);
+      else if (vv) { if (vv.phone) await require('../sms').send(vv.phone, C.APP_NAME + ': new message from the ' + famName(client.family_name).replace(/^The /, '') + ' — ' + C.PORTAL_URL); if (vv.email) await mail.notify(vv.email, 'New message from ' + famName(client.family_name), 'You have a new message about your job.', '', 'Open the portal'); }
+      return;
+    }
     if (famOnly) {   // only the people in the thread hear about it
       const to = ((topic.extra && topic.extra.to) || []).filter(e => normEmail(e) !== ctx.email);
       const users = await db.all(`select * from users where client_id=$1 and active and lower(email) = any($2)`, [ctx.clientId, to.map(normEmail)]);
@@ -80,6 +96,8 @@ async function sendMessage(ctx, p, c) {
 
 // Opening a topic marks its messages read for whoever opened it.
 async function readTopic(ctx, p, c) {
+  const vt = await vendorTopic(ctx, p, c);
+  if (vt) { await db.q(`update topics set extra=coalesce(extra,'{}'::jsonb) || jsonb_build_object('vendor_read_at', now()) where topic_id=$1`, [vt.topic_id], c); return {}; }
   must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
   const col = ctx.role === 'client' ? 'read_by_client' : 'read_by_coordinator';
   await db.q(`update messages set ${col}=true where client_id=$1 and topic_id=$2 and ${col}=false`, [ctx.clientId, String(p.topicId || '')], c);
@@ -95,7 +113,8 @@ async function setTopicStatus(ctx, p, c) {
 
 // Deleting a conversation hides it for whoever deleted it; the record stays (we archive, we do not destroy).
 async function hideTopic(ctx, p, c) {
-  must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
+  await vendorTopic(ctx, p, c);
+  must(core.fam(ctx) || ctx.role === 'coordinator' || ctx.role === 'vendor', 'Not allowed');
   const topic = await core.topicById(ctx.clientId, p.topicId, c);
   must(topic, 'Not found');
   const who = ctx.role === 'coordinator' ? 'coordinator' : ctx.email;
