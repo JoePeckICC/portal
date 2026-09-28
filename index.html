@@ -608,9 +608,9 @@ html[data-theme=sage]{--gold:#5E8A6A;--panel:#EEF3EC;--tint:#E4ECE4}html[data-th
   .imz{display:block;height:auto;min-height:0;max-height:none;border-radius:10px}
   .iml{border-right:0}.imlist{overflow:visible}
   .imr{display:none}
-  .imz.open .imr{display:flex;position:fixed;inset:0;z-index:1100;padding-top:env(safe-area-inset-top,0px)}
+  .imz.open .iml{display:none}
+  .imz.open .imr{display:flex;height:min(76vh,680px);min-height:420px}   /* the conversation stays inside the Messages block, under the tiles */
   .imback{display:inline-flex}
-  body.imopen .sitebar,body.imopen .hero,body.imopen .bub-wrap{display:none}body.imopen{overflow:hidden}
   .imb{max-width:80%}
   .impm{width:min(280px,calc(100vw - 32px))}
 }
@@ -2349,6 +2349,8 @@ function imPeople(){var d=S.data,me=d.me,c=d.client||{},cn=d.coordinator,out=[];
   if(cn)out.push({key:'coordinator',name:cn.name||'Your coordinator',sub:'Care coordinator'});
   if(d.patientUser&&String(d.patientUser).toLowerCase()!==String(me.email).toLowerCase())out.push({key:String(d.patientUser).toLowerCase(),name:[c.patient_first_name,c.patient_last_name].filter(Boolean).join(' ')||d.patientUser,sub:'Patient'});
   (d.inner||[]).forEach(function(u){if(String(u.email).toLowerCase()!==String(me.email).toLowerCase())out.push({key:String(u.email).toLowerCase(),name:u.name||u.email,sub:u.relationship||'Inner circle'})});
+  // vendors who have taken a job for this family: write to them in the same thread as the job
+  var seen={};(d.topics||[]).filter(function(t){return t.kind==='vendor'}).forEach(function(t){var x=t.extra||{},k='vendor:'+t.topic_id,id=x.vendor_id||x.vendor_name;if(seen[id])return;seen[id]=1;out.push({key:k,name:x.vendor_name||'Vendor',sub:(x.service||'')+' · vendor',vendor:t.topic_id})});
   return out}
 function imWho(t){var d=S.data,co=d.me.role==='coordinator',cn=d.coordinator;
   if(t.kind==='auto')return{name:BOOT.appName,sub:'Reminders and confirmations',sys:true};
@@ -2460,6 +2462,8 @@ function imCompose(){
   inp.oninput=draw;draw();
   v.appendChild(imComposer(function(body,urgent,files){
     if(!N.to.length)return Promise.reject(new Error('Pick who it is to.'));
+    var vk=N.to.filter(function(k){return k.indexOf('vendor:')===0})[0];
+    if(vk){var vt=vk.slice(7);if(N.to.length>1)return Promise.reject(new Error('Write to a vendor on their own.'));return call('sendMessage',{topicId:vt,body:body,urgent:false,files:files}).then(function(){S.mnew=null;S.topic=vt;S.mopen=true;S.mf='active'})}
     var withCo=co||N.to.indexOf('coordinator')>=0,me=String(d.me.email).toLowerCase(),want=N.to.filter(function(k){return k!=='coordinator'}).concat([me]).sort().join(',');
     var ts=(d.topics||[]).slice().sort(function(a,b){return String(b.last_at||b.created_at).localeCompare(String(a.last_at||a.created_at))});
     var hit=withCo?ts.filter(function(t){return t.kind!=='auto'&&t.kind!=='family'})[0]:ts.filter(function(t){return t.kind==='family'&&((t.extra&&t.extra.to)||[]).slice().sort().join(',')===want})[0];
