@@ -409,6 +409,8 @@ const INTAKE_STEPS_ = [
     ch('M.2a', 'Have they been told anything yet?', ['Everything', 'Some of it', 'Nothing yet'], { when: is('M.2', 'Yes, for the children') }),
     ch('M.3', 'Is anyone else at home who needs daily help?', ['No', 'Yes — an older parent', 'Yes — another adult who needs care', 'Rather discuss in person', RNS_], { quick: true, tier: 3, noteOpen: true }),
     mu('M.4', 'Are there pets or animals?', ['No', 'Dog', 'Cat', 'Other'], { req: true, em: true, quick: true, nodk: true }),
+    // Their names (Joe, 2026-09-28): asked here once, so the plan and every pet care request already know them.
+    tx('M.4p', 'What are their names?', { when: any(has('M.4', 'Dog'), has('M.4', 'Cat'), has('M.4', 'Other')), ph: 'Biscuit (dog), Pepper (cat)', why: 'So everyone who helps knows them by name, and you never type it again.' }),
     ch('M.4a', 'Roughly how much does the dog weigh?', ['Under 25 lb', '25–60 lb', 'Over 60 lb'], { when: all(svc('pets'), has('M.4', 'Dog')) }),
     ch('M.4b', 'Does it jump up on people?', ['Yes', 'Sometimes', 'No'], { when: all(svc('pets'), has('M.4', 'Dog')) }),
     ch('M.4c', 'Is there a fenced yard it can be let out into?', ['Yes', 'No'], { when: all(svc('pets'), has('M.4', 'Dog')),

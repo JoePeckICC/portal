@@ -333,7 +333,7 @@ function seedRules(all, client) {
   if (/rehab/.test(ans(a, 'G.10'))) add(CC, 'Rehab facility: which one, how far, and a visiting plan', det(a, 'G.10a'));
   if (/4–7|More than/.test(ans(a, 'G.9'))) add(FS, 'Household coverage while ' + name + ' is in the hospital', 'Several days where the house runs without them.' + (ans(a, 'G.9c') ? ' Days that worry them: ' + ans(a, 'G.9c') : ''));
   if (ans(a, 'M.1') === 'Yes') add(FS, 'Childcare for surgery week', det(a, 'M.1') ? 'Ages: ' + det(a, 'M.1') : '');
-  if (ans(a, 'M.4') && ans(a, 'M.4') !== 'No') add(FS, 'Pet care for the hospital days', ans(a, 'M.4') + (ans(a, 'M.4f') ? ' — ' + ans(a, 'M.4f') : ''));
+  if (ans(a, 'M.4') && ans(a, 'M.4') !== 'No') add(FS, 'Pet care for the hospital days', (ans(a, 'M.4p') || ans(a, 'M.4')) + (ans(a, 'M.4f') ? ' — ' + ans(a, 'M.4f') : ''));
   if (/Someone else/.test(ans(a, 'C.6'))) add(CC, 'Confirm the one contact for the surgical team: ' + det(a, 'C.6').slice(0, 80), 'Give the hospital one name and number so messages never cross.');
   if (/Nobody's been designated/.test(ans(a, 'C.6'))) add(CC, 'Name one contact for the surgical team', 'Several of them are calling. One named person keeps the information clean.');
   if (!/^Someone$/.test(ans(a, 'C.2c'))) add(FS, 'Name a backup caregiver', 'Who steps in if the main caregiver gets sick or hits a wall. Decide it while it is easy.');

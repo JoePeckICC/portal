@@ -282,6 +282,8 @@ const STEPS = [
   `create index if not exists jobs_open_idx on jobs(status, city, service)`,
   `create index if not exists jobs_client_idx on jobs(client_id)`,
   `alter table vendors add column if not exists hours jsonb not null default '{}'::jsonb`,
+  // Support team members can do more than one kind of help (Joe, 2026-09-28): the kinds they signed up for.
+  `alter table vendors add column if not exists services jsonb not null default '[]'::jsonb`,
   // ---- the loan closet (2026-09-28): see handlers/loans.js
   `create table if not exists equipment (
      equip_id text primary key, kind text not null default 'Other', label text not null default '', city text not null default '', state text not null default '',
