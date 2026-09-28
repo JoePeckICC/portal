@@ -16,6 +16,8 @@ const famOrCo = ctx => must(core.fam(ctx) || ctx.role === 'coordinator', 'Not al
 const clientOrCo = ctx => must(ctx.role === 'client' || ctx.role === 'coordinator', 'Not allowed');
 const needFamily = ctx => must(ctx.clientId, 'Pick a family first');
 const dateOnly = s => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? s : null);
+// A task date: within a year back and three years ahead, or an error that says so.
+const taskDate = s => { const d = dateOnly(s); if (!d) return null; const t = Date.now(); must(Date.parse(d) >= t - 366 * 864e5 && Date.parse(d) <= t + 3 * 366 * 864e5, 'Please check the due date. It should be within the past year or the next three years.'); return d; };
 
 // ---- intake
 async function saveIntake(ctx, p, c) {
@@ -176,17 +178,17 @@ async function setPlanStatus(ctx, p, c) {
 // ---- tasks
 async function addTask(ctx, p, c) {
   coOnly(ctx); needFamily(ctx);
-  const title = clean(p.title, 300); must(title.trim(), 'Write the task');
-  const row = await db.insert('tasks', { task_id: id(), client_id: ctx.clientId, title, category: pick(p.category, C.CATEGORIES, C.CATEGORIES[0]), status: 'Not started', owner: clean(p.owner, 80), due_date: dateOnly(p.due_date), notes: clean(p.notes, 2000) }, c);
+  const title = clean(p.title, 300); must(title.trim(), 'Write what the task is before adding it.');
+  const row = await db.insert('tasks', { task_id: id(), client_id: ctx.clientId, title, category: pick(p.category, C.CATEGORIES, C.CATEGORIES[0]), status: 'Not started', owner: clean(p.owner, 80), due_date: taskDate(p.due_date), notes: clean(p.notes, 2000) }, c);
   return { task: row };
 }
 // Edit a task's wording, date, owner or notes (added 2026-09-25 for the Implement page).
 async function editTask(ctx, p, c) {
   coOnly(ctx);
   const row = await db.one(`select * from tasks where client_id=$1 and task_id=$2`, [ctx.clientId, String(p.taskId || '')], c); must(row, 'Not found');
-  const title = clean(p.title === undefined ? row.title : p.title, 300); must(title.trim(), 'Write the task');
+  const title = clean(p.title === undefined ? row.title : p.title, 300); must(title.trim(), 'Write what the task is before saving it.');
   await db.q(`update tasks set title=$2, due_date=$3, owner=$4, notes=$5, category=$6 where task_id=$1`,
-    [row.task_id, title, p.due_date === undefined ? row.due_date : dateOnly(p.due_date), clean(p.owner === undefined ? row.owner : p.owner, 80), clean(p.notes === undefined ? row.notes : p.notes, 2000), pick(p.category, C.CATEGORIES, row.category)], c);
+    [row.task_id, title, p.due_date === undefined ? row.due_date : taskDate(p.due_date), clean(p.owner === undefined ? row.owner : p.owner, 80), clean(p.notes === undefined ? row.notes : p.notes, 2000), pick(p.category, C.CATEGORIES, row.category)], c);
   return {};
 }
 async function setTaskStatus(ctx, p, c) {
@@ -202,6 +204,7 @@ async function addAppointment(ctx, p, c) {
   const title = clean(p.title, 200), when = clean(p.starts_at, 40);
   must(title.trim(), 'Write what the appointment is');
   must(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/.test(when), 'Pick a date and time');
+  { const t = Date.parse(when.slice(0, 10)); must(t >= Date.now() - 366 * 864e5 && t <= Date.now() + 731 * 864e5, 'Please check the date. It should be within the past year or the next two years.'); }
   const row = await db.insert('appointments', { appt_id: id(), client_id: ctx.clientId, title, starts_at: localToIso(when), location: clean(p.location, 200), note: clean(p.note, 500), status: 'Scheduled' }, c);
   await core.autoMsg(ctx.clientId, 'Appointment added: ' + title + ' — ' + require('../util').niceWhen(when) + (row.location ? ', ' + row.location : '') + '.', c);
   return { appointment: apptPublic(row) };

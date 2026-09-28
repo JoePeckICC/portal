@@ -46,6 +46,9 @@ async function sendMessage(ctx, p, c) {
   const msg = await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: topic.topic_id, sender_email: ctx.email, body, read_by_client: ctx.role === 'client', read_by_coordinator: ctx.role === 'coordinator', urgent: !!p.urgent, attachments: JSON.stringify(atts) }, c);
   if (atts.length) body = (body.trim() ? body + '\n\n' : '') + 'Attached: ' + atts.map(a => a.name).join(', ');
   await db.q(`update topics set last_at=now(), status='Active' where topic_id=$1`, [topic.topic_id], c);
+  // Replying is reading: everything before it in this topic is read by whoever replied.
+  if (ctx.role === 'coordinator') await db.q(`update messages set read_by_coordinator=true where topic_id=$1 and client_id=$2`, [topic.topic_id, ctx.clientId], c);
+  else if (ctx.role === 'client') await db.q(`update messages set read_by_client=true where topic_id=$1 and client_id=$2`, [topic.topic_id, ctx.clientId], c);
   const client = await core.clientById(ctx.clientId, c);
   const after = async () => {
     if (core.fam(ctx)) {

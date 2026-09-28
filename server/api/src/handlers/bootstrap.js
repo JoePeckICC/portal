@@ -41,7 +41,7 @@ async function bootstrap(ctx) {
   }
   const cid = ctx.clientId;
   const [inner, patient, plan, tasks, topics, updates, circle, appointments, goals, careTeam, meds, vendorBills, assistance, doses, uploads, referrals] = await Promise.all([
-    db.all(`select email,name,relationship from users where client_id=$1 and active and lower(role)='family' order by email`, [cid]),
+    db.all(`select email,name,relationship,(coalesce(password_hash,'')='') as pending from users where client_id=$1 and active and lower(role)='family' order by email`, [cid]),
     db.one(`select email from users where client_id=$1 and active and lower(role)='client' order by email limit 1`, [cid]),
     db.all(`select * from plan_items where client_id=$1 ${ctx.role === 'coordinator' ? '' : 'and draft = false'} order by updated_at`, [cid]),
     db.all(`select * from tasks where client_id=$1 order by updated_at`, [cid]),
@@ -93,6 +93,8 @@ async function bootstrap(ctx) {
   const { apptPublic, localStamp } = require('../time');
   out.appointments = appointments.map(apptPublic); out.goals = goals; out.careTeam = careTeam; out.meds = meds.map(require('./meds').medPublic); out.vendorBills = vendorBills; out.assistance = assistance;
   out.allergies = client.allergies || '';
+  // Allergies the intake mentions, so an empty chart field never reads as "none" when the family told us something.
+  try { const ia = await intake.readIntake(cid); out.allergyMentions = intake.allergyMentions(ia.answers || {}).map(x => x.text); } catch { out.allergyMentions = []; }
   if (ctx.role === 'coordinator') out.coSettings = await require('./coordinator').coSettingsPublic(ctx.user);
   else if (co) out.blockedDates = core.coSettings(co).blocked;
   out.doses = doses.map(d => ({ ...d, due_at: localStamp(d.due_at), taken_at: d.taken_at || '' }));

@@ -14,6 +14,9 @@ async function saveProfile(ctx, p, c) {
   const patch = {};
   fields.forEach(f => { if (p[f] !== undefined) patch[f] = clean(p[f], 240); });
   if (patch.dob !== undefined) { if (!String(patch.dob).trim()) patch.dob = null; else { const t = new Date().toISOString().slice(0, 10); must(/^\d{4}-\d{2}-\d{2}$/.test(patch.dob) && patch.dob >= '1900-01-01' && patch.dob <= t, 'Please check the date of birth.'); } }
+  // A relationship is words, never a piece of a phone number; a phone typed into the name box moves to the phone box.
+  if (patch.emergency_relationship !== undefined && /\d/.test(patch.emergency_relationship)) patch.emergency_relationship = patch.emergency_relationship.replace(/[()\d\s.+-]+/g, ' ').trim();
+  if (patch.emergency_name !== undefined) { const pm = /(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/.exec(patch.emergency_name); if (pm) { if (!String(patch.emergency_phone || cl.emergency_phone || '').trim()) patch.emergency_phone = pm[0]; patch.emergency_name = (patch.emergency_name.slice(0, pm.index) + ' ' + patch.emergency_name.slice(pm.index + pm[0].length)).replace(/\s+/g, ' ').replace(/^[\s,;—–-]+|[\s,;—–(-]+$/g, '').trim(); } }
   ['phone', 'emergency_phone'].forEach(f => { if (patch[f] !== undefined && patch[f].trim()) { const ok = intake.phoneOk(patch[f]); must(ok, 'That phone number does not look right. Please enter a 10-digit US number, like (615) 555-0100.'); patch[f] = ok; } });
   if (ctx.role === 'coordinator' && p.family_name !== undefined && clean(p.family_name, 80).trim()) patch.family_name = clean(p.family_name, 80).trim();   // the setup screen: the intake may be signed under a different name
   if (ctx.role === 'coordinator' && p.surgery_date !== undefined) patch.surgery_date = /^\d{4}-\d{2}-\d{2}$/.test(String(p.surgery_date)) ? p.surgery_date : null;   // the setup screen (2026-09-25)
@@ -111,7 +114,7 @@ async function forgetDevices(ctx) { await auth.forgetDevices(ctx.email); return 
 async function savePrefs(ctx, p, c) {
   const patch = {};
   if (p.prefs) { const cur = core.prefs(ctx.user); Object.keys(C.NOTIFY_KINDS).forEach(k => { if (p.prefs[k] !== undefined) cur[k] = !!p.prefs[k]; }); patch.prefs = JSON.stringify(cur); }
-  if (p.goes_by !== undefined) patch.goes_by = clean(p.goes_by, 60).trim();
+  if (p.goes_by !== undefined) patch.goes_by = clean(p.goes_by, 24).trim();
   if (p.avatar !== undefined) patch.avatar = C.AVATARS.indexOf(p.avatar) >= 0 ? p.avatar : '';
   if (Object.keys(patch).length) await db.update('users', { email: ctx.email }, patch, c);
   return {};

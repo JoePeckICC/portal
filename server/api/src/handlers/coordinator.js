@@ -75,8 +75,14 @@ async function coSettingsPublic(user) {
 async function saveCoSettings(ctx, p, c) {
   coOnly(ctx);
   const s = core.coSettings(ctx.user);
-  if (p.blocked !== undefined) s.blocked = (p.blocked || []).map(String).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).filter((d, i, a) => a.indexOf(d) === i).sort();
-  if (p.notify) Object.keys(C.CO_KINDS).forEach(k => { if (['instant', 'digest', 'off'].indexOf(p.notify[k]) >= 0) s.notify[k] = p.notify[k]; });
+  if (p.blocked !== undefined) {
+    const t0 = ymd(new Date(), C.TZ), t2 = ymd(new Date(Date.now() + 730 * 864e5), C.TZ), was = s.blocked || [];
+    const days = (p.blocked || []).map(String).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).filter((d, i, a) => a.indexOf(d) === i);
+    must(days.every(d => was.indexOf(d) >= 0 || (d >= t0 && d <= t2)), 'Pick a day between today and two years from now.');
+    s.blocked = days.filter(d => d >= t0).sort();
+  }
+  // Safety alerts always reach the coordinator: ER and 911, urgent messages, medical questions.
+  if (p.notify) Object.keys(C.CO_KINDS).forEach(k => { if (['instant', 'digest', 'off'].indexOf(p.notify[k]) >= 0 && !(p.notify[k] === 'off' && ['er', 'urgent', 'medical'].indexOf(k) >= 0)) s.notify[k] = p.notify[k]; });
   if (p.digestHour !== undefined) { const h = Number(p.digestHour); if (h >= 0 && h <= 23) s.digestHour = h; }
   if (p.title !== undefined) s.title = clean(p.title, 80).trim();
   if (p.tagline !== undefined) s.tagline = clean(p.tagline, 120).trim();
@@ -120,15 +126,19 @@ async function newFamily(ctx, p, c) {
 }
 
 // ---- the In Basket: what needs the coordinator, across every family
-async function inbasket(ctx) {
+async function inbasket(ctx, p) {
   coOnly(ctx);
   const clients = await db.all(`select * from clients where lower(status) not in ('closed','archived')`);
   const byId = {}; clients.forEach(cl => { byId[cl.client_id] = cl; });
   const ids = clients.map(cl => cl.client_id);
-  const fam = cid => (byId[cid] ? famName(byId[cid].family_name) : cid);
+  // Two families with the same name are told apart by the patient's first name.
+  const same = {}; clients.forEach(cl => { const k = famName(cl.family_name); same[k] = (same[k] || 0) + 1; });
+  const fam = cid => { const cl = byId[cid]; if (!cl) return cid; const k = famName(cl.family_name); return same[k] > 1 && cl.patient_first_name ? k + ' · ' + cl.patient_first_name : k; };
   const today = ymd(new Date(), C.TZ);
   const day = s => { const { localToIso } = require('../time'); return new Date(localToIso(s)); };
   const t0 = day(today), t1 = new Date(t0.getTime() + 864e5), t7 = new Date(t0.getTime() + 7 * 864e5);
+  // The Schedule can page by week; the In Basket itself always looks at this week.
+  const wk = Math.max(-12, Math.min(52, parseInt((p || {}).week, 10) || 0)), a0 = new Date(t0.getTime() + wk * 7 * 864e5), a7 = new Date(a0.getTime() + 7 * 864e5);
   const needs = [];
   const [meds, unread, intakes, assist, papers, appts, tasks, booked, uncoord] = await Promise.all([
     db.all(`select * from medications where status='Pending review' and client_id = any($1)`, [ids]),
@@ -138,13 +148,13 @@ async function inbasket(ctx) {
     db.all(`select * from assistance where status='Suggested' and client_id = any($1)`, [ids]),
     db.all(`select u.* from uploads u where u.kind='Discharge' and u.client_id = any($1) and u.uploaded_at > coalesce((select max(added_at) from medications m where m.client_id=u.client_id), '1970-01-01')
             and u.uploaded_at = (select max(uploaded_at) from uploads x where x.client_id=u.client_id and x.kind='Discharge')`, [ids]),
-    db.all(`select * from appointments where status<>'Cancelled' and client_id = any($1) and starts_at >= $2 and starts_at < $3 order by starts_at`, [ids, t0, t7]),
+    db.all(`select * from appointments where status<>'Cancelled' and client_id = any($1) and starts_at >= $2 and starts_at < $3 order by starts_at`, [ids, a0, a7]),
     db.all(`select * from tasks where status<>'Done' and client_id = any($1) and due_date is not null and due_date < $2`, [ids, ymd(t7, C.TZ)]),
     db.all(`select client_id, count(*)::int n from appointments where status<>'Cancelled' and starts_at > now() and client_id = any($1) group by client_id`, [ids]),
     db.all(`select client_id, count(*)::int n from plan_items where client_id = any($1) and status<>'Done' and coalesce(extra->>'draft','') not in ('true','1') and coalesce(extra->>'coordinated','') not in ('true') group by client_id`, [ids]),
   ]);
   meds.forEach(m => needs.push({ kind: 'Meds', client_id: m.client_id, family: fam(m.client_id), text: m.name + (m.dose ? ' ' + m.dose : '') + ' — pending review', when: m.updated_at || m.added_at || '', go: 'meds', pri: 1 }));
-  unread.forEach(u => { const urg = u.kind === 'urgent' || u.urgent; needs.push({ kind: urg ? 'Urgent' : u.kind === 'medical' ? 'Medical' : 'Message', client_id: u.client_id, family: fam(u.client_id), text: '“' + String(u.body).slice(0, 110) + (String(u.body).length > 110 ? '…' : '') + '” — ' + (u.title || 'Messages') + (u.n > 1 ? ' (' + u.n + ')' : ''), when: u.last_at, go: 'messages:' + u.topic_id, pri: urg ? 0 : 2 }); });
+  unread.forEach(u => { const urg = u.kind === 'urgent' || u.urgent; const medQ = u.kind === 'medical' || require('../intake').medicalQuestions({ m: { a: String(u.body || '') } }).length > 0; needs.push({ kind: urg ? 'Urgent' : medQ ? 'Medical' : 'Message', client_id: u.client_id, family: fam(u.client_id), text: '“' + String(u.body).slice(0, 110) + (String(u.body).length > 110 ? '…' : '') + '” — ' + (u.title || 'Messages') + (u.n > 1 ? ' (' + u.n + ')' : ''), when: u.last_at, go: 'messages:' + u.topic_id, pri: urg ? 0 : 2 }); });
   intakes.forEach(i => {
     const cl = byId[i.client_id];
     if (cl && !isTrue(cl.plan_ready)) needs.push({ kind: 'Plan', client_id: i.client_id, family: fam(i.client_id), text: 'Plan ready to create — the intake is in', when: i.submitted_at || '', go: 'build', pri: 1 });
@@ -153,7 +163,7 @@ async function inbasket(ctx) {
   clients.forEach(cl => {
     if (isTrue(cl.paid) && isTrue(cl.plan_ready) && !booked.some(b => b.client_id === cl.client_id)) needs.push({ kind: 'Implement', client_id: cl.client_id, family: fam(cl.client_id), text: 'Portal open, nothing booked yet — set the plan in motion', when: cl.paid_at || '', go: 'run', pri: 2 });
     const uc = uncoord.find(u => u.client_id === cl.client_id);   // paid, and the in-depth coordination behind the plan is not done
-    if (isTrue(cl.paid) && isTrue(cl.plan_ready) && uc && uc.n) needs.push({ kind: 'Coordinate', client_id: cl.client_id, family: fam(cl.client_id), text: 'Paid — ' + uc.n + ' plan item' + (uc.n === 1 ? '' : 's') + ' still to coordinate', when: cl.paid_at || '', go: 'run:coord', pri: 2 });
+    if (isTrue(cl.paid) && isTrue(cl.plan_ready) && uc && uc.n) needs.push({ kind: 'Coordinate', client_id: cl.client_id, family: fam(cl.client_id), text: 'Paid — ' + uc.n + ' open plan item' + (uc.n === 1 ? '' : 's') + ' not marked coordinated yet', when: cl.paid_at || '', go: 'run:coord', pri: 2 });
     if (cl.billing_status === 'Payment failed') needs.push({ kind: 'Billing', client_id: cl.client_id, family: fam(cl.client_id), text: 'Card declined · $' + (cl.monthly_amount == null ? '' : cl.monthly_amount) + ' · Stripe will retry', when: '', go: 'billing', pri: 3 });
     if (cl.stripe_customer_id && !isTrue(cl.paid) && cl.billing_status === 'Active') needs.push({ kind: 'Billing', client_id: cl.client_id, family: fam(cl.client_id), text: 'First invoice not paid yet — portal still locked', when: '', go: 'billing', pri: 4 });
   });
@@ -166,9 +176,9 @@ async function inbasket(ctx) {
   const fams = clients.map(cl => {
     const flags = needs.filter(n => n.client_id === cl.client_id).map(n => n.kind);
     const dts = cl.surgery_date ? Math.round((day(cl.surgery_date) - t0) / 864e5) : null;
-    return { client_id: cl.client_id, family: famName(cl.family_name), family_name: cl.family_name, patient: [cl.patient_first_name, cl.patient_last_name].join(' ').trim(), stage: cl.current_stage || '', surgery_date: cl.surgery_date || '', days: dts, flags: flags.filter((f, i) => flags.indexOf(f) === i), billing: cl.billing_status || (cl.stripe_customer_id ? 'Active' : ''), paid: isTrue(cl.paid), plan_ready: isTrue(cl.plan_ready) };
+    return { client_id: cl.client_id, family: fam(cl.client_id), family_name: cl.family_name, patient: [cl.patient_first_name, cl.patient_last_name].join(' ').trim(), stage: cl.current_stage || '', surgery_date: cl.surgery_date || '', days: dts, flags: flags.filter((f, i) => flags.indexOf(f) === i), billing: cl.billing_status || (cl.stripe_customer_id ? 'Active' : ''), paid: isTrue(cl.paid), plan_ready: isTrue(cl.plan_ready) };
   }).sort((a, b) => (a.days === null ? 9999 : a.days) - (b.days === null ? 9999 : b.days));
-  return { needs, appts: apptsOut, tasks: tasksOut, families: fams, capacity: { active: clients.filter(cl => isTrue(cl.paid) && (cl.current_stage || '') !== 'Finding wisdom').length, max: C.CAPACITY }, counts: { needs: needs.length, today: appts.filter(a => new Date(a.starts_at) < t1).length, families: fams.length, overdue: tasksOut.filter(t => t.overdue).length } };
+  return { needs, appts: apptsOut, tasks: tasksOut, families: fams, capacity: { active: clients.filter(cl => isTrue(cl.paid) && (cl.current_stage || '') !== 'Finding wisdom').length, max: C.CAPACITY }, counts: { needs: needs.filter(n => n.kind !== 'Plan').length, newClients: needs.filter(n => n.kind === 'Plan').length, today: wk ? 0 : appts.filter(a => new Date(a.starts_at) < t1).length, families: fams.length, overdue: tasksOut.filter(t => t.overdue).length } };
 }
 
 module.exports = { resources, saveResource, recommend, openResource, saveCoSettings, newFamily, inbasket };
