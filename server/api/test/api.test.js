@@ -320,7 +320,28 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   const loan = await api(pat, 'requestJob', { service: 'Medical equipment', soon: 'days', info: [{ l: 'Item', v: 'Walker' }] });
   assert.equal(loan.ok, true, loan.error); assert.equal(loan.job.extra.loan, true);
   const pj = (await api(pat, 'bootstrap', {})).jobs;
-  assert.equal(pj.find(j => j.job_id === ride.job.job_id).info.length, 2, 'the family sees all their own answers'); assert.equal(pj.find(j => j.job_id === meal.job.job_id).soon, 'week'); assert.equal(pj.find(j => j.job_id === stay.job.job_id).from, ci);
+  assert.equal(pj.find(j => j.job_id === ride.job.job_id).info.length, 2, 'the family sees all their own answers');
+  // the circle's casting call: the support team never sees it until the time is up or the family says "ask InCadence now"
+  const cc = await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: '1' });
+  assert.equal(cc.ok, true, cc.error); assert.ok(cc.job.extra.circle.until);
+  assert.ok(!(await api(sarah, 'bootstrap', {})).openJobs.some(x => x.job_id === cc.job.job_id), 'the circle goes first');
+  const hi = (await db.all(`select * from help_items where job_id=$1`, [cc.job.job_id]))[0]; assert.equal(hi.status, 'Open');
+  { const r = await api(pat, 'askUsNow', { jobId: cc.job.job_id }); assert.equal(r.ok, true, r.error); }
+  assert.ok((await api(sarah, 'bootstrap', {})).openJobs.some(x => x.job_id === cc.job.job_id), 'then the support team');
+  assert.equal((await db.all(`select status from help_items where job_id=$1`, [cc.job.job_id]))[0].status, 'Removed');
+  const only = await api(pat, 'requestJob', { service: 'Childcare', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: 'only', info: [{ l: 'Their ages', v: '4 and 7' }] });
+  const hi2 = (await db.all(`select * from help_items where job_id=$1`, [only.job.job_id]))[0];
+  { const r = await api(pat, 'claimHelp', { itemId: hi2.item_id }); assert.equal(r.ok, true, r.error); }
+  const oj2 = (await api(pat, 'bootstrap', {})).jobs.find(j => j.job_id === only.job.job_id); assert.equal(oj2.status, 'Taken'); assert.ok(oj2.circle_by);
+  // the loan closet: the coordinator lends a walker from the Nashville closet and it comes back
+  const coord = await signIn('joe@incadencecare.com');
+  const eq = await api(coord, 'saveEquipment', { kind: 'Walker', label: 'Walker #1', city: 'Nashville', state: 'TN' }); assert.equal(eq.ok, true, eq.error);
+  assert.equal((await api(pat, 'saveEquipment', { kind: 'Walker', city: 'Nashville' })).error, 'Not allowed');
+  const ln = await api(coord, 'lendEquipment', { equipId: eq.item.equip_id, jobId: loan.job.job_id, dueBack: '2026-11-01' }); assert.equal(ln.ok, true, ln.error);
+  const pb3 = await api(pat, 'bootstrap', {}); assert.equal(pb3.borrowed[0].label, 'Walker #1'); assert.equal(pb3.jobs.find(j => j.job_id === loan.job.job_id).status, 'Taken');
+  assert.match((await api(coord, 'lendEquipment', { equipId: eq.item.equip_id, clientId: 'x' })).error, /already out/);
+  { const r = await api(coord, 'returnEquipment', { equipId: eq.item.equip_id }); assert.equal(r.ok, true, r.error); }
+  assert.equal((await api(pat, 'bootstrap', {})).borrowed.length, 0); assert.equal(pj.find(j => j.job_id === meal.job.job_id).soon, 'week'); assert.equal(pj.find(j => j.job_id === stay.job.job_id).from, ci);
 });
 
 test('supporters only get updates', async () => {
