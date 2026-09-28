@@ -40,7 +40,7 @@ module.exports = {
   RES_KINDS: ['Video', 'Article', 'Guide', 'Checklist'],
   UPDATE_KINDS: ['Clinical', 'Faith', 'Family'],                 // the color of an update on the timeline
   RES_TRACKS: ['Open', 'Members'],
-  TOPIC_KINDS: { question: 'Question for {CO}', plan: 'About the plan', billing: 'Billing', urgent: 'Something urgent today', medical: 'A medical question', other: 'Something else', auto: 'Automated messages' },
+  TOPIC_KINDS: { question: 'Question for {CO}', plan: 'About the plan', billing: 'Billing', urgent: 'Something urgent today', medical: 'A medical question', other: 'Something else', auto: 'Automated messages', family: 'Just us' },
   MSG_KEEP: 150,
   TZ: env.TZ || 'America/Chicago',
   CAPACITY: Number(env.CAPACITY || 12),            // families one coordinator can carry well; the In Basket shows the meter
