@@ -42,7 +42,7 @@ async function changeAmount(ctx, p, c) {
     await db.q(`update clients set stripe_subscription_id=$2 where client_id=$1`, [cl.client_id, ns.id], c);
   }
   await db.update('clients', { client_id: cl.client_id }, { monthly_amount: amount, billing_status: amount > 0 ? 'Active' : 'No charge' }, c);
-  await core.autoMsg(ctx.clientId, 'Your monthly amount is now $' + amount.toFixed(2) + (amount === 0 ? ' — no charge going forward.' : ', starting with the next invoice.'), c);
+  await core.autoMsg(ctx.clientId, 'Your monthly amount is now $' + amount.toFixed(2) + (amount === 0 ? ', no charge going forward.' : ', starting with the next invoice.'), c);
   return pub(ctx, c);
 }
 async function pauseBilling(ctx, p, c) {
@@ -53,7 +53,7 @@ async function pauseBilling(ctx, p, c) {
   await db.q(`update clients set billing_status=$2 where client_id=$1`, [cl.client_id, p.resume ? 'Active' : 'Paused'], c);
   await core.autoMsg(ctx.clientId, p.resume ? 'Billing resumed.' : 'Billing is paused. No invoices until it is resumed.', c);
   if (!p.resume) { try { await require('../lifecycle').paused(cl, c); } catch (e) { console.error('paused', e.message); } }
-  if (core.fam(ctx)) await core.notifyCo(await core.coordinatorFor(cl), 'billing', (p.resume ? 'Billing resumed — ' : 'Billing paused — ') + famName(cl.family_name), (ctx.user.name || ctx.email) + (p.resume ? ' resumed billing from the Billing page.' : ' paused billing from the Billing page. You may want to check in.'), '', 'Open the portal');
+  if (core.fam(ctx)) await core.notifyCo(await core.coordinatorFor(cl), 'billing', (p.resume ? 'Billing resumed, ' : 'Billing paused, ') + famName(cl.family_name), (ctx.user.name || ctx.email) + (p.resume ? ' resumed billing from the Billing page.' : ' paused billing from the Billing page. You may want to check in.'), '', 'Open the portal');
   return pub(ctx, c);
 }
 async function billing(ctx) {
@@ -136,7 +136,7 @@ async function chargeOnce(ctx, p, c) {
   await B.stripe('POST', '/v1/invoiceitems', { customer: cl.stripe_customer_id, invoice: inv.id, amount: Math.round(amount * 100), currency: 'usd', description: desc });
   inv = await B.stripe('POST', '/v1/invoices/' + inv.id + '/finalize', {});
   if (auto) { try { await B.stripe('POST', '/v1/invoices/' + inv.id + '/pay', {}); } catch {} } else await B.stripe('POST', '/v1/invoices/' + inv.id + '/send', {});
-  await core.autoMsg(ctx.clientId, 'New charge: ' + desc + ' — $' + amount.toFixed(2) + (auto ? ', charged to the card on file.' : '. The invoice is in your email and under Billing.'), c);
+  await core.autoMsg(ctx.clientId, 'New charge: ' + desc + ', $' + amount.toFixed(2) + (auto ? ', charged to the card on file.' : '. The invoice is in your email and under Billing.'), c);
   return {};
 }
 async function sendReminder(ctx, p, c) {

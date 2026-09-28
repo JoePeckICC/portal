@@ -8,10 +8,10 @@ const { id, must, clean, pick, famName, normEmail, EMAIL_RE, isTrue, first } = r
 // Topics: every conversation has one. Either side can open a topic; presets or a name of their own.
 // What the family reads the moment they open a medical question. We are not the doctors; we get them to the right one.
 const MEDICAL_LANE_UNUSED = cf => 'Before you type: we are not your doctors, and we will not guess at a medical answer. What we will do is help you get it from the right person, fast.\n\n' +
-  'If you think it is an emergency, call 911 or go to the ER now — do not wait on a message. Then use “We’re headed to the ER” on your Home page and ' + cf + ' will call ahead.\n\n' +
+  'If you think it is an emergency, call 911 or go to the ER now, do not wait on a message. Then use “We’re headed to the ER” on your Home page and ' + cf + ' will call ahead.\n\n' +
   'If your discharge papers or your team told you to call them about something, call the number they gave you now.\n\n' +
   'If you are having thoughts of hurting yourself, call or text 988. If anyone in the house is in danger, call 911.\n\n' +
-  'Everything else — a question about a symptom, a medication, “is this normal?” — belongs to the surgeon’s office or their after-hours line. Write it here and ' + cf + ' will help you ask it well, and follow up if nobody calls back.';
+  'Everything else, a question about a symptom, a medication, “is this normal?”, belongs to the surgeon’s office or their after-hours line. Write it here and ' + cf + ' will help you ask it well, and follow up if nobody calls back.';
 // A vendor has no family of their own: each call finds the family through the vendor's own job thread.
 async function vendorTopic(ctx, p, c) {
   if (ctx.role !== 'vendor') return null;
@@ -54,7 +54,7 @@ async function sendMessage(ctx, p, c) {
     for (const f of files) {
       if (!f || !f.b64 || !f.name) continue;
       const bytes = Buffer.from(f.b64, 'base64');
-      must(bytes.length <= 10 * 1024 * 1024, 'Keep each file under 10 MB — a photo of each page works well');
+      must(bytes.length <= 10 * 1024 * 1024, 'Keep each file under 10 MB, a photo of each page works well');
       const up = await storage.saveUpload(ctx, { clientId: ctx.clientId, kind: 'Other', name: clean(f.name, 120), mime: f.type || 'application/octet-stream', bytes }, c);
       atts.push({ name: up.name, url: core.fileUrl(ctx, up), id: up.upload_id, type: f.type || '', size: bytes.length });
     }
@@ -74,7 +74,7 @@ async function sendMessage(ctx, p, c) {
     if (vend) {   // a job thread: the vendor hears from the family by text; the family hears from the vendor by email
       const vv = await db.one(`select * from vendors where vendor_id=$1`, [topic.extra && topic.extra.vendor_id]);
       if (ctx.role === 'vendor') await core.notifyFamily(ctx.clientId, 'message', ((vv && vv.name) || 'Your vendor') + ' wrote', ((vv && vv.name) || 'Your vendor') + ' wrote:', body, 'Open the portal', ctx.email);
-      else if (vv) { if (vv.phone) await require('../sms').send(vv.phone, C.APP_NAME + ': new message from the ' + famName(client.family_name).replace(/^The /, '') + ' — ' + C.PORTAL_URL); if (vv.email) await mail.notify(vv.email, 'New message from ' + famName(client.family_name), 'You have a new message about your job.', '', 'Open the portal'); }
+      else if (vv) { if (vv.phone) await require('../sms').send(vv.phone, C.APP_NAME + ': new message from the ' + famName(client.family_name).replace(/^The /, '') + ', ' + C.PORTAL_URL); if (vv.email) await mail.notify(vv.email, 'New message from ' + famName(client.family_name), 'You have a new message about your job.', '', 'Open the portal'); }
       return;
     }
     if (famOnly) {   // only the people in the thread hear about it
@@ -85,10 +85,10 @@ async function sendMessage(ctx, p, c) {
     }
     if (core.fam(ctx)) {
       const co = await core.coordinatorFor(client);
-      await core.notifyCo(co, urgent ? 'urgent' : topic.kind === 'medical' ? 'medical' : 'message', (urgent ? 'URGENT — ' : topic.kind === 'medical' ? 'Medical question — ' : '') + topic.title + ' — ' + famName(client.family_name).toLowerCase(), ctx.user.name + ' wrote in "' + topic.title + '":', body, 'Open the portal');
-      await core.notifyFamily(ctx.clientId, 'message', topic.title + ' — ' + ctx.user.name + ' wrote', ctx.user.name + ' wrote in "' + topic.title + '":', body, 'Open the portal', ctx.email);
+      await core.notifyCo(co, urgent ? 'urgent' : topic.kind === 'medical' ? 'medical' : 'message', (urgent ? 'URGENT, ' : topic.kind === 'medical' ? 'Medical question, ' : '') + topic.title + ', ' + famName(client.family_name).toLowerCase(), ctx.user.name + ' wrote in "' + topic.title + '":', body, 'Open the portal');
+      await core.notifyFamily(ctx.clientId, 'message', topic.title + ', ' + ctx.user.name + ' wrote', ctx.user.name + ' wrote in "' + topic.title + '":', body, 'Open the portal', ctx.email);
     } else {
-      await core.notifyFamily(ctx.clientId, 'message', topic.title + ' — a note from ' + (ctx.user.name || 'your coordinator'), (ctx.user.name || 'Your coordinator') + ' wrote in "' + topic.title + '":', body, 'Open the portal', ctx.email);
+      await core.notifyFamily(ctx.clientId, 'message', topic.title + ', a note from ' + (ctx.user.name || 'your coordinator'), (ctx.user.name || 'Your coordinator') + ' wrote in "' + topic.title + '":', body, 'Open the portal', ctx.email);
     }
   };
   return { message: core.msgPublic(msg, ctx), _after: after };
@@ -143,7 +143,7 @@ async function postUpdate(ctx, p, c) {
   }
   const u = await db.insert('updates', { update_id: id(), client_id: ctx.clientId, posted_by: ctx.email, stage: pick(p.stage, C.STAGES, client.current_stage || ''), title, body, visible_to_circle: visible,
     kind: pick(p.kind, C.UPDATE_KINDS, 'Family'), detail: clean(p.detail, 4000), quote: clean(p.quote, 600), quote_ref: clean(p.quote_ref, 120), extra: JSON.stringify(extra || {}) }, c);
-  if (extra && !extra.photo_ok) { const co = await core.coordinatorFor(client); if (co) await core.notifyCo(co, 'upload', 'A photo to approve — ' + famName(client.family_name), (ctx.user.name || ctx.email) + ' put a photo on “' + title + '”. The Circle sees it once you approve it.', '', 'Open Updates'); }
+  if (extra && !extra.photo_ok) { const co = await core.coordinatorFor(client); if (co) await core.notifyCo(co, 'upload', 'A photo to approve, ' + famName(client.family_name), (ctx.user.name || ctx.email) + ' put a photo on “' + title + '”. The Circle sees it once you approve it.', '', 'Open Updates'); }
   const after = async () => {
     if (!visible) return;
     for (const s of await db.all(`select supporter_email from circle where client_id=$1 and status='Active'`, [ctx.clientId]))

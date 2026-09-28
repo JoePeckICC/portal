@@ -1,6 +1,6 @@
 'use strict';
 // The loan closet (2026-09-28, Joe): "you're going to buy a walker and then you're never going to use it again."
-// The coordinator keeps equipment in each city — walkers, wheelchairs, shower chairs — and lends it to families
+// The coordinator keeps equipment in each city, walkers, wheelchairs, shower chairs, and lends it to families
 // through the portal. A family asks on Find Care (a "Medical equipment" request, which goes to the coordinator,
 // never to vendors); the coordinator picks a piece from that city's closet and lends it, with a date it is due
 // back. Nothing is ever deleted: a piece that wears out is retired, and every loan stays in its history.

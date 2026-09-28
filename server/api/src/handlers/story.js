@@ -35,13 +35,13 @@ async function setPeer(ctx, p, c) {
 // The discharge planner: eight questions the day before the wheelchair. A "no" or a "don't know" becomes a task, once.
 const DISCHARGE = [
   { id: 'ride', q: 'Is the named adult driver confirmed for the discharge day and time?', task: 'Confirm who drives home from the hospital, and the time', cat: 0 },
-  { id: 'meds', q: 'Do you have the medication schedule in writing — what, how much, when?', task: 'Get the medication schedule from the nurse, on paper, before leaving', cat: 0 },
+  { id: 'meds', q: 'Do you have the medication schedule in writing, what, how much, when?', task: 'Get the medication schedule from the nurse, on paper, before leaving', cat: 0 },
   { id: 'rx', q: 'Are the prescriptions filled, or do you know which pharmacy has them and its hours today?', task: 'Find out where the prescriptions are going and when they will be ready', cat: 0 },
   { id: 'call', q: 'Do you know who to call once home, at what number, day and night?', task: 'Write down the post-op line and the after-hours number', cat: 1 },
-  { id: 'follow', q: 'Are the follow-up appointments booked, or do you know who books them?', task: 'Pin down the follow-up appointments — who books, and when', cat: 0 },
-  { id: 'equip', q: 'Is the equipment at home or in the car?', task: 'Chase the equipment delivery — walker, shower chair, whatever was ordered', cat: 0 },
+  { id: 'follow', q: 'Are the follow-up appointments booked, or do you know who books them?', task: 'Pin down the follow-up appointments, who books, and when', cat: 0 },
+  { id: 'equip', q: 'Is the equipment at home or in the car?', task: 'Chase the equipment delivery, walker, shower chair, whatever was ordered', cat: 0 },
   { id: 'night', q: 'Is someone in the house the first night?', task: 'Name who stays the first night', cat: 2 },
-  { id: 'home', q: 'Is home ready — bed on the right floor, a clear path, food for three days?', task: 'Set up the landing zone at home before the car pulls in', cat: 2 },
+  { id: 'home', q: 'Is home ready, bed on the right floor, a clear path, food for three days?', task: 'Set up the landing zone at home before the car pulls in', cat: 2 },
   { id: 'papers', q: 'Are the discharge papers in the bag, and will you upload them tonight?', task: 'Upload the discharge papers under Documents once home', cat: 0 },
 ];
 async function dischargePlan(ctx, p, c) {
@@ -57,7 +57,7 @@ async function dischargePlan(ctx, p, c) {
     if (v === 'yes' || !v) { await db.q(`delete from tasks where client_id=$1 and extra->>'auto'=$2 and status='Not started'`, [ctx.clientId, 'discharge:' + q.id], c); continue; }
     {
       const exists = await db.one(`select 1 from tasks where client_id=$1 and extra->>'auto'=$2 and status<>'Done'`, [ctx.clientId, 'discharge:' + q.id], c);
-      if (!exists) { await db.insert('tasks', { task_id: id(), client_id: ctx.clientId, title: q.task, category: C.CATEGORIES[q.cat], status: 'Not started', owner: first(client.patient_first_name) || 'Family', due_date: null, notes: 'From the discharge planner' + (v === 'dk' ? ' — nobody knew yet' : '') + '.', extra: JSON.stringify({ auto: 'discharge:' + q.id }) }, c); made.push(q.task); }
+      if (!exists) { await db.insert('tasks', { task_id: id(), client_id: ctx.clientId, title: q.task, category: C.CATEGORIES[q.cat], status: 'Not started', owner: first(client.patient_first_name) || 'Family', due_date: null, notes: 'From the discharge planner' + (v === 'dk' ? ', nobody knew yet' : '') + '.', extra: JSON.stringify({ auto: 'discharge:' + q.id }) }, c); made.push(q.task); }
     }
   }
   await patchExtra(client, { discharge: { answers: { ...((extraOf(client).discharge || {}).answers || {}), ...out }, at: new Date().toISOString(), by: ctx.email } }, c);

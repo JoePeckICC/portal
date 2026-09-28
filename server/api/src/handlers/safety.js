@@ -1,6 +1,6 @@
 'use strict';
 // Safety (2026-09-27): the ER heads-up and the escalation log. A family taps "We're headed to the ER", says which
-// hospital and why, and the coordinator is paged that minute — so they can call the ED before the car arrives with
+// hospital and why, and the coordinator is paged that minute, so they can call the ED before the car arrives with
 // the one-page Health summary in hand. Every escalation (ER, 911, a call to the surgeon after hours) lands in the
 // log with an outcome, so the story is in one place when the family or a lawyer asks.
 const C = require('../config');
@@ -27,8 +27,8 @@ async function erAlert(ctx, p, c) {
   const after = async () => {
     const co = await core.coordinatorFor(client);
     const name = (ctx.user && ctx.user.name) || ctx.email;
-    await core.notifyCo(co, 'er', 'ER — ' + famName(client.family_name) + ' · ' + hospital, name + ' says they are headed to ' + hospital + ' now. Call the ED charge nurse before they arrive; the Health summary has what to read them.', why, 'Open the chart');
-    await core.notifyFamily(ctx.clientId, 'urgent', 'Headed to the ER — ' + hospital, name + ' let us know the family is headed to ' + hospital + '. Your care coordinator has been notified.', why, 'Open the portal', ctx.email);
+    await core.notifyCo(co, 'er', 'ER, ' + famName(client.family_name) + ' · ' + hospital, name + ' says they are headed to ' + hospital + ' now. Call the ED charge nurse before they arrive; the Health summary has what to read them.', why, 'Open the chart');
+    await core.notifyFamily(ctx.clientId, 'urgent', 'Headed to the ER, ' + hospital, name + ' let us know the family is headed to ' + hospital + '. Your care coordinator has been notified.', why, 'Open the portal', ctx.email);
   };
   return { escalation: row, _after: after };
 }

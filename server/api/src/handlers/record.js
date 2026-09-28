@@ -50,7 +50,7 @@ async function uploadDoc(ctx, p, c) {
   let after = null;
   if (ctx.role !== 'coordinator') {
     if (kind === 'Discharge') await core.autoMsg(ctx.clientId, 'Discharge papers uploaded: ' + row.name + '. ' + (co ? first(co.name) : 'Your coordinator') + ' will build the medication list from them.', c);
-    after = () => core.notifyCo(co, 'upload', famName(client.family_name) + ' uploaded a document (' + kind + ')', ctx.user.name + ' uploaded ' + row.name + (row.note ? ' — ' + row.note : ''), '', 'Open the portal');
+    after = () => core.notifyCo(co, 'upload', famName(client.family_name) + ' uploaded a document (' + kind + ')', ctx.user.name + ' uploaded ' + row.name + (row.note ? ', ' + row.note : ''), '', 'Open the portal');
   } else await core.autoMsg(ctx.clientId, 'New document under My Record → Documents: ' + row.name + ' (' + kind + ').', c);
   return { upload: core.docPublic(row, ctx), _after: after };
 }
@@ -92,7 +92,7 @@ async function askHelp(ctx, p, c) {
   await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: t.topic_id, sender_email: ctx.email, body, read_by_client: ctx.role === 'client', read_by_coordinator: false }, c);
   await db.q(`update topics set last_at=now(), status='Active' where topic_id=$1`, [t.topic_id], c);
   const client = await core.clientById(ctx.clientId, c), co = await core.coordinatorFor(client, c);
-  const after = () => core.notifyCo(co, 'message', title + ' — ' + famName(client.family_name).toLowerCase(), ctx.user.name + ' asked:', body, 'Open the portal');
+  const after = () => core.notifyCo(co, 'message', title + ', ' + famName(client.family_name).toLowerCase(), ctx.user.name + ' asked:', body, 'Open the portal');
   return { topic: t, _after: after };
 }
 
@@ -107,7 +107,7 @@ async function askAssistance(ctx, p, c) {
   await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: t.topic_id, sender_email: ctx.email, body, read_by_client: true, read_by_coordinator: false }, c);
   await db.q(`update topics set last_at=now(), status='Active' where topic_id=$1`, [t.topic_id], c);
   const client = await core.clientById(ctx.clientId, c), co = await core.coordinatorFor(client, c);
-  const after = () => core.notifyCo(co, 'assist', 'Financial assistance — ' + famName(client.family_name), ctx.user.name + ' asked for help with billing:', body, 'Open the portal');
+  const after = () => core.notifyCo(co, 'assist', 'Financial assistance, ' + famName(client.family_name), ctx.user.name + ' asked for help with billing:', body, 'Open the portal');
   return { topicId: t.topic_id, _after: after };
 }
 async function saveAssistance(ctx, p, c) {
@@ -119,7 +119,7 @@ async function saveAssistance(ctx, p, c) {
   }
   const name = clean(p.name, 160).trim(); must(name, 'Name the program');
   await db.insert('assistance', { program_id: id(), client_id: ctx.clientId, name, what: clean(p.what, 200), status: pick(p.status, C.ASSIST_STATUSES, 'Suggested'), note: clean(p.note, 500), link: clean(p.link, 300) }, c);
-  await core.autoMsg(ctx.clientId, 'Financial help to look at: ' + name + (p.what ? ' — ' + clean(p.what, 200) : '') + '. See Billing → Financial assistance.', c);
+  await core.autoMsg(ctx.clientId, 'Financial help to look at: ' + name + (p.what ? ', ' + clean(p.what, 200) : '') + '. See Billing → Financial assistance.', c);
   return {};
 }
 // Vendor bills: what the family owes the people the coordinator brought in. Either side can add; the family marks paid.

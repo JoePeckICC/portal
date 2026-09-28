@@ -1,7 +1,7 @@
 'use strict';
 // The marketplace, step 1 (2026-09-27): a vetted list of local vendors per city (rides, meals, childcare, pets,
 // lodging, help at home). The coordinator keeps the list and books from it; a family sees only the vendor booked
-// on their own plan item. Families pay vendors directly — we never take their money.
+// on their own plan item. Families pay vendors directly, we never take their money.
 //
 // And the needs log: what each family needed and when (days from surgery), by hospital and surgery. It is built
 // from the plan and tasks every day, nobody types it. Group numbers show only once 11 or more families are behind
@@ -24,7 +24,7 @@ async function saveVendor(ctx, p, c) {
     name, city, state: clean(p.state, 4).toUpperCase(), service: SERVICES.includes(p.service) ? p.service : 'Other',
     phone: (v => { const s = clean(v, 40).trim(); if (!s) return ''; const ok = require('../intake').phoneOk(s); must(ok, 'That phone number does not look right. Use 10 digits, like (615) 555-0100.'); return ok; })(p.phone), email: clean(p.email, 160), website: web(p.website), price: clean(p.price, 120),
     insured: isTrue(p.insured), checked: isTrue(p.checked), notes: clean(p.notes, 2000), active: p.active === undefined ? true : isTrue(p.active),
-    updated_by: ctx.email, updated_at: new Date(),
+    updated_by: ctx.email, updated_at: new Date(), ...(p.bio !== undefined ? { bio: clean(p.bio, 400).trim() } : {}),
   };
   const saved = p.vendorId ? (await db.update('vendors', { vendor_id: String(p.vendorId) }, row, c))[0] : await db.insert('vendors', { vendor_id: id(), ...row }, c);
   must(saved, 'Not found');

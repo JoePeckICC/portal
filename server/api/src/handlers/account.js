@@ -63,7 +63,7 @@ async function saveAnswers(ctx, p, c) {
     if (!byId[base] || C.FIXED_ANSWERS.indexOf(base) >= 0) return;
     ok[qid] = p.answers[qid];
     const before = (cur.answers[qid] || {}).a || '', after = String((p.answers[qid] || {}).a || '');
-    if (byId[qid] && before !== after) changes.push(byId[qid].q.replace(/\[\[([^\]|]*)\|[^\]]*\]\]/g, '$1').replace(/\{[A-Z_]+\}/g, 'they') + ': "' + (before || '—') + '" → "' + (after || '—') + '"');
+    if (byId[qid] && before !== after) changes.push(byId[qid].q.replace(/\[\[([^\]|]*)\|[^\]]*\]\]/g, '$1').replace(/\{[A-Z_]+\}/g, 'they') + ': "' + (before || 'Not set') + '" → "' + (after || 'Not set') + '"');
   });
   must(Object.keys(ok).length, 'Nothing to change');
   ok._status = { a: 'Updated after submitting' };
@@ -118,6 +118,8 @@ async function savePrefs(ctx, p, c) {
   if (p.avatar !== undefined) patch.avatar = C.AVATARS.indexOf(p.avatar) >= 0 ? p.avatar : '';
   // Where someone in a family's circle lives (a ZIP code), so the family can ask the people nearby for a hand.
   if (p.zip !== undefined) { const z = String(p.zip || '').trim(); must(/^\d{5}$/.test(z), 'Use a 5-digit ZIP code'); await db.q(`update users set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object('zip', $2::text) where email=$1`, [ctx.email, z], c); }
+  // A mobile number, so the family can text them when they need a hand.
+  if (p.mobile !== undefined) { const raw = String(p.mobile || '').trim(); const ph = raw ? require('../intake').phoneOk(raw) : ''; must(!raw || ph, 'That phone number does not look right. Use 10 digits, like (615) 555-0100.'); await db.q(`update users set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object('phone', $2::text) where email=$1`, [ctx.email, ph || ''], c); }
   if (Object.keys(patch).length) await db.update('users', { email: ctx.email }, patch, c);
   return {};
 }

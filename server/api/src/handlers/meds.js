@@ -45,7 +45,7 @@ async function saveMed(ctx, p, c) {
   let after = null;
   if (ctx.role !== 'coordinator') {
     await core.autoMsg(ctx.clientId, (existing ? 'Updated' : 'Added') + ' medication: ' + name + (row.dose ? ' ' + row.dose : '') + '. Pending review by ' + (co ? first(co.name) : 'your coordinator') + '.', c);
-    after = () => core.notifyCo(co, 'meds', famName(client.family_name) + ' — medication to review', ctx.user.name + (existing ? ' updated ' : ' added ') + name + (row.dose ? ' ' + row.dose : '') + (times.length ? ' at ' + times.join(', ') : ' (as needed)') + '. It is pending your review.', row.instructions, 'Review it');
+    after = () => core.notifyCo(co, 'meds', famName(client.family_name) + ', medication to review', ctx.user.name + (existing ? ' updated ' : ' added ') + name + (row.dose ? ' ' + row.dose : '') + (times.length ? ' at ' + times.join(', ') : ' (as needed)') + '. It is pending your review.', row.instructions, 'Review it');
   }
   return { med: medPublic(saved), _after: after };
 }
@@ -56,7 +56,7 @@ async function addMeds(ctx, p, c) {
   const added = [];
   for (const m of rows) added.push((await saveMed(ctx, m, c)).med);
   const cf = first(ctx.user.name) || 'Your coordinator';
-  await core.autoMsg(ctx.clientId, cf + ' built your medication list from the discharge papers: ' + added.map(m => m.name + (m.dose ? ' ' + m.dose : '')).join(', ') + '. Check it under Pharmacy — reminders start from the next dose.', c);
+  await core.autoMsg(ctx.clientId, cf + ' built your medication list from the discharge papers: ' + added.map(m => m.name + (m.dose ? ' ' + m.dose : '')).join(', ') + '. Check it under Pharmacy, reminders start from the next dose.', c);
   const after = () => core.notifyFamily(ctx.clientId, 'meds', 'Your medication list is ready', cf + ' added ' + added.length + ' medication' + (added.length === 1 ? '' : 's') + ' from your discharge papers.', added.map(m => '• ' + m.name + (m.dose ? ' ' + m.dose : '') + (m.times ? ' at ' + m.times.split(',').join(', ') : ' as needed')).join('\n'), 'Open Pharmacy');
   return { added: added.length, _after: after };
 }
@@ -88,7 +88,7 @@ async function takeDose(ctx, p, c) {
     on conflict (med_id,due_at) do update set status='Taken', taken_at=now(), by=excluded.by`, [id(), ctx.clientId, med.med_id, due, ctx.email], c);
   return {};
 }
-// A note on one dose: vomited after taking it, or skipped on purpose. Logged, never re-dosed by us — the team says what to do.
+// A note on one dose: vomited after taking it, or skipped on purpose. Logged, never re-dosed by us, the team says what to do.
 async function doseNote(ctx, p, c) {
   famOrCo(ctx);
   must(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(p.dueAt || '')), 'Bad time');
@@ -97,7 +97,7 @@ async function doseNote(ctx, p, c) {
   const due = localToIso(p.dueAt);
   await db.q(`insert into doses (dose_id,client_id,med_id,due_at,status,taken_at,by) values ($1,$2,$3,$4,$5,now(),$6)
     on conflict (med_id,due_at) do update set status=excluded.status, taken_at=now(), by=excluded.by`, [id(), ctx.clientId, med.med_id, due, status, ctx.email], c);
-  if (status === 'Vomited') await core.autoMsg(ctx.clientId, 'Vomited after ' + med.name + (med.dose ? ' ' + med.dose : '') + ' (' + require('../util').niceWhen(p.dueAt) + '). Do not take it again unless the team says to — call the post-op line and ask.', c);
+  if (status === 'Vomited') await core.autoMsg(ctx.clientId, 'Vomited after ' + med.name + (med.dose ? ' ' + med.dose : '') + ' (' + require('../util').niceWhen(p.dueAt) + '). Do not take it again unless the team says to, call the post-op line and ask.', c);
   return {};
 }
 // A dose taken hours late: the rest of today's doses of that medication slide by the same amount, today only.
@@ -117,7 +117,7 @@ async function missedDose(ctx, p, c) {
   const client = await core.clientById(ctx.clientId, c), co = await core.coordinatorFor(client, c);
   const when = require('../util').niceWhen(p.dueAt);
   await core.autoMsg(ctx.clientId, 'Missed dose: ' + med.name + ' (' + when + '). ' + (co ? first(co.name) : 'Your coordinator') + ' knows, and will be in touch about what to do next.', c);
-  const after = () => core.notifyCo(co, 'missed', 'Check-in asked — ' + famName(client.family_name), ctx.user.name + ' missed ' + med.name + (med.dose ? ' ' + med.dose : '') + ' due ' + when + ' and asked you to check in.', med.instructions, 'Open the portal');
+  const after = () => core.notifyCo(co, 'missed', 'Check-in asked, ' + famName(client.family_name), ctx.user.name + ' missed ' + med.name + (med.dose ? ' ' + med.dose : '') + ' due ' + when + ' and asked you to check in.', med.instructions, 'Open the portal');
   return { _after: after };
 }
 // Reads discharge papers (photo or PDF) and drafts medication rows from the text. Always a draft; the coordinator checks every line.

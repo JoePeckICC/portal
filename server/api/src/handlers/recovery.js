@@ -15,20 +15,20 @@ const extraOf = c => (c.extra && typeof c.extra === 'object' ? c.extra : {});
 async function patchExtra(client, patch, c) { await db.q(`update clients set extra=$2 where client_id=$1`, [client.client_id, JSON.stringify({ ...extraOf(client), ...patch })], c); }
 
 // The things families ask about. status: no | from (a date) | ok | ask (nobody has said). Each "no"/"from" also
-// suggests a home check — a task on the family's list, made once, keyed so it is never made twice.
+// suggests a home check, a task on the family's list, made once, keyed so it is never made twice.
 const RESTRICTIONS = [
-  { key: 'drive', label: 'Driving', check: 'Line up rides for the first appointments — who drives, which days', cat: 'Family & ongoing support' },
-  { key: 'lift', label: 'Lifting', check: 'Move what gets lifted every day — laundry, groceries, the dog food, a toddler — to waist height, or to someone else', cat: 'Family & ongoing support' },
+  { key: 'drive', label: 'Driving', check: 'Line up rides for the first appointments, who drives, which days', cat: 'Family & ongoing support' },
+  { key: 'lift', label: 'Lifting', check: 'Move what gets lifted every day, laundry, groceries, the dog food, a toddler, to waist height, or to someone else', cat: 'Family & ongoing support' },
   { key: 'stairs', label: 'Stairs', check: 'Set up a bed and a bathroom on one floor', cat: 'Family & ongoing support' },
   { key: 'shower', label: 'Showering and bathing', check: 'A shower chair, a hand-held head or a sponge-bath plan; waterproof dressing covers if the team said so', cat: 'Family & ongoing support' },
   { key: 'work', label: 'Work', check: 'Tell the employer the return date the team gave; start the FMLA or leave paperwork under Letters', cat: 'Understanding & advocacy' },
-  { key: 'diet', label: 'Eating and drinking', check: 'Stock the kitchen for the diet the team gave — three days of easy food that fits it', cat: 'Family & ongoing support' },
+  { key: 'diet', label: 'Eating and drinking', check: 'Stock the kitchen for the diet the team gave, three days of easy food that fits it', cat: 'Family & ongoing support' },
   { key: 'exercise', label: 'Exercise and walking', check: 'A safe walking route from the front door, and a chair at the far end', cat: 'Family & ongoing support' },
   { key: 'dressing', label: 'The dressing and the incision', check: 'Supplies on the landing-zone table: what the team said to use, and how often', cat: 'Care coordination' },
   { key: 'travel', label: 'Travel and flying', check: '', cat: '' },
   { key: 'alcohol', label: 'Alcohol', check: '', cat: '' },
   { key: 'intimacy', label: 'Intimacy', check: '', cat: '' },
-  { key: 'sleep', label: 'Sleeping position', check: 'Set the bed or recliner up the way the team said — propped, on which side, with which pillows', cat: 'Family & ongoing support' },
+  { key: 'sleep', label: 'Sleeping position', check: 'Set the bed or recliner up the way the team said, propped, on which side, with which pillows', cat: 'Family & ongoing support' },
 ];
 const STATUSES = ['ask', 'no', 'from', 'ok'];
 
@@ -78,7 +78,7 @@ async function checkin(ctx, p, c) {
   const mood = p.mood === undefined || p.mood === '' ? null : Math.max(1, Math.min(5, Number(p.mood) || 0)) || null;
   const pain = p.pain === undefined || p.pain === '' ? null : Math.max(0, Math.min(10, Number(p.pain)));
   const words = clean(p.words, 1500).trim();
-  must(mood !== null || pain !== null || words, 'A face, a number, or a few words — any one is enough');
+  must(mood !== null || pain !== null || words, 'A face, a number, or a few words, any one is enough');
   const row = await db.insert('checkins', { checkin_id: id(), client_id: ctx.clientId, by: ctx.email, role: ctx.role, mood, pain, words, caregiver: ctx.role === 'family' }, c);
   const client = await core.clientById(ctx.clientId, c);
   const after = async () => {
@@ -86,7 +86,7 @@ async function checkin(ctx, p, c) {
     const prev = await db.one(`select mood from checkins where client_id=$1 and checkin_id<>$2 and at > now() - interval '36 hours' order by at desc limit 1`, [ctx.clientId, row.checkin_id]);
     if (mood === 1 || (prev && prev.mood !== null && prev.mood <= 2)) {
       const co = await core.coordinatorFor(client);
-      await core.notifyCo(co, mood === 1 ? 'urgent' : 'checkin', 'A hard day — ' + famName(client.family_name), (ctx.user.name || ctx.email) + ' checked in at ' + mood + ' of 5' + (pain !== null ? ', pain ' + pain + ' of 10' : '') + (prev ? ' — the second low day in a row' : '') + '. A call today.', words, 'Open the chart');
+      await core.notifyCo(co, mood === 1 ? 'urgent' : 'checkin', 'A hard day, ' + famName(client.family_name), (ctx.user.name || ctx.email) + ' checked in at ' + mood + ' of 5' + (pain !== null ? ', pain ' + pain + ' of 10' : '') + (prev ? ', the second low day in a row' : '') + '. A call today.', words, 'Open the chart');
     }
   };
   return { checkin: row, _after: after };
@@ -143,7 +143,7 @@ async function setDisaster(ctx, p, c) {
   let made = false;
   if (items.length && !dz.utility) {
     const exists = await db.one(`select 1 from tasks where client_id=$1 and extra->>'auto'='disaster:utility' and status<>'Done'`, [ctx.clientId], c);
-    if (!exists) { await db.insert('tasks', { task_id: id(), client_id: ctx.clientId, title: 'Register with the power company’s medical priority list', category: 'Care coordination', status: 'Not started', owner: first(client.patient_first_name) || 'Family', due_date: null, notes: 'Call the utility; ask for the medical baseline / priority restoration program. A doctor’s letter is usually needed — the coordinator can request it.', extra: JSON.stringify({ auto: 'disaster:utility' }) }, c); made = true; }
+    if (!exists) { await db.insert('tasks', { task_id: id(), client_id: ctx.clientId, title: 'Register with the power company’s medical priority list', category: 'Care coordination', status: 'Not started', owner: first(client.patient_first_name) || 'Family', due_date: null, notes: 'Call the utility; ask for the medical baseline / priority restoration program. A doctor’s letter is usually needed, the coordinator can request it.', extra: JSON.stringify({ auto: 'disaster:utility' }) }, c); made = true; }
   }
   else await db.q(`delete from tasks where client_id=$1 and extra->>'auto'='disaster:utility' and status='Not started'`, [ctx.clientId], c);
   return { made };

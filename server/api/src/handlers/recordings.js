@@ -86,7 +86,7 @@ async function checkTranscripts() {
     n++;
     try {
       const client = await core.clientById(t.client_id), co = await core.coordinatorFor(client);
-      await core.notifyCo(co, 'upload', famName(client.family_name) + ': transcript ' + (r.text ? 'ready' : 'failed') + ' — ' + t.title,
+      await core.notifyCo(co, 'upload', famName(client.family_name) + ': transcript ' + (r.text ? 'ready' : 'failed') + ', ' + t.title,
         r.text ? 'The transcript of “' + t.title + '” is ready to read and check. The family does not see it until you share it.' : 'The transcript of “' + t.title + '” did not work: ' + r.error, '', 'Open the portal');
     } catch (e) { console.error('transcript notify', e.message); }
   }

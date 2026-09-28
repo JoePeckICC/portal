@@ -91,7 +91,7 @@ async function resubmitIntake(ctx, client, cur, c) {
   intake.intakeSpec().steps.forEach(st => st.qs.forEach(q => { byId[q.id] = q.q.replace(/\[\[([^\]|]*)\|[^\]]*\]\]/g, '$1').replace(/\{[A-Z_]+\}/g, 'they'); }));
   const lines = Object.keys(cur.changed || {}).map(qid => {
     const x = cur.changed[qid], base = qid.replace(/d$/, ''), label = byId[qid] || (byId[base] ? byId[base] + ' (details)' : qid);
-    return x.from === x.to ? label + ': note changed' : label + ': "' + (x.from || '—') + '" → "' + (x.to || '—') + '"' + (x.note ? ' (note changed too)' : '');
+    return x.from === x.to ? label + ': note changed' : label + ': "' + (x.from || 'Not set') + '" → "' + (x.to || 'Not set') + '"' + (x.note ? ' (note changed too)' : '');
   });
   let after = null;
   if (lines.length && ctx.role !== 'coordinator') {
@@ -207,7 +207,7 @@ async function addAppointment(ctx, p, c) {
   must(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/.test(when), 'Pick a date and time');
   { const t = Date.parse(when.slice(0, 10)); must(t >= Date.now() - 366 * 864e5 && t <= Date.now() + 731 * 864e5, 'Please check the date. It should be within the past year or the next two years.'); }
   const row = await db.insert('appointments', { appt_id: id(), client_id: ctx.clientId, title, starts_at: localToIso(when), location: clean(p.location, 200), note: clean(p.note, 500), status: 'Scheduled' }, c);
-  await core.autoMsg(ctx.clientId, 'Appointment added: ' + title + ' — ' + require('../util').niceWhen(when) + (row.location ? ', ' + row.location : '') + '.', c);
+  await core.autoMsg(ctx.clientId, 'Appointment added: ' + title + ', ' + require('../util').niceWhen(when) + (row.location ? ', ' + row.location : '') + '.', c);
   return { appointment: apptPublic(row) };
 }
 async function cancelAppointment(ctx, p, c) {
@@ -244,7 +244,7 @@ async function addReferral(ctx, p, c) {
   coOnly(ctx); needFamily(ctx);
   const vendor = clean(p.vendor, 160).trim(); must(vendor, 'Name the vendor');
   const row = await db.insert('referrals', { referral_id: id(), client_id: ctx.clientId, vendor, service: clean(p.service, 160), contact: clean(p.contact, 160), note: clean(p.note, 500), status: 'Suggested', added_by: ctx.email }, c);
-  await core.autoMsg(ctx.clientId, 'New referral: ' + vendor + (row.service ? ' — ' + row.service : '') + '. See Find Care.', c);
+  await core.autoMsg(ctx.clientId, 'New referral: ' + vendor + (row.service ? ', ' + row.service : '') + '. See Find Care.', c);
   return { referral: row };
 }
 async function setReferralStatus(ctx, p, c) {

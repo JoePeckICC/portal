@@ -77,7 +77,7 @@ async function comment(ctx, p, c) {
   if (ctx.role === 'supporter') must(isTrue(u.visible_to_circle), 'Not found');
   const status = ctx.role === 'supporter' ? 'Pending' : 'Approved';   // the coordinator moderates what the Circle writes
   const row = await db.insert('update_comments', { comment_id: id(), update_id: u.update_id, client_id: ctx.clientId, author: clean(ctx.user.name || ctx.email, 120), email: ctx.email, body, status, by_role: ctx.role }, c);
-  const after = status === 'Pending' ? async () => { const co = await core.coordinatorFor(await core.clientById(ctx.clientId)); if (co) await core.notifyCo(co, 'comment', 'A comment to approve — ' + famName((await core.clientById(ctx.clientId)).family_name), (ctx.user.name || ctx.email) + ' wrote under “' + u.title + '”: ' + body.slice(0, 200), '', 'Open Updates'); } : null;
+  const after = status === 'Pending' ? async () => { const co = await core.coordinatorFor(await core.clientById(ctx.clientId)); if (co) await core.notifyCo(co, 'comment', 'A comment to approve, ' + famName((await core.clientById(ctx.clientId)).family_name), (ctx.user.name || ctx.email) + ' wrote under “' + u.title + '”: ' + body.slice(0, 200), '', 'Open Updates'); } : null;
   return { comment: row, _after: after };
 }
 async function moderateComment(ctx, p, c) {
@@ -194,7 +194,7 @@ async function publicComment(p, req) {
   const u = await db.one(`select * from updates where update_id=$1 and client_id=$2 and visible_to_circle`, [String(p.updateId || ''), client.client_id]); must(u, 'Not found');
   await db.insert('update_comments', { comment_id: id(), update_id: u.update_id, client_id: client.client_id, author: name, email: '', body, status: 'Pending', by_role: 'link' });
   const co = await core.coordinatorFor(client);
-  if (co) await core.notifyCo(co, 'comment', 'A comment to approve — ' + famName(client.family_name), name + ' wrote under “' + u.title + '”: ' + body.slice(0, 200), '', 'Open Updates');
+  if (co) await core.notifyCo(co, 'comment', 'A comment to approve, ' + famName(client.family_name), name + ' wrote under “' + u.title + '”: ' + body.slice(0, 200), '', 'Open Updates');
   return { ok: true, pending: true };
 }
 async function publicClaim(p, req) {

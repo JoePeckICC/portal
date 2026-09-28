@@ -7,7 +7,7 @@ const { isTrue, must, ymd } = require('../util');
 
 // Everything the page needs to draw itself.
 async function bootstrap(ctx) {
-  const out = { me: { email: ctx.email, name: ctx.user.name, role: ctx.role, goes_by: ctx.user.goes_by || '', avatar: ctx.user.avatar || '', prefs: core.prefs(ctx.user), zip: (ctx.user.extra && ctx.user.extra.zip) || '' }, fixedAnswers: C.FIXED_ANSWERS, notifyKinds: C.NOTIFY_KINDS, avatars: C.AVATARS };
+  const out = { me: { email: ctx.email, name: ctx.user.name, role: ctx.role, goes_by: ctx.user.goes_by || '', avatar: ctx.user.avatar || '', prefs: core.prefs(ctx.user), zip: (ctx.user.extra && ctx.user.extra.zip) || '', mobile: (ctx.user.extra && ctx.user.extra.phone) || '' }, fixedAnswers: C.FIXED_ANSWERS, notifyKinds: C.NOTIFY_KINDS, avatars: C.AVATARS };
   if (ctx.role === 'coordinator') {
     out.families = (await db.all(`select client_id, family_name, patient_first_name, patient_last_name, current_stage, status from clients where status <> 'Archived' order by family_name`)).map(c =>
       ({ client_id: c.client_id, family_name: c.family_name, patient: [c.patient_first_name, c.patient_last_name].join(' ').trim(), current_stage: c.current_stage, status: c.status }));
@@ -70,9 +70,9 @@ async function bootstrap(ctx) {
   if (ctx.role === 'coordinator') out.intakeFlags = intake.intakeFlags(out.intake.answers);
   out.tasks = tasks; out.topics = topics;
   { const vids = [...new Set(out.topics.filter(t => t.kind === 'vendor').map(t => t.extra && t.extra.vendor_id).filter(Boolean))];   // the vendor's number, for the call button in their conversation
-    if (vids.length) { const ph = {}; const hr = {}; const sv = {}; (await db.all(`select vendor_id, phone, hours, service, services from vendors where vendor_id = any($1)`, [vids])).forEach(v => { ph[v.vendor_id] = v.phone; hr[v.vendor_id] = require('./jobs').normHours(v.hours); sv[v.vendor_id] = require('./jobs').svcsOf(v); }); out.topics = out.topics.map(t => t.kind === 'vendor' ? { ...t, extra: { ...t.extra, vendor_phone: ph[t.extra && t.extra.vendor_id] || '', vendor_hours: hr[t.extra && t.extra.vendor_id] || null, vendor_services: sv[t.extra && t.extra.vendor_id] || [t.extra && t.extra.service] } } : t); } }
+    if (vids.length) { const ph = {}; const hr = {}; const sv = {}; const pr = {}; (await db.all(`select vendor_id, phone, hours, service, services, bio, checked, insured from vendors where vendor_id = any($1)`, [vids])).forEach(v => { ph[v.vendor_id] = v.phone; hr[v.vendor_id] = require('./jobs').normHours(v.hours); sv[v.vendor_id] = require('./jobs').svcsOf(v); pr[v.vendor_id] = { vendor_bio: v.bio || '', vendor_vetted: !!v.checked, vendor_insured: !!v.insured }; }); out.topics = out.topics.map(t => t.kind === 'vendor' ? { ...t, extra: { ...t.extra, vendor_phone: ph[t.extra && t.extra.vendor_id] || '', vendor_hours: hr[t.extra && t.extra.vendor_id] || null, vendor_services: sv[t.extra && t.extra.vendor_id] || [t.extra && t.extra.service], ...(pr[t.extra && t.extra.vendor_id] || {}) } } : t); } }
   out.borrowed = await require('./loans').borrowedBy(cid); if (ctx.role === 'coordinator') Object.assign(out, await require('./loans').closetFor());
-  out.circleNear = core.fam(ctx) ? (await require('./jobs').circleNear(cid, ctx.email)).length : 0;
+  out.circleAsk = core.fam(ctx) ? (await require('./jobs').circleNear(cid, ctx.email, null, true)).map(x => ({ email: x.email, name: x.name, text: !!x.phone })) : []; out.circleNear = out.circleAsk.length;
   out.jobs = await require('./jobs').jobsFor(cid); out.careNotes = ce.care_notes || {}; out.pets = Array.isArray(ce.pets) ? ce.pets : require('./jobs').petsFromIntake((out.intake || await intake.readIntake(cid)).answers); out.jobServices = require('./market').SERVICES;
   out.updates = withPhoto(updates, ctx.role);
   out.tracker = ce.tracker || null; out.trackerSteps = CIRCLE.TRACKER; out.reactions = CIRCLE.REACTIONS; out.what_i_need = ce.what_i_need || '';
@@ -101,6 +101,7 @@ async function bootstrap(ctx) {
   const co = await core.coordinatorFor(client); out.coordinator = pubCo(co);
   const { apptPublic, localStamp } = require('../time');
   out.appointments = appointments.map(apptPublic); out.goals = goals; out.careTeam = careTeam; out.meds = meds.map(require('./meds').medPublic); out.vendorBills = vendorBills; out.assistance = assistance;
+  { const pl = [out.walk && out.walk.name].concat((out.appointments || []).map(a => a.location)).filter(Boolean); Object.assign(out, await require('./tips').tipsFor(ctx, pl)); }
   out.allergies = client.allergies || '';
   // Allergies the intake mentions, so an empty chart field never reads as "none" when the family told us something.
   try { const ia = await intake.readIntake(cid); out.allergyMentions = intake.allergyMentions(ia.answers || {}).map(x => x.text); } catch { out.allergyMentions = []; }
