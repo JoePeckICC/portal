@@ -322,6 +322,11 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   const pj = (await api(pat, 'bootstrap', {})).jobs;
   assert.equal(pj.find(j => j.job_id === ride.job.job_id).info.length, 2, 'the family sees all their own answers');
   // the circle's casting call: the support team never sees it until the time is up or the family says "ask InCadence now"
+  assert.match((await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: '1' })).error, /No one in your circle lives near you/);
+  const sis = await signIn('sis@example.com');
+  assert.match((await api(sis, 'savePrefs', { zip: '372' })).error, /5-digit/);
+  { const r = await api(sis, 'savePrefs', { zip: '37205' }); assert.equal(r.ok, true, r.error); }
+  assert.equal((await api(pat, 'bootstrap', {})).circleNear, 1, 'sis lives nearby');
   const cc = await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: '1' });
   assert.equal(cc.ok, true, cc.error); assert.ok(cc.job.extra.circle.until);
   assert.ok(!(await api(sarah, 'bootstrap', {})).openJobs.some(x => x.job_id === cc.job.job_id), 'the circle goes first');
@@ -331,7 +336,7 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   assert.equal((await db.all(`select status from help_items where job_id=$1`, [cc.job.job_id]))[0].status, 'Removed');
   const only = await api(pat, 'requestJob', { service: 'Childcare', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: 'only', info: [{ l: 'Their ages', v: '4 and 7' }] });
   const hi2 = (await db.all(`select * from help_items where job_id=$1`, [only.job.job_id]))[0];
-  { const r = await api(pat, 'claimHelp', { itemId: hi2.item_id }); assert.equal(r.ok, true, r.error); }
+  { const r = await api(sis, 'claimHelp', { itemId: hi2.item_id }); assert.equal(r.ok, true, r.error); }
   const oj2 = (await api(pat, 'bootstrap', {})).jobs.find(j => j.job_id === only.job.job_id); assert.equal(oj2.status, 'Taken'); assert.ok(oj2.circle_by);
   // the loan closet: the coordinator lends a walker from the Nashville closet and it comes back
   const coord = await signIn('joe@incadencecare.com');
