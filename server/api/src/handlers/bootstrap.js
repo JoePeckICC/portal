@@ -97,6 +97,7 @@ async function bootstrap(ctx) {
   else if (co) out.blockedDates = core.coSettings(co).blocked;
   out.doses = doses.map(d => ({ ...d, due_at: localStamp(d.due_at), taken_at: d.taken_at || '' }));
   out.uploads = uploads.map(u => core.docPublic(u, ctx));
+  out.transcripts = await require('./recordings').forClient(ctx, cid);
   if (ctx.role === 'family') { out.uploads = out.uploads.filter(u => u.shared); out.appointments.forEach(a => { if (!(a.extra && isTrue(a.extra.note_shared))) { a.visit_note = ''; a.note_hidden = true; } }); }
   out.referrals = referrals;
   if (core.fam(ctx) || ctx.role === 'coordinator') { try { out.recommended = await latestRec(cid); } catch { out.recommended = null; } }   // the coordinator's Implement page checks it too

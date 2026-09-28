@@ -29,7 +29,7 @@ async function reactivateClient(ctx, p, c) {
 async function exportClient(ctx) {
   coOnly(ctx);
   const cl = await core.clientById(ctx.clientId); must(cl, 'Not found');
-  const tables = ['users', 'plan_items', 'tasks', 'goals', 'topics', 'messages', 'updates', 'circle', 'intake_answers', 'appointments', 'care_team', 'referrals', 'medications', 'doses', 'uploads', 'vendor_bills', 'assistance', 'recommendations', 'resource_views'];
+  const tables = ['users', 'plan_items', 'tasks', 'goals', 'topics', 'messages', 'updates', 'circle', 'intake_answers', 'appointments', 'care_team', 'referrals', 'medications', 'doses', 'uploads', 'vendor_bills', 'assistance', 'recommendations', 'resource_views', 'transcripts'];
   const out = { exported_at: new Date().toISOString(), by: ctx.email, client: cl };
   for (const t of tables) out[t] = await db.all(`select * from ${t} where client_id=$1`, [cl.client_id]);
   if (out.users) out.users = out.users.map(u => { const { password_hash, ...rest } = u; return rest; });
@@ -45,7 +45,7 @@ async function purgeClient(ctx, p, c) {
   must(String(p.confirm || '').trim() === String(cl.family_name).trim(), 'Type the family name exactly to confirm');
   const storage = require('../storage');
   for (const u of await db.all(`select storage_key from uploads where client_id=$1 and storage_key is not null`, [cl.client_id], c)) await storage.remove(u.storage_key);
-  for (const t of ['doses', 'medications', 'messages', 'topics', 'plan_items', 'tasks', 'goals', 'updates', 'circle', 'intake_answers', 'appointments', 'care_team', 'referrals', 'uploads', 'vendor_bills', 'assistance', 'recommendations', 'resource_views'])
+  for (const t of ['transcripts', 'doses', 'medications', 'messages', 'topics', 'plan_items', 'tasks', 'goals', 'updates', 'circle', 'intake_answers', 'appointments', 'care_team', 'referrals', 'uploads', 'vendor_bills', 'assistance', 'recommendations', 'resource_views'])
     await db.q(`delete from ${t} where client_id=$1`, [cl.client_id], c);
   await db.q(`delete from sessions where email in (select email from users where client_id=$1)`, [cl.client_id], c);
   await db.q(`delete from users where client_id=$1`, [cl.client_id], c);

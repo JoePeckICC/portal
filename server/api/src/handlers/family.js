@@ -70,6 +70,7 @@ async function exportAll(ctx, p, c) {
   for (const t of tables) { try { out[t] = await db.all(`select * from ${t} where client_id=$1`, [cid], c); } catch (e) { out[t] = []; } }
   out.journal = await db.all(`select entry_id, at, prompt, body from journal where client_id=$1 and by=$2`, [cid, ctx.email], c);   // only their own
   out.uploads = (out.uploads || []).map(u => ({ ...u, storage_key: undefined, url: core.fileUrl(ctx, u) }));
+  out.transcripts = (await db.all(`select title, appt_date, text, updated_at from transcripts where client_id=$1 and shared and status='Ready'`, [cid], c));
   return { file: out };
 }
 
