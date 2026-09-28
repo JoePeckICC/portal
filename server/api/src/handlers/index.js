@@ -8,7 +8,7 @@ Object.assign(H, require('./stubs'), require('./bootstrap'), require('./messages
 H.READ_ONLY = { needsReport: 1, accessLog: 1, bootstrap: 1, billing: 1, allBilling: 1, inbasket: 1, resources: 1, planPdf: 1, summaryPdf: 1, readDischarge: 1, topicMessages: 1, exportClient: 1, slots: 1 };
 // Supporters (the wider circle) read updates and manage their own account. Nothing else.
 // A vendor can take and finish jobs and talk in their own job threads; nothing else.
-H.VENDOR_OK = { bootstrap: 1, savePrefs: 1, signOutEverywhere: 1, changePassword: 1, forgetDevices: 1, takeJob: 1, passJob: 1, finishJob: 1, saveHours: 1, sendMessage: 1, readTopic: 1, hideTopic: 1, topicMessages: 1 };
+H.VENDOR_OK = { bootstrap: 1, savePrefs: 1, signOutEverywhere: 1, changePassword: 1, forgetDevices: 1, takeJob: 1, passJob: 1, finishJob: 1, saveHours: 1, saveServices: 1, sendMessage: 1, readTopic: 1, hideTopic: 1, topicMessages: 1 };
 H.SUPPORTER_OK = { bootstrap: 1, savePrefs: 1, changeEmail: 1, signOutEverywhere: 1, changePassword: 1, forgetDevices: 1, react: 1, comment: 1, claimHelp: 1 };
 // A family's portal stays closed until their first payment is in. Consent and intake are always open.
 // Coordinator actions that are fine on an archived family (everything else is refused until reactivation).
