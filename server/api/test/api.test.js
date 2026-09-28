@@ -227,7 +227,7 @@ test('a family writes to their own circle; the coordinator never sees it; delete
   assert.equal(row2.extra.hidden, undefined, 'a new line brings it back');
 });
 
-test('vendors: invited, told by text, first to take it has it, then talk in Messages — and see nothing else', async () => {
+test('vendors: invited, told by text, first to take it has it, then talk in Messages, and see nothing else', async () => {
   const sms = require('../src/sms');
   const co = await signIn('joe@incadencecare.com');
   await db.q(`update clients set address='12 Oak St, Nashville, TN 37203' where client_id='c1'`);
@@ -322,12 +322,19 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   const pj = (await api(pat, 'bootstrap', {})).jobs;
   assert.equal(pj.find(j => j.job_id === ride.job.job_id).info.length, 2, 'the family sees all their own answers');
   // the circle's casting call: the support team never sees it until the time is up or the family says "ask InCadence now"
-  assert.match((await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: '1' })).error, /No one in your circle lives near you/);
   const sis = await signIn('sis@example.com');
+  assert.equal((await api(pat, 'bootstrap', {})).circleNear, 1, 'someone whose ZIP we do not know can still be asked');
+  { const r = await api(sis, 'savePrefs', { zip: '90210' }); assert.equal(r.ok, true, r.error); }
+  assert.match((await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: '1' })).error, /No one in your circle can be asked/, 'far away is left out');
   assert.match((await api(sis, 'savePrefs', { zip: '372' })).error, /5-digit/);
   { const r = await api(sis, 'savePrefs', { zip: '37205' }); assert.equal(r.ok, true, r.error); }
   assert.equal((await api(pat, 'bootstrap', {})).circleNear, 1, 'sis lives nearby');
-  const cc = await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: '1' });
+  { const r = await api(sis, 'savePrefs', { mobile: '(615) 555-0142' }); assert.equal(r.ok, true, r.error); }
+  assert.equal((await api(pat, 'bootstrap', {})).circleAsk[0].text, true, 'sis can be texted');
+  const nS = sms.sent.length;
+  assert.match((await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: '1', circleTo: ['nobody@example.com'] })).error, /No one in your circle/);
+  const cc = await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: '1', circleTo: ['sis@example.com'] });
+  assert.ok(sms.sent.slice(nS).some(x => x.to === '+16155550142'), 'the circle gets a text');
   assert.equal(cc.ok, true, cc.error); assert.ok(cc.job.extra.circle.until);
   assert.ok(!(await api(sarah, 'bootstrap', {})).openJobs.some(x => x.job_id === cc.job.job_id), 'the circle goes first');
   const hi = (await db.all(`select * from help_items where job_id=$1`, [cc.job.job_id]))[0]; assert.equal(hi.status, 'Open');
@@ -371,9 +378,23 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   { const r = await api(pat, 'savePets', { pets: [{ name: 'Biscuit', kind: 'Dog', notes: 'Pulls on the leash' }, { name: '', kind: 'Cat' }] }); assert.equal(r.ok, true, r.error); assert.equal(r.pets.length, 1); assert.ok(r.pets[0].id); }
   assert.equal((await api(sarah, 'savePets', { pets: [] })).error, 'Not allowed');
   const pets = (await api(pat, 'bootstrap', {})).pets; assert.equal(pets[0].name, 'Biscuit');
-  const pw = await api(pat, 'requestJob', { topicId: vt.topic_id, startsAt: localToIso(day2 + 'T16:00'), service: 'Pet care', info: [{ l: 'Pets', v: 'Biscuit (dog) — Pulls on the leash' }] });
+  const pw = await api(pat, 'requestJob', { topicId: vt.topic_id, startsAt: localToIso(day2 + 'T16:00'), service: 'Pet care', info: [{ l: 'Pets', v: 'Biscuit (dog), Pulls on the leash' }] });
   assert.equal(pw.ok, true, pw.error);
-  assert.equal((await api(sarah, 'bootstrap', {})).openJobs.find(x => x.job_id === pw.job.job_id).info[0].v, 'Biscuit (dog) — Pulls on the leash', 'she sees the dog');
+  assert.equal((await api(sarah, 'bootstrap', {})).openJobs.find(x => x.job_id === pw.job.job_id).info[0].v, 'Biscuit (dog), Pulls on the leash', 'she sees the dog');
+  // her profile: a line about herself, and whether we vetted her
+  { const r = await api(sarah, 'saveBio', { bio: 'Nursing student at Belmont. Loves big dogs.' }); assert.equal(r.ok, true, r.error); }
+  await api(coord, 'saveVendor', { vendorId: v.vendor.vendor_id, name: 'Sarah Walks', city: 'Nashville', state: 'TN', service: 'Pet care', phone: '(615) 555-0199', email: 'sarah@walks.example', checked: true });
+  const vx = (await api(pat, 'bootstrap', {})).topics.find(t => t.topic_id === vt.topic_id).extra;
+  assert.equal(vx.vendor_bio, 'Nursing student at Belmont. Loves big dogs.'); assert.equal(vx.vendor_vetted, true);
+  // tips for the next family: the coordinator reads each one first; only shared ones reach other families
+  await db.q(`insert into appointments (appt_id, client_id, title, starts_at, location) values ('tipap','c1','Pre-op', now() + interval '3 day', 'Test Hospital') on conflict do nothing`);
+  const tp = await api(pat, 'shareTip', { place: 'Test Hospital', text: 'Use the Garage B entrance; it is closest to pre-op.' }); assert.equal(tp.ok, true, tp.error);
+  assert.equal((await api(pat, 'bootstrap', {})).placeTips.length, 0, 'not shown before the coordinator reads it');
+  assert.ok((await api(coord, 'bootstrap', { clientId: 'c1' })).tipQueue.some(t => t.tip_id === tp.tip.tip_id));
+  assert.equal((await api(pat, 'reviewTip', { tipId: tp.tip.tip_id, share: true })).error, 'Not allowed');
+  { const r = await api(coord, 'reviewTip', { tipId: tp.tip.tip_id, share: true }); assert.equal(r.ok, true, r.error); }
+  assert.equal((await api(pat, 'bootstrap', {})).placeTips[0].text, 'Use the Garage B entrance; it is closest to pre-op.');
+  assert.equal((await api(pat, 'bootstrap', {})).placeTips[0].client_id, undefined, 'no family name on a shared tip');
 });
 
 test('supporters only get updates', async () => {
@@ -794,7 +815,7 @@ test('changes after submitting: one email to the coordinator, listing what chang
   assert.match(got[0].subject, /changed their intake answers/);
   const body = got[0].body + ' ' + (got[0].lead || '');
   assert.match(body, /Straight home" → "To rehab or a nursing facility first" \(note changed too\)/);
-  assert.match(body, /What's already installed\?: "—" → "Ramp; Raised toilet seat"/);
+  assert.match(body, /What's already installed\?: "Not set" → "Ramp; Raised toilet seat"/);
 });
 
 test('through the portal, sign-in lives in HttpOnly cookies, never in the page', async () => {
@@ -951,17 +972,17 @@ test('the family email timeline: first ten days, renewal, receipt, pause, ended,
     const pz = await api(tess, 'pauseBilling', {});
     assert.equal(pz.ok, true, pz.error);
     assert.ok(calls.some(x => x.includes('pause_collection[behavior]')), calls.join('\n'));
-    assert.deepEqual(subjects(n), ['InCadence Care: Your billing is paused', 'InCadence Care: Billing paused — The Tran family']);   // the family's note, and the coordinator's alert
+    assert.deepEqual(subjects(n), ['InCadence Care: Your billing is paused', 'InCadence Care: Billing paused, The Tran family']);   // the family's note, and the coordinator's alert
     cl = await db.one(`select * from clients where client_id=$1`, [cid]); assert.equal(cl.billing_status, 'Paused');
     assert.equal((await api(tess, 'pauseBilling', { resume: true })).ok, true);
     // Cancelled in Stripe: the ended note with the one-click reasons, the coordinator alert, and no more monthly notes.
     n = mail.sent.length;
     assert.equal(await hook({ type: 'customer.subscription.deleted', data: { object: { id: 'sub_tess', customer: 'cus_tess', cancellation_details: { feedback: 'too_expensive', comment: 'Sam is home now' } } } }), 200);
     cl = await db.one(`select * from clients where client_id=$1`, [cid]);
-    assert.ok(cl.cancelled_at); assert.equal(cl.billing_status, 'Cancelled'); assert.equal(cl.stripe_subscription_id, null); assert.match(cl.cancel_reason, /Too expensive — Sam is home now/);
+    assert.ok(cl.cancelled_at); assert.equal(cl.billing_status, 'Cancelled'); assert.equal(cl.stripe_subscription_id, null); assert.match(cl.cancel_reason, /Too expensive, Sam is home now/);
     const s2 = subjects(n);
     assert.ok(s2.includes('InCadence Care: Your membership has ended'), s2.join(' | '));
-    assert.ok(s2.some(x => /Cancelled — The Tran family/i.test(x)) || (await db.all(`select * from digest where lower(subject) like 'cancelled — the tran family%'`)).length, 'the coordinator hears (instant or digest, per their settings)');
+    assert.ok(s2.some(x => /Cancelled, The Tran family/i.test(x)) || (await db.all(`select * from digest where lower(subject) like 'cancelled, the tran family%'`)).length, 'the coordinator hears (instant or digest, per their settings)');
     const endedMail = mail.sent.find(m => m.subject === 'InCadence Care: Your membership has ended');
     assert.match(endedMail.html, /\?why=cost/); assert.match(endedMail.html, /Sam is recovered/);
     n = mail.sent.length; await L.timed(at(paid, 152, L.SEND_HOUR)); assert.deepEqual(subjects(n), [], 'no month-six note after cancelling');
@@ -1136,7 +1157,7 @@ test('the master intake: modes, per-area depth, the emergency path, flags and pl
   // An answer to a question that is now hidden opens nothing.
   assert.ok(!ids({ ...thorough, 'L.3': 'No', 'L.3a': 'High' }).includes('L.3a'));
   // Flags, per the register.
-  const flags = intake.intakeFlags(A({ ...thorough, 'H2.1': 'Not yet', 'I.3': 'No bending, lifting, or twisting', 'M.1': 'Yes', 'M.1_d': '3', 'N.1': 'Yes — mixed', 'N.1b': "Commercial driver's license (CDL)", 'P.1': S.RNS_, 'O3.15': 'Her garden' }));
+  const flags = intake.intakeFlags(A({ ...thorough, 'H2.1': 'Not yet', 'I.3': 'No bending, lifting, or twisting', 'M.1': 'Yes', 'M.1_d': '3', 'N.1': 'Yes, mixed', 'N.1b': "Commercial driver's license (CDL)", 'P.1': S.RNS_, 'O3.15': 'Her garden' }));
   const has = re => flags.some(f => re.test(f.label));
   assert.ok(has(/Fasting times/) && has(/LIFTING CONFLICT/) && has(/Licensed job/) && has(/return to work is far out/) && has(/No named escort/) && has(/rather we didn't touch/));
   assert.ok(flags.some(f => f.tier === 'Declined' && f.id === 'P.1'), 'a decline reaches the reviewer as a decline');
