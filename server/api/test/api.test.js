@@ -855,7 +855,7 @@ test('implementation: editTask, the Circle switch, and the In Basket row once a 
   assert.equal((await api(co, 'editTask', { clientId: cid, taskId: t.task.task_id, due_date: '2026-11-01', owner: 'Her brother' })).ok, true);
   const row = await db.one(`select * from tasks where task_id=$1`, [t.task.task_id]);
   assert.equal(String(row.due_date).slice(0, 10), '2026-11-01'); assert.equal(row.owner, 'Her brother'); assert.equal(row.title, 'Pet care for the hospital days');
-  assert.match((await api(co, 'editTask', { clientId: cid, taskId: t.task.task_id, title: ' ' })).error, /Write the task/);
+  assert.match((await api(co, 'editTask', { clientId: cid, taskId: t.task.task_id, title: ' ' })).error, /Write what the task is/);
   // the Circle switch
   assert.equal((await api(co, 'setCircle', { clientId: cid, on: true })).client.circle_enabled, true);
   assert.equal((await api(co, 'setCircle', { clientId: cid, on: false })).client.circle_enabled, false);
