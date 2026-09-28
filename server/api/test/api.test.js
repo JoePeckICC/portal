@@ -262,6 +262,23 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   assert.equal(sb.myJobs[0].address, '12 Oak St, Nashville, TN 37203'); assert.equal(sb.messages.filter(m => m.topic_id === vt.topic_id).length, 3);
   { const r = await api(sarah, 'finishJob', { jobId: j.job.job_id }); assert.equal(r.ok, true, r.error); }
   assert.equal((await api(pat, 'bootstrap', {})).jobs[0].status, 'Done');
+  // booking the same vendor again from the conversation: only they hear, and it stays in that thread
+  const n3 = sms.sent.length;
+  const again = await api(pat, 'requestJob', { topicId: vt.topic_id, startsAt: new Date(Date.now() + 2 * 86400e3).toISOString(), details: 'Same as before' });
+  assert.equal(again.ok, true, again.error);
+  assert.deepEqual(sms.sent.slice(n3).map(x => x.to), ['+16155550199'], 'only Sarah is asked');
+  assert.equal((await api(paws, 'bootstrap', {})).openJobs.length, 0, 'the other walker never sees it');
+  const sb2 = await api(sarah, 'bootstrap', {}); assert.equal(sb2.openJobs[0].for_me, true);
+  { const r = await api(sarah, 'takeJob', { jobId: again.job.job_id }); assert.equal(r.ok, true, r.error); }
+  const pb2 = await api(pat, 'bootstrap', {});
+  assert.equal(pb2.topics.filter(t => t.kind === 'vendor').length, 1, 'no second thread');
+  assert.ok(pb2.messages.some(m => m.topic_id === vt.topic_id && /confirmed/.test(m.body)));
+  const third = await api(pat, 'requestJob', { topicId: vt.topic_id, startsAt: new Date(Date.now() + 3 * 86400e3).toISOString() });
+  { const r = await api(sarah, 'passJob', { jobId: third.job.job_id }); assert.equal(r.ok, true, r.error); }
+  assert.ok((await api(pat, 'bootstrap', {})).messages.some(m => m.topic_id === vt.topic_id && /can’t make/.test(m.body)));
+  { const r = await api(pat, 'saveCareNote', { service: 'Pet care', text: 'Biscuit: two walks, key under the mat' }); assert.equal(r.ok, true, r.error); }
+  assert.equal((await api(pat, 'bootstrap', {})).careNotes['Pet care'], 'Biscuit: two walks, key under the mat', 'the usual note is kept');
+  assert.equal((await api(sarah, 'saveCareNote', { service: 'Pet care', text: 'x' })).error, 'Not allowed');
 });
 
 test('supporters only get updates', async () => {
