@@ -305,6 +305,14 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   assert.equal((await api(pat, 'vendorTimes', { topicId: vt.topic_id, date: day2 })).any, true);
   assert.match((await api(sarah, 'saveHours', { hours: { week: [] } })).error, /at least one day/);
   assert.equal((await api(sarah, 'bootstrap', {})).vendor.hours.set, true, 'onboarding is done once hours are saved');
+  // not everything fits a clock time: meals by how soon, lodging by check-in and check-out
+  const meal = await api(pat, 'requestJob', { service: 'Meals', soon: 'week', details: 'Dinners for four' });
+  assert.equal(meal.ok, true, meal.error); assert.equal(meal.job.extra.soon, 'week');
+  const ci = localStamp(new Date(Date.now() + 3 * 86400e3)).slice(0, 10), co2 = localStamp(new Date(Date.now() + 6 * 86400e3)).slice(0, 10);
+  const stay = await api(pat, 'requestJob', { service: 'Lodging', from: ci, until: co2 });
+  assert.equal(stay.ok, true, stay.error); assert.equal(stay.job.extra.until, co2);
+  assert.match((await api(pat, 'requestJob', { service: 'Lodging', from: co2, until: ci })).error, /after check-in/);
+  const pj = (await api(pat, 'bootstrap', {})).jobs; assert.equal(pj.find(j => j.job_id === meal.job.job_id).soon, 'week'); assert.equal(pj.find(j => j.job_id === stay.job.job_id).from, ci);
 });
 
 test('supporters only get updates', async () => {
