@@ -227,6 +227,43 @@ test('a family writes to their own circle; the coordinator never sees it; delete
   assert.equal(row2.extra.hidden, undefined, 'a new line brings it back');
 });
 
+test('vendors: invited, told by text, first to take it has it, then talk in Messages — and see nothing else', async () => {
+  const sms = require('../src/sms');
+  const co = await signIn('joe@incadencecare.com');
+  await db.q(`update clients set address='12 Oak St, Nashville, TN 37203' where client_id='c1'`);
+  const v = await api(co, 'saveVendor', { name: 'Sarah Walks', city: 'Nashville', state: 'TN', service: 'Pet care', phone: '(615) 555-0199', email: 'sarah@walks.example' });
+  assert.equal(v.ok, true, v.error);
+  const v2 = await api(co, 'saveVendor', { name: 'Paws Too', city: 'Nashville', state: 'TN', service: 'Pet care', phone: '(615) 555-0188', email: 'paws@walks.example' });
+  { const r = await api(co, 'inviteVendor', { vendorId: v.vendor.vendor_id }); assert.equal(r.ok, true, r.error); }
+  { const r = await api(co, 'inviteVendor', { vendorId: v2.vendor.vendor_id }); assert.equal(r.ok, true, r.error); }
+  const pat = await signIn('pat@example.com');
+  const n = sms.sent.length;
+  const j = await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 86400e3).toISOString(), details: 'Biscuit, 2 walks' });
+  assert.equal(j.ok, true, j.error); assert.equal(j.job.city, 'Nashville');
+  const texts = sms.sent.slice(n);
+  assert.deepEqual(texts.map(x => x.to).sort(), ['+16155550188', '+16155550199'], 'both invited vendors in town get a text');
+  assert.ok(!/Pat|Peck|Oak/.test(texts[0].body), 'the text carries no name or address');
+  const sarah = await signIn('sarah@walks.example'), paws = await signIn('paws@walks.example');
+  const b = await api(sarah, 'bootstrap', {});
+  assert.equal(b.ok, true, b.error); assert.equal(b.me.role, 'vendor'); assert.equal(b.openJobs.length, 1);
+  assert.equal(b.openJobs[0].address, undefined, 'no address before taking it'); assert.equal(b.client, undefined);
+  const tk = await api(sarah, 'takeJob', { jobId: j.job.job_id }); assert.equal(tk.ok, true, tk.error);
+  assert.match((await api(paws, 'takeJob', { jobId: j.job.job_id })).error, /already took/);
+  assert.equal((await api(sarah, 'addInner', { email: 'x@example.com', name: 'X' })).error, 'Not allowed');
+  assert.equal((await api(sarah, 'topicMessages', { topicId: 'tp1' })).ok, false, 'not their thread');
+  const pb = await api(pat, 'bootstrap', {});
+  assert.equal(pb.jobs[0].status, 'Taken'); assert.equal(pb.jobs[0].vendor_name, 'Sarah Walks');
+  const vt = pb.topics.find(t => t.kind === 'vendor'); assert.ok(vt);
+  const n2 = sms.sent.length;
+  { const r = await api(pat, 'sendMessage', { topicId: vt.topic_id, body: 'Leash is by the door' }); assert.equal(r.ok, true, r.error); }
+  assert.equal(sms.sent.slice(n2)[0].to, '+16155550199', 'the vendor is texted that there is a message');
+  { const r = await api(sarah, 'sendMessage', { topicId: vt.topic_id, body: 'Got it' }); assert.equal(r.ok, true, r.error); }
+  const sb = await api(sarah, 'bootstrap', {});
+  assert.equal(sb.myJobs[0].address, '12 Oak St, Nashville, TN 37203'); assert.equal(sb.messages.filter(m => m.topic_id === vt.topic_id).length, 3);
+  { const r = await api(sarah, 'finishJob', { jobId: j.job.job_id }); assert.equal(r.ok, true, r.error); }
+  assert.equal((await api(pat, 'bootstrap', {})).jobs[0].status, 'Done');
+});
+
 test('supporters only get updates', async () => {
   const s = await signIn('aunt@example.com').catch(() => null);
   assert.equal(s, null, 'aunt is in the circle table but has no user row yet');
