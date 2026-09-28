@@ -601,7 +601,7 @@ html[data-theme=sage]{--gold:#5E8A6A;--panel:#EEF3EC;--tint:#E4ECE4}html[data-th
 .imsh{display:flex;justify-content:flex-end;padding:14px 0 0;position:sticky;top:0;background:#F4F2EC}
 .imcenter{display:flex;flex-direction:column;align-items:center;text-align:center;padding:4px 0 14px}.imcenter h2{margin:10px 0 2px;font-size:26px}.imcenter p{margin:0}
 .imacts{display:flex;gap:10px;justify-content:center}.imact{flex:1;max-width:130px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 6px;background:#fff;border:0;border-radius:12px;text-decoration:none;color:var(--gold-ink);font:inherit;font-size:13px;cursor:pointer}.imact svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.imact small{font-size:11px;color:var(--muted)}
-.imsec{background:#fff;border-radius:12px;padding:14px 16px;margin-top:14px}.imsec h3{margin:0 0 10px;font-size:18px}
+.imsec{background:#fff;border-radius:12px;padding:14px 16px;margin-top:14px}.popsh{justify-content:space-between;align-items:center;gap:12px;z-index:2}.poph{font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:600}.fpop .popb>.fpick,.fpop .popb>.imsec:first-child{margin-top:6px}.fpop .fpick{background:#fff;border-radius:12px;padding:6px 16px 16px}.prow{display:grid;grid-template-columns:104px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.prow:last-of-type{border-bottom:0}.prow>span{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-ink);padding-top:3px}.popa{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:12px}.pbio{margin:10px auto 0;max-width:36ch;font-size:15px}.ptap{cursor:pointer}.t b.ptap{text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:4px}.ptap:hover{color:var(--gold-ink)}.imsec h3{margin:0 0 10px;font-size:18px}
 .imgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.imgrid img{width:100%;aspect-ratio:1;object-fit:cover;display:block}.imgrid .imnone{grid-column:1/-1;padding:0}
 .imdoc{display:grid;grid-template-columns:20px 1fr auto;gap:4px 10px;align-items:center;padding:8px 0;border-bottom:1px solid #ECE8DF}.imdoc svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8}.imdoc .small{grid-column:2}.imdoc .keep{grid-row:1/3;grid-column:3;font-size:14px}.imdocs .imnone{padding:0}
 .imnew{display:flex;flex-direction:column;min-height:0;overflow:auto;flex:1}
@@ -1369,13 +1369,25 @@ function vendorCalendar(){
 // Beside it: what is coming up, the coordinator, the hospital care team, and help at home, each a box.
 function findView(){
   var d=S.data;S.fc=S.fc||'book';
-  if(S.fc==='team'||S.fc==='vendors'||S.fc==='ref'){var tp=el('<div><a href="#" class="small back" style="display:inline-block;margin-bottom:10px">‹ Find Care</a><div class="head"><div class="k">Find Care</div><h1>Your team</h1></div></div>');$('.back',tp).onclick=function(ev){ev.preventDefault();S.fc='book';render();scrollTo(0,0)};tp.appendChild(teamView());return tp}
+  if(S.fc==='team'||S.fc==='vendors'||S.fc==='ref'){var tp=el('<div><a href="#" class="small back" style="display:inline-block;margin-bottom:10px">‹ Find Care</a><div class="head"><div class="k">Find Care</div><h1>Your team</h1></div></div>');$('.back',tp).onclick=function(ev){ev.preventDefault();S.fc='book';S.pop=null;render();toTiles()};tp.appendChild(teamView());popsInto(tp);return tp}
   if(S.fc==='help'){S.fc='book'}
   var v=el('<div><div class="head"><div class="k">Find Care</div><h1>How can we help?</h1></div><div class="cols"><section class="left"></section><aside class="stack"></aside></div></div>');
   $('.left',v).appendChild(findPick());
   var side=$('aside',v);side.appendChild(comingUp());side.appendChild(teamCard());side.appendChild(reachUs());
-  if(String(S.sheet||'').indexOf('cu:')===0){$all('body>.sheet').forEach(function(x){x.remove()});var sh=cuSheet();if(sh)document.body.appendChild(sh);else S.sheet=null}
+  popsInto(v);
   return v}
+// A card that rises from the bottom over the page (Joe, 2026-09-28), the same as tapping a name in Messages. The page,
+// its header, the tiles and the message bubble stay where they are; Done or a tap outside puts it away.
+function popEl(title,body,onClose,noTitle){
+  var o=el('<div class="iminfo fpop" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><div class="imsheet"><div class="imsh popsh">'+(noTitle?'<span></span>':'<b class="poph">'+esc(title)+'</b>')+'<button type="button" class="imlink dn">Done</button></div><div class="popb"></div></div></div>');
+  $('.popb',o).appendChild(body);
+  function close(){onClose();render()}
+  $('.dn',o).onclick=close;o.onclick=function(ev){if(ev.target===o)close()};o.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
+  return o}
+// Whatever is open on Find Care: a form from the menu, a detail from Coming up, or a person from Your team.
+function popsInto(v){var a=fwPop();if(a){v.appendChild(a);return}var p=String(S.pop||''),b=p.indexOf('cu:')===0?cuSheet():p.indexOf('p:')===0?personPop():null;if(b)v.appendChild(b);else S.pop=null}
+// Lands the page with the tiles still showing just under the header (Joe: load in here, not at the very top).
+function toTiles(){requestAnimationFrame(function(){var t=$('.tiles'),h=$('.sitebar');if(!t){scrollTo(0,0);return}var y=scrollY+t.getBoundingClientRect().bottom-(h?h.getBoundingClientRect().height:0)-70;scrollTo(0,Math.max(0,y))})}
 // How can we help? First a plain menu — who to talk to, or what kind of help — each one a button with a line
 // saying what it is. Tap one and only that form shows, with a way back to the menu. One thing at a time.
 var HELP_WHAT={'Rides':'To appointments and back','Meals':'A meal delivered, or a grocery run','Childcare':'Someone to watch the kids','Pet care':'Walks, feeding, a sitter','Lodging':'A place to stay near the hospital','Help at home':'Errands, pharmacy runs, chores','Medical equipment':'Borrow a walker, a wheelchair and more','Other':'Anything else'};
@@ -1384,10 +1396,10 @@ var HELP_TITLE={'Rides':'A ride','Meals':'Meals and groceries','Childcare':'Chil
 function findPick(){
   var d=S.data,co=d.me.role==='coordinator',cf=first(d.coordinator&&d.coordinator.name)||'your coordinator',svc=d.jobServices||Object.keys(HELP_WHAT);
   var vts=(d.topics||[]).filter(function(t){return t.kind==='vendor'});
-  if(S.bk&&S.bk.done){var a=S.bk.done,c0=el('<div class="card"><div class="k">Booked</div><h2 style="margin:8px 0">'+esc(a.title)+'</h2><p>'+esc(fmtWhen(a.starts_at))+' · '+esc(a.location)+'</p><p class="muted">'+esc(a.note)+'. An invite is in your email'+(a.link?', with the video link':'')+'.</p><p><button class="btn quiet" type="button">Back to everything</button></p></div>');$('button',c0).onclick=function(){S.bk=null;S.fw=null;render()};return c0}
+  if(false){var a=S.bk.done,c0=el('<div class="card"><div class="k">Booked</div><h2 style="margin:8px 0">'+esc(a.title)+'</h2><p>'+esc(fmtWhen(a.starts_at))+' · '+esc(a.location)+'</p><p class="muted">'+esc(a.note)+'. An invite is in your email'+(a.link?', with the video link':'')+'.</p><p><button class="btn quiet" type="button">Back to everything</button></p></div>');$('button',c0).onclick=function(){S.bk=null;S.fw=null;render()};return c0}
   var w=S.fw;
-  function go(v){S.fw=v;S.vst=null;S.hst=null;render();var t=document.querySelector('.fpick');if(t)t.scrollIntoView({block:'start'})}
-  if(!w){var m=el('<div class="card fmenu"></div>');
+  function go(v){S.fw=v;S.vst=null;S.hst=null;S.bk=null;render()}
+  {var m=el('<div class="card fmenu"></div>');
     function group(title,items){if(!items.length)return;m.appendChild(el('<div class="k" style="margin:'+(m.children.length?'18px':'0')+' 0 8px">'+title+'</div>'));var g=el('<div class="fgrid"></div>');items.forEach(function(x){var b=el('<button type="button" class="bopt fopt"><b>'+esc(x[1])+'</b><span>'+esc(x[2])+'</span></button>');b.onclick=function(){go(x[0])};g.appendChild(b)});m.appendChild(g)}
     // Favorites: the people they already use, and the kinds of help this family needs — what they ticked at intake
     // and what they have asked for before. Everything else follows.
@@ -1398,15 +1410,20 @@ function findPick(){
     function sv(x){return['svc:'+x,HELP_TITLE[x]||x,HELP_WHAT[x]||'']}
     group('Favorites',vts.map(function(t){var x=t.extra||{};return['v:'+t.topic_id,x.vendor_name||'Support team',((x.vendor_services&&x.vendor_services.length?x.vendor_services:[x.service]).filter(Boolean).join(', '))+' · book again, or meet them first']}).concat(favS.map(sv)));
     group(m.children.length?'Everything else':'Ways we can help',rest.map(sv));
-    return m}
-  var title=w==='co'?(co?'A call with the family':'Talk with '+cf):w.indexOf('v:')===0?'Book '+(((vts.filter(function(x){return x.topic_id===w.slice(2)})[0]||{}).extra||{}).vendor_name||'them'):(HELP_TITLE[w.slice(4)]||w.slice(4));
-  var c=el('<div class="card fpick"><a href="#" class="small back">‹ All the ways we can help</a><h2 style="margin:8px 0 2px">'+esc(title)+'</h2><div class="fwb"></div></div>');
-  $('.back',c).onclick=function(ev){ev.preventDefault();S.fw=null;S.vst=null;S.hst=null;render()};
-  var b=$('.fwb',c);
-  if(w==='co')b.appendChild(coSched(function(ap){S.bk={done:ap};refresh()}));
-  else if(w.indexOf('v:')===0){var t=vts.filter(function(x){return x.topic_id===w.slice(2)})[0];if(!t){S.fw=null;return findPick()}b.appendChild(imSchedPop(t,true))}
+    return m}}
+// Tap a box and its form rises over the menu; Done puts it away. The booking confirmation shows there too.
+function fwPop(){
+  var d=S.data,co=d.me.role==='coordinator',cf=first(d.coordinator&&d.coordinator.name)||'your coordinator',w=S.fw,vts=(d.topics||[]).filter(function(t){return t.kind==='vendor'});
+  function close(){S.fw=null;S.vst=null;S.hst=null;S.bk=null}
+  if(S.bk&&S.bk.done){var a=S.bk.done;return popEl('Booked',el('<div class="imsec"><h3 style="margin:0 0 6px">'+esc(a.title)+'</h3><p style="margin:0">'+esc(fmtWhen(a.starts_at))+' · '+esc(a.location)+'</p><p class="small muted" style="margin:6px 0 0">'+esc(a.note)+'. An invite is in your email'+(a.link?', with the video link':'')+'.</p></div>'),close)}
+  if(!w)return null;
+  var t=w.indexOf('v:')===0?vts.filter(function(x){return x.topic_id===w.slice(2)})[0]:null;if(w.indexOf('v:')===0&&!t){S.fw=null;return null}
+  var title=w==='co'?(co?'A call with the family':'Talk with '+cf):t?'Book '+((t.extra||{}).vendor_name||'them'):(HELP_TITLE[w.slice(4)]||w.slice(4));
+  var b=el('<div class="fpick"></div>');
+  if(w==='co')b.appendChild(coSched(function(ap){S.fw=null;S.bk={done:ap};refresh()}));
+  else if(t)b.appendChild(imSchedPop(t,true));
   else b.appendChild(helpForm(w.slice(4)));
-  return c}
+  return popEl(title,b,close)}
 // Asking for help at home (Joe, 2026-09-28): each kind of help asks what it actually needs to know.
 // Rides: where from and where to. Meals: a meal or a grocery run, for how many, delivered where. Childcare: how long,
 // how many, where. Lodging: check-in to check-out, near what, what kind of place. Medical equipment is borrowed from
@@ -1435,11 +1452,13 @@ function helpQs(svc,st){
     if((st.f.kind||'A meal delivered')==='A grocery run')q.push({k:'list',l:'The grocery list',t:'area',req:1,ph:'Milk, eggs, bread, bananas…'});
     else q.push({k:'people',l:'How many people',t:'sel',o:n(1,8)},{k:'food',l:'Foods to avoid or likes',t:'text',ph:'No nuts, the kids love pasta'});
     q.push({k:'to',l:'Deliver to',t:'addr',p:1,def:home,req:1});return q}
-  if(svc==='Childcare')return[
+  // The children are already in their intake ("4 and 7"): shown, not asked again, with a way to change it for this time.
+  if(svc==='Childcare'){var kt=suAns('M.1')==='Yes'?String(suAns('M.1_d')||'').trim():'',kn=(kt.match(/\d+/g)||[]).length,known=kt&&kn&&!st.kidsEdit;return[
     {k:'long',l:'For how long',t:'sel',o:['1–2 hours','Half a day','A full day','Overnight']},
-    {k:'kids',l:'How many children',t:'sel',o:n(1,6)},
-    {k:'ages',l:'Their ages',t:'text',ph:'4 and 7',req:1},
-    {k:'where',l:'Where',t:'addr',p:1,def:home,req:1}];
+    {k:'kidsinfo',l:'Children',t:'fixed',def:kn+(kn===1?' child':' children')+', age'+(kn===1?' ':'s ')+kt,show:function(){return known}},
+    {k:'kids',l:'How many children',t:'sel',o:n(1,6),def:kn?String(Math.min(kn,6)):'',show:function(){return !known}},
+    {k:'ages',l:'Their ages',t:'text',ph:'4 and 7',req:1,def:kt,show:function(){return !known}},
+    {k:'where',l:'Where',t:'addr',p:1,def:home,req:1}]}
   if(svc==='Lodging')return[
     {k:'near',l:'Where do you want to be near?',t:'text',def:hosp,req:1,ph:'The hospital'},
     {k:'type',l:'What kind of place',t:'sel',o:['Either is fine','A hotel','A rental with a kitchen','A room near the hospital (family housing)']},
@@ -1450,8 +1469,7 @@ function helpQs(svc,st){
     {k:'item',l:'What to borrow',t:'sel',o:['Walker','Wheelchair','Shower chair','Raised toilet seat','Bedside commode','Crutches','Knee scooter','Something else']},
     {k:'other',l:'What is it?',t:'text',req:1,show:function(){return st.f.item==='Something else'}},
     {k:'long',l:'For how long',t:'sel',o:['A few weeks','About a month','A few months','Not sure']},
-    {k:'get',l:'Getting it',t:'sel',o:['Bring it to us','We will pick it up']},
-    {k:'to',l:'Bring it to',t:'addr',p:1,def:home,req:1,show:function(){return (st.f.get||'Bring it to us')==='Bring it to us'}}];
+    {k:'to',l:'Bring it to',t:'addr',p:1,def:home,req:1}];
   return[]}
 // The family's pets (Joe, 2026-09-28): saved once and ticked each time. The first time, what intake said about the dog
 // is already filled in. A pet's name, what kind, and what a stranger should know; the support team sees it on the job.
@@ -1477,7 +1495,8 @@ function helpForm(service){
   if(!S.hst||S.hst.svc!==service)S.hst={m:0,day:null,out:null,slot:'',soon:'',svc:service,note:null,touched:false,f:{}};
   var st=S.hst,card=el('<div><div class="hb"></div></div>');
   function keep(){var ta=$('.hb textarea.hn',card);if(ta)st.note=ta.value;$all('.hb [data-q]',card).forEach(function(i){st.f[i.getAttribute('data-q')]=i.type==='checkbox'?(i.checked?'Yes':''):i.value})}
-  function qEl(q){var v=st.f[q.k];if(v===undefined){v=q.t==='sel'?q.o[0]:(q.def||'');st.f[q.k]=v}
+  function qEl(q){var v=st.f[q.k];if(v===undefined||(q.t==='fixed')){v=q.t==='sel'?(q.def&&q.o.indexOf(q.def)>=0?q.def:q.o[0]):(q.def||'');st.f[q.k]=v}
+    if(q.t==='fixed'){var fx=el('<div class="field"><label>'+esc(q.l)+'</label><div>'+esc(v)+' <a href="#" class="small chg" style="margin-left:6px">Change</a></div></div>');$('.chg',fx).onclick=function(ev){ev.preventDefault();keep();st.kidsEdit=true;draw()};return fx}
     if(q.t==='check')return el('<label class="small" style="display:flex;gap:8px;align-items:center;margin:4px 0 10px;font-weight:400"><input type="checkbox" data-q="'+q.k+'" style="width:auto"'+(v?' checked':'')+'> '+esc(q.l)+'</label>');
     var inp=q.t==='sel'?'<select data-q="'+q.k+'">'+q.o.map(function(o){return'<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select>':q.t==='area'?'<textarea data-q="'+q.k+'" style="min-height:70px" placeholder="'+esc(q.ph||'')+'">'+esc(v)+'</textarea>':'<input data-q="'+q.k+'" value="'+esc(v)+'" placeholder="'+esc(q.ph||'')+'"'+(q.t==='addr'?' autocomplete="street-address"':'')+'>';
     return el('<div class="field"><label>'+esc(q.l)+(q.p?' <span class="small muted" style="font-weight:400">(shared once someone takes it)</span>':'')+'</label>'+inp+'</div>')}
@@ -1522,7 +1541,7 @@ function helpForm(service){
       if(st.svc==='Pet care'){if(st.petNew){err.textContent='Save your pet first.';return}var pi=petsInfo(st);if(!pi){err.textContent='Tick which pets.';return}q.info.unshift(pi)}
       if(q.service==='Rides'||q.service==='Childcare'||q.service==='Meals'){var a=qs.filter(function(x){return x.t==='addr'&&(x.k==='from'||x.k==='where'||x.k==='to')})[0];if(a)q.address=String(st.f[a.k]||'')}
       var kp=$('.keep',f),note=q.details;busy($('button[type=submit]',f),true,'Sending…');
-      (kp&&kp.checked&&note.trim()!==saved.trim()?call('saveCareNote',{service:st.svc,text:note}):Promise.resolve()).then(function(){return call('requestJob',q)}).then(function(){S.hst=null;toast(loan?'Sent to '+(first(d.coordinator&&d.coordinator.name)||'your coordinator')+'.':q.circle?'Sent to your circle. We will show you who steps up.':'Sent. We will show you who takes it.');return refresh()}).catch(function(e){err.textContent=e.message;busy($('button[type=submit]',f),false,loan?'Ask to borrow it':'Ask for help')})};
+      (kp&&kp.checked&&note.trim()!==saved.trim()?call('saveCareNote',{service:st.svc,text:note}):Promise.resolve()).then(function(){return call('requestJob',q)}).then(function(){S.hst=null;S.fw=null;toast(loan?'Sent to '+(first(d.coordinator&&d.coordinator.name)||'your coordinator')+'.':q.circle?'Sent to your circle. We will show you who steps up.':'Sent. We will show you who takes it.');return refresh()}).catch(function(e){err.textContent=e.message;busy($('button[type=submit]',f),false,loan?'Ask to borrow it':'Ask for help')})};
     b.appendChild(f)}
   draw();return card}
 // Coming up: calls with the coordinator, visits, and help that is booked or asked for, soonest first.
@@ -1538,54 +1557,82 @@ function comingUp(){
   if((d.borrowed||[]).length)items=items.filter(function(it){return !(it.j&&it.j.loan&&it.j.status==='Taken')});
   if(!items.length&&!(d.borrowed||[]).length)ul.appendChild(el('<div class="small muted" style="padding:8px 0">Nothing set up yet.</div>'));
   items.forEach(function(it){var r;
-    if(it.a){var a=it.a;r=el('<a href="#" class="ap cuit" style="flex-direction:column;align-items:flex-start;gap:2px;text-decoration:none;color:inherit"><b>'+esc(fmtWhen(a.starts_at))+'</b><span>'+esc(a.title)+(a.location?' · '+esc(a.location):'')+'</span><span class="small cumore">Details ›</span></a>');r.onclick=function(ev){ev.preventDefault();S.sheet='cu:a:'+a.appt_id;render()}}
+    if(it.a){var a=it.a;r=el('<a href="#" class="ap cuit" style="flex-direction:column;align-items:flex-start;gap:2px;text-decoration:none;color:inherit"><b>'+esc(fmtWhen(a.starts_at))+'</b><span>'+esc(a.title)+(a.location?' · '+esc(a.location):'')+'</span><span class="small cumore">Details ›</span></a>');r.onclick=function(ev){ev.preventDefault();S.pop='cu:a:'+a.appt_id;render()}}
     else{var j=it.j,stx=jobStatus(j);
-      r=el('<a href="#" class="ap cuit" style="flex-direction:column;align-items:flex-start;gap:2px;text-decoration:none;color:inherit"><b>'+esc(jobWhen(j))+'</b><span>'+esc(j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':j.service)+'</span><span class="small muted">'+stx+'</span><span class="small cumore">Details ›</span></a>');r.onclick=function(ev){ev.preventDefault();S.sheet='cu:j:'+j.job_id;render()}}
+      r=el('<a href="#" class="ap cuit" style="flex-direction:column;align-items:flex-start;gap:2px;text-decoration:none;color:inherit"><b>'+esc(jobWhen(j))+'</b><span>'+esc(j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':j.service)+'</span><span class="small muted">'+stx+'</span><span class="small cumore">Details ›</span></a>');r.onclick=function(ev){ev.preventDefault();S.pop='cu:j:'+j.job_id;render()}}
     ul.appendChild(r)});
   return c}
 // A map of an address: Google's map inside the page, and a link that opens it in Maps.
 function placeMap(addr){var q=encodeURIComponent(addr);return el('<div class="cmap"><iframe src="https://www.google.com/maps?q='+q+'&output=embed" title="Map of '+esc(addr)+'" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe><div class="small" style="margin-top:4px"><a href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noopener">Open in Google Maps ›</a></div></div>')}
 function cuSheet(){
-  var d=S.data,co=d.me.role==='coordinator',p=String(S.sheet).split(':'),b=el('<div class="stack"></div>');
+  var d=S.data,co=d.me.role==='coordinator',p=String(S.pop).split(':'),b=el('<div></div>'),cn=d.coordinator,cf=first(cn&&cn.name)||'your coordinator';
+  function row(k,v){return v?'<div class="prow"><span>'+k+'</span><div>'+v+'</div></div>':''}
+  function done(){S.pop=null}
   if(p[1]==='a'){var a=(d.appointments||[]).filter(function(x){return String(x.appt_id)===p[2]})[0];if(!a)return null;
-    var info=el('<div class="card"><span class="k">'+esc(fmtWhen(a.starts_at))+'</span><h2 style="margin:8px 0 4px">'+esc(a.title)+'</h2>'+(a.location?'<p style="margin:0">'+esc(a.location)+'</p>':'')+(a.note?'<p class="small muted" style="margin:6px 0 0">'+esc(a.note)+'</p>':'')+(a.about?'<p class="small" style="margin:6px 0 0">'+esc(a.about)+'</p>':'')+(a.link?'<p style="margin:10px 0 0"><a class="btn sm" href="'+esc(a.link)+'" target="_blank" rel="noopener">Join the video call</a></p>':'')+((a.event_id||co)?'<p style="margin:12px 0 0"><a href="#" class="small x" style="color:var(--muted)">Cancel this</a></p>':'')+'</div>');
-    var x=$('.x',info);if(x)x.onclick=function(ev){ev.preventDefault();if(uiOk('Cancel '+a.title+'?',this,arguments))call('cancelAppointment',{apptId:a.appt_id}).then(function(){S.sheet=null;return refresh()}).catch(alertErr)};
+    var st=toDate(a.starts_at),en=st&&a.minutes?new Date(st.getTime()+a.minutes*60000):null,L=String(a.location||''),how=a.mode==='phone'||/^phone$/i.test(L)?'Phone call':a.mode==='video'||/^video$/i.test(L)?'Video call':L?'In person':'';
+    var info=el('<div class="imsec">'+row('When',st?esc(st.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}))+'<br>'+esc(fmtTime(st))+(en?' – '+esc(fmtTime(en)):'')+(a.minutes?' <span class="muted">· '+a.minutes+' min</span>':''):'')+row('How',esc(how)+(a.note?'<div class="small muted">'+esc(a.note)+'</div>':''))+row('Where',how==='In person'?esc(L):'')+row('With',a.kind&&cn?esc(cn.name)+' <span class="muted">· your coordinator</span>':'')+row('To talk through',a.about?esc(a.about):'')+'<div class="popa">'+(a.link?'<a class="btn sm" href="'+esc(a.link)+'" target="_blank" rel="noopener">Join the video call</a>':'')+(!co&&cn?'<a href="#" class="small msg">Message '+esc(cf)+' about this</a>':'')+((a.event_id||co)?'<a href="#" class="small x" style="color:var(--muted)">Cancel this</a>':'')+'</div></div>');
+    var x=$('.x',info);if(x)x.onclick=function(ev){ev.preventDefault();if(uiOk('Cancel '+a.title+'?',this,arguments))call('cancelAppointment',{apptId:a.appt_id}).then(function(){S.pop=null;return refresh()}).catch(alertErr)};
+    var mg=$('.msg',info);if(mg)mg.onclick=function(ev){ev.preventDefault();msgCoordinator()};
     b.appendChild(info);
     // The hospital: the campus map and the walk from parking. Anywhere else with an address: the place on a map.
-    if(apAtHosp(a)&&d.walk){var we=walkEl(d.walk);if(we)b.appendChild(we)}
-    else if(a.location&&!/^(phone|video)$/i.test(a.location)){var mc=el('<div class="card"><span class="k">Where</span></div>');mc.appendChild(placeMap(a.location));b.appendChild(mc)}
-    return sheetEl(a.title,b)}
+    if(apAtHosp(a)&&d.walk){var we=walkEl(d.walk);if(we){var ws=el('<div class="imsec"></div>');ws.appendChild(we);b.appendChild(ws)}}
+    else if(how==='In person'){var mc=el('<div class="imsec"><h3>Where</h3></div>');mc.appendChild(placeMap(L));b.appendChild(mc)}
+    return popEl(a.title,b,done)}
   if(p[1]==='j'){var j=(d.jobs||[]).filter(function(x){return String(x.job_id)===p[2]})[0];if(!j)return null;
-    var what=j.loan?'Borrow: '+(((j.info||[]).filter(function(x){return/borrow|what is it/i.test(x.l)})[0]||{}).v||'equipment'):j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':j.service,stx=jobStatus(j);
-    var jc=el('<div class="card"><span class="k">'+esc(jobWhen(j))+'</span><h2 style="margin:8px 0 4px">'+esc(what)+'</h2><p style="margin:0">'+stx+'</p><div style="margin-top:8px;display:grid;gap:2px">'+jobInfoHtml(j)+'</div>'+(j.details?'<p class="small" style="margin:8px 0 0">'+esc(j.details)+'</p>':'')+'<p style="margin:12px 0 0;display:flex;gap:14px">'+(j.topic_id?'<a href="#" class="small msg">Message '+esc(first(j.vendor_name)||'them')+'</a>':'')+'<a href="#" class="small cx" style="color:var(--muted)">Cancel this</a></p></div>');
-    var mg=$('.msg',jc);if(mg)mg.onclick=function(ev){ev.preventDefault();S.sheet=null;var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t)};
-    $('.cx',jc).onclick=function(ev){ev.preventDefault();if(!uiOk('Cancel this?'+(j.status==='Taken'?' '+j.vendor_name+' is told.':''),this,arguments))return;call('cancelJob',{jobId:j.job_id}).then(function(){S.sheet=null;return refresh()}).catch(alertErr)};
+    var what=j.loan?'Borrow: '+(((j.info||[]).filter(function(x){return/borrow|what is it/i.test(x.l)})[0]||{}).v||'equipment'):j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':(HELP_TITLE[j.service]||j.service);
+    var jc=el('<div class="imsec">'+row('When',esc(jobWhen(j)))+row('Status',jobStatus(j))+row('Where',j.address?esc(j.address):'')+(j.info||[]).filter(function(x){return !/borrow|what is it/i.test(x.l)||!j.loan}).map(function(x){return row(esc(x.l),esc(x.v))}).join('')+row('Note',j.details?esc(j.details):'')+'<div class="popa">'+(j.topic_id?'<a href="#" class="small msg">Message '+esc(first(j.vendor_name)||'them')+'</a>':'')+'<a href="#" class="small cx" style="color:var(--muted)">Cancel this</a></div></div>');
+    var mg2=$('.msg',jc);if(mg2)mg2.onclick=function(ev){ev.preventDefault();S.pop=null;var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t)};
+    $('.cx',jc).onclick=function(ev){ev.preventDefault();if(!uiOk('Cancel this?'+(j.status==='Taken'?' '+j.vendor_name+' is told.':''),this,arguments))return;call('cancelJob',{jobId:j.job_id}).then(function(){S.pop=null;return refresh()}).catch(alertErr)};
     if(j.status==='Open'&&j.circle&&!j.circle.released){var an=el('<p style="margin:10px 0 0"><button type="button" class="btn sm">Ask our support team now</button></p>');$('button',an).onclick=function(){var bb=this;busy(bb,true,'Sending…');call('askUsNow',{jobId:j.job_id}).then(function(){toast('Sent to the support team.');return refresh()}).catch(alertErr)};jc.appendChild(an)}
     b.appendChild(jc);
-    return sheetEl(what,b)}
+    if(j.address&&!j.loan){var mc2=el('<div class="imsec"><h3>Where</h3></div>');mc2.appendChild(placeMap(j.address));b.appendChild(mc2)}
+    return popEl(what,b,done)}
   return null}
+// The coordinator's conversation: the newest thread that isn't a vendor, the family's own, or reminders.
+function coTopics(){return (S.data.topics||[]).filter(function(t){return t.kind!=='vendor'&&t.kind!=='family'&&t.kind!=='auto'})}
+function msgCoordinator(){var t=coTopics().sort(function(a,b){return String(b.last_at||'').localeCompare(String(a.last_at||''))})[0];S.pop=null;S.fw=null;if(t)openTopic(t);else{S.touched=true;S.view='messages';render()}}
+// A person on Your team, the way Messages shows them: their name, a line about them, call / message / schedule, photos.
+function personPop(){
+  var d=S.data,co=d.me.role==='coordinator',p=String(S.pop).split(':'),cn=d.coordinator,P=null;
+  function pics(ids){var out=[];(d.messages||[]).forEach(function(m){if(ids.indexOf(String(m.topic_id))<0)return;(m.attachments||[]).forEach(function(a){if(String(a.type||'').indexOf('image/')===0)out.push(a)})});return out}
+  if(p[1]==='co'&&cn)P={name:cn.name,sub:'Care coordinator · '+BOOT.appName,bio:cn.bio||'Your one point of contact — the plan, scheduling, questions, and anything that comes up.',phone:BOOT.phone,msg:co?null:msgCoordinator,sched:co?null:function(){S.pop=null;S.fw='co'},schedTxt:'a time with '+first(cn.name),photos:pics(coTopics().map(function(t){return String(t.topic_id)}))};
+  if(p[1]==='t'){var t=(d.topics||[]).filter(function(x){return String(x.topic_id)===p[2]})[0];if(t){var x=t.extra||{},H=x.vendor_hours;
+    P={name:x.vendor_name||'Support team',sub:(x.vendor_services&&x.vendor_services.length?x.vendor_services:[x.service]).filter(Boolean).map(function(z){return VSVC_LABEL[z]||z}).join(', ')+' · support team',bio:H&&H.open?'Open — ask for any time.':H&&(H.week||[]).some(Boolean)?'Usually free '+hoursTxt(H)+'.':'',phone:x.vendor_phone||'',msg:co?null:function(){S.pop=null;openTopic(t)},sched:co?null:function(){S.pop=null;S.fw='v:'+t.topic_id},schedTxt:'or meet first',photos:pics([String(t.topic_id)])}}}
+  if(p[1]==='m'){var m=(d.careTeam||[]).filter(function(y){return String(y.member_id)===p[2]})[0];if(m){var e=m.extra||{};
+    P={name:m.name,sub:[m.role||(m.kind==='provider'?'Provider':'Support team'),m.org].filter(Boolean).join(' · '),bio:m.notes||'',phone:m.phone||'',extra:(m.address?'<div class="imsec"><h3>Where</h3><div class="pmap"></div></div>':'')+(m.kind==='provider'?'<div class="imsec"><h3>Records</h3><p class="small" style="margin:0">'+(e.release_signed?'✓ Release signed':'Release signed: not yet')+'</p><p class="small" style="margin:4px 0 0">'+(e.records_received?'✓ Records received':'Records received: not yet')+'</p></div>':'')+'<p style="text-align:center;margin:16px 0 0"><a href="#" class="small rm" style="color:var(--muted)">Remove from my team</a></p>',addr:m.address,mid:m.member_id}}}
+  if(!P)return null;
+  var o=el('<div><div class="imcenter">'+imAv({name:P.name},true)+'<h2>'+esc(P.name)+'</h2><p class="muted">'+esc(P.sub)+'</p>'+(P.bio?'<p class="pbio">'+esc(P.bio)+'</p>':'')+'</div><div class="imacts">'+(P.phone?'<a class="imact" href="tel:'+esc(String(P.phone).replace(/[^\d+]/g,''))+'"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><span>call</span><small>'+esc(P.phone)+'</small></a>':'')+(P.msg?'<button type="button" class="imact pm"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span>message</span></button>':'')+(P.sched?'<button type="button" class="imact ps"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>schedule</span><small>'+esc(P.schedTxt)+'</small></button>':'')+'</div>'+(P.photos?'<div class="imsec"><h3>Photos</h3><div class="imgrid"></div></div>':'')+(P.extra||'')+'</div>');
+  if(!$('.imact',o))$('.imacts',o).remove();
+  var pm=$('.pm',o);if(pm)pm.onclick=function(){P.msg()};var ps=$('.ps',o);if(ps)ps.onclick=function(){P.sched();render()};
+  var g=$('.imgrid',o);if(g){if(!P.photos.length)g.appendChild(el('<p class="imnone">No photos shared yet.</p>'));P.photos.forEach(function(a){g.appendChild(el('<a href="'+esc(a.url)+'" target="_blank" rel="noopener"><img src="'+esc(a.url)+'" alt="'+esc(a.name)+'" loading="lazy"></a>'))})}
+  var pmap=$('.pmap',o);if(pmap)pmap.appendChild(placeMap(P.addr));
+  var rm=$('.rm',o);if(rm)rm.onclick=function(ev){ev.preventDefault();if(uiOk('Remove '+P.name+' from your team?',this,arguments))call('removeCareTeam',{memberId:P.mid}).then(function(){S.pop=null;return refresh()}).catch(alertErr)};
+  return popEl(P.name,o,function(){S.pop=null},true)}
 function reachUs(){
-  return el('<div class="card"><span class="k">Reach us</span>'+(BOOT.phone?'<p style="margin:8px 0 0"><a href="tel:'+esc(BOOT.phone)+'" style="font-size:20px;font-family:Fraunces,Georgia,serif">'+esc(BOOT.phone)+'</a></p>':'')+'<p class="small muted" style="margin:6px 0 0">If this is a medical emergency, call 911. In a crisis, call or text 988.</p></div>')}
+  var c=el('<div class="card"><span class="k">Reach us</span>'+(BOOT.phone?'<p style="margin:8px 0 0"><a href="tel:'+esc(BOOT.phone)+'" style="font-size:20px;font-family:Fraunces,Georgia,serif">'+esc(BOOT.phone)+'</a></p>':'')+(S.data.me.role!=='coordinator'?'<p style="margin:4px 0 0"><a href="#" class="rmsg" style="font-size:20px;font-family:Fraunces,Georgia,serif">Message your coordinator</a></p>':'')+'<p class="small muted" style="margin:6px 0 0">If this is a medical emergency, call 911. In a crisis, call or text 988.</p></div>');
+  var r=$('.rmsg',c);if(r)r.onclick=function(ev){ev.preventDefault();msgCoordinator()};return c}
 // Your team: the coordinator, the care team, and vendors at a glance; tap to open the full list.
 function teamCard(){
   var d=S.data,cn=d.coordinator,prov=(d.careTeam||[]).filter(function(m){return m.kind==='provider'}).map(function(m){return m.name});
   var vend=(d.topics||[]).filter(function(t){return t.kind==='vendor'}).map(function(t){return (t.extra||{}).vendor_name||'Vendor'}).concat((d.careTeam||[]).filter(function(m){return m.kind==='vendor'}).map(function(m){return m.name})).concat((d.referrals||[]).map(function(r){return r.vendor}));
   function names(a,none){return a.length?esc(a.slice(0,3).join(', ')+(a.length>3?' and '+(a.length-3)+' more':'')):'<span class="muted">'+none+'</span>'}
   var c=el('<a href="#" class="card tbox" style="display:block;text-decoration:none;color:inherit"><span class="k" style="display:flex;justify-content:space-between">Your team<span aria-hidden="true">›</span></span><div class="small" style="margin-top:10px;display:grid;gap:8px"><div><b>Coordinator</b><br>'+names(cn?[cn.name]:[],'Not assigned yet')+'</div><div><b>Care team</b><br>'+names(prov,'None added yet')+'</div><div><b>Support team</b><br>'+names(vend,'None yet')+'</div></div></a>');
-  c.onclick=function(ev){ev.preventDefault();S.fc='team';S.tadd=false;S.radd=false;render();scrollTo(0,0)};
+  c.onclick=function(ev){ev.preventDefault();S.fc='team';S.tadd=false;S.radd=false;S.pop=null;render();toTiles()};
   return c}
 function dayKey(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
 function fmtHour(h){var d=new Date();d.setHours(h,0,0,0);return d.toLocaleTimeString(undefined,{hour:'numeric'})}
+// Tap a name (or the picture) on Your team and that person rises in a card, like tapping a name in Messages.
+function tapPerson(r,key){if(!r)return;var n=$('.t b',r),a=$('.av',r);[n,a].forEach(function(x){if(!x)return;x.classList.add('ptap');x.setAttribute('role','button');x.tabIndex=0;x.onclick=function(ev){ev.preventDefault();S.pop=key;render()};x.onkeydown=function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();x.onclick(ev)}}})}
 function teamView(){
   var d=S.data,co=d.me.role==='coordinator',cn=d.coordinator,cf=first(cn&&cn.name)||'your coordinator',ST=BOOT.referralStatuses||['Suggested','Contacted','In place','Not needed'];
   var v=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>');var left=$('.left',v),side=$('aside',v);
   function card(m,role,sub,extra){return '<div class="mem"><div class="av">'+esc(initial(m.name))+'</div><div class="t"><b>'+esc(m.name)+'</b><div class="small muted">'+esc(role)+(sub?' · '+esc(sub):'')+'</div>'+(m.phone?'<div class="small"><a href="tel:'+esc(m.phone)+'">'+esc(m.phone)+'</a></div>':'')+(m.address?'<div class="small muted">'+esc(m.address)+'</div>':'')+(m.notes?'<div class="small muted">'+esc(m.notes)+'</div>':'')+'</div>'+(extra||'')+'</div>'}
   if(cn){var cc=el('<div class="group"><span class="k">Your coordinator</span>'+card({name:cn.name,phone:BOOT.phone||''},'Care coordinator',BOOT.appName,co?'':'<span class="memacts"><a href="#" class="small msg">Message</a><a href="#" class="small bk">Schedule</a></span>')+'</div>');
-    var cm=$('.msg',cc);if(cm)cm.onclick=function(ev){ev.preventDefault();S.touched=true;S.view='messages';render()};var cb=$('.bk',cc);if(cb)cb.onclick=function(ev){ev.preventDefault();S.fc='book';S.fw='co';render();scrollTo(0,0)};left.appendChild(cc)}
+    var cm=$('.msg',cc);if(cm)cm.onclick=function(ev){ev.preventDefault();S.touched=true;S.view='messages';render()};var cb=$('.bk',cc);if(cb)cb.onclick=function(ev){ev.preventDefault();S.fw='co';render()};tapPerson(cc.querySelector('.mem'),'p:co');left.appendChild(cc)}
   // Care team: doctors, nurses, clinics.
   var prov=(d.careTeam||[]).filter(function(m){return m.kind==='provider'}),pg=el('<div class="group"><span class="k">Care team</span></div>');
   if(!prov.length)pg.appendChild(el('<div class="small muted" style="padding:8px 0">Doctors, nurses, clinics — add anyone '+(co?'the family sees':'you see')+'.</div>'));
-  prov.forEach(function(m){var r=el(card(m,m.role||'Provider',m.org,'<a href="#" class="small x" style="color:var(--muted)">Remove</a>'));$('.x',r).onclick=function(ev){ev.preventDefault();if(uiOk('Remove '+m.name+'?',this,arguments))call('removeCareTeam',{memberId:m.member_id}).then(refresh).catch(alertErr)};
+  prov.forEach(function(m){var r=el(card(m,m.role||'Provider',m.org,'<a href="#" class="small x" style="color:var(--muted)">Remove</a>'));tapPerson(r,'p:m:'+m.member_id);$('.x',r).onclick=function(ev){ev.preventDefault();if(uiOk('Remove '+m.name+'?',this,arguments))call('removeCareTeam',{memberId:m.member_id}).then(refresh).catch(alertErr)};
     // Records, one release per provider: the coordinator ticks; the family sees where it stands.
     var x=m.extra||{},rr=el('<div class="small" style="margin:6px 0 0 52px;display:flex;gap:14px;flex-wrap:wrap">'+[['release','Release signed',x.release_signed],['records','Records received',x.records_received]].map(function(k){return co?'<label style="display:flex;gap:6px;align-items:center;margin:0;font-weight:400"><input type="checkbox" data-k="'+k[0]+'" style="width:auto"'+(k[2]?' checked':'')+'>'+k[1]+(k[2]?' <span class="muted">'+esc(fmtShort(k[2]))+'</span>':'')+'</label>':'<span class="'+(k[2]?'':'muted')+'">'+(k[2]?'✓ '+k[1]:k[1]+': not yet')+'</span>'}).join('')+'</div>');$all('input',rr).forEach(function(i){i.onchange=function(){var q={memberId:m.member_id};q[this.getAttribute('data-k')]=this.checked;call('setProviderRecords',q).then(refresh).catch(alertErr)}});r.appendChild(rr);
     pg.appendChild(r)});
@@ -1594,8 +1641,8 @@ function teamView(){
   var vg=el('<div class="group"><span class="k">Support team</span></div>'),app=(d.topics||[]).filter(function(t){return t.kind==='vendor'}),hand=(d.careTeam||[]).filter(function(m){return m.kind==='vendor'}),refs=(d.referrals||[]).slice().sort(function(a,b){return String(b.updated_at)>String(a.updated_at)?1:-1});
   if(!app.length&&!hand.length&&!refs.length)vg.appendChild(el('<div class="small muted" style="padding:8px 0">People who help at home — dog walkers, meals, rides. Ask above under How can we help, or ask '+esc(cf)+'.</div>'));
   app.forEach(function(t){var x=t.extra||{},r=el(card({name:x.vendor_name||'Vendor',phone:x.vendor_phone||''},x.service||'Support team','',co?'':'<span class="memacts"><a href="#" class="small msg">Message</a><a href="#" class="small bk">Schedule</a></span>'));
-    var m1=$('.msg',r);if(m1)m1.onclick=function(ev){ev.preventDefault();openTopic(t)};var b1=$('.bk',r);if(b1)b1.onclick=function(ev){ev.preventDefault();document.body.appendChild(imSchedPop(t))};vg.appendChild(r)});
-  hand.forEach(function(m){var r=el(card(m,m.role||'Support team',m.org,'<a href="#" class="small x" style="color:var(--muted)">Remove</a>'));$('.x',r).onclick=function(ev){ev.preventDefault();if(uiOk('Remove '+m.name+'?',this,arguments))call('removeCareTeam',{memberId:m.member_id}).then(refresh).catch(alertErr)};vg.appendChild(r)});
+    var m1=$('.msg',r);if(m1)m1.onclick=function(ev){ev.preventDefault();openTopic(t)};var b1=$('.bk',r);if(b1)b1.onclick=function(ev){ev.preventDefault();S.fw='v:'+t.topic_id;S.vst=null;render()};tapPerson(r,'p:t:'+t.topic_id);vg.appendChild(r)});
+  hand.forEach(function(m){var r=el(card(m,m.role||'Support team',m.org,'<a href="#" class="small x" style="color:var(--muted)">Remove</a>'));tapPerson(r,'p:m:'+m.member_id);$('.x',r).onclick=function(ev){ev.preventDefault();if(uiOk('Remove '+m.name+'?',this,arguments))call('removeCareTeam',{memberId:m.member_id}).then(refresh).catch(alertErr)};vg.appendChild(r)});
   refs.forEach(function(rf){var row=el('<div class="mem"><div class="av">'+esc(initial(rf.vendor))+'</div><div class="t"><b>'+esc(rf.vendor)+'</b><div class="small muted">'+esc(rf.service||'Referral')+' · referred by '+esc(co?'you':cf)+'</div>'+(rf.contact?'<div class="small">'+esc(rf.contact)+'</div>':'')+(rf.note?'<div class="small muted">'+esc(rf.note)+'</div>':'')+'</div><select aria-label="Where it stands">'+ST.map(function(s){return'<option'+(s===rf.status?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select></div>');$('select',row).onchange=function(){call('setReferralStatus',{referralId:rf.referral_id,status:this.value}).then(refresh).catch(alertErr)};vg.appendChild(row)});
   left.appendChild(vg);
   // Adding someone by hand, and (for the coordinator) referring a vendor: a button until it is needed.
@@ -1643,7 +1690,7 @@ function drawerEl(){
   if(S.drawer){setTimeout(function(){var f=$('.dx',w);if(f)f.focus()},0);w.addEventListener('keydown',function(e){if(e.key==='Escape'){e.preventDefault();$('.dx',w).onclick(e);return}if(e.key!=='Tab')return;var fs=$all('a,button,input',$('.drawer',w)).filter(function(x){return x.offsetParent!==null});if(!fs.length)return;var a=fs[0],z=fs[fs.length-1];if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}})}
   return w;
 }
-function setView(target){var p=String(target).split(':');S.touched=true;S.view=p[0];if(p[0]==='find')S.fc=p[1]||'book';if(p[0]==='settings')S.sp=p[1]||'hub';if(p[0]==='meds')S.mp=p[1]||'list';if(p[0]==='billing')S.bp=p[1]||'summary';if(p[0]==='record')S.rp=p[1]||'visits';if(p[0]==='messages'){S.mf=null;S.draftT=null}if(p[0]==='resources')S.ro=p[1]||null;if(p[0]==='run'&&p[1])S.ru=p[1];if(p[0]==='meet')S.mt=p[1]?+p[1]||0:0;if(p[0]==='build'&&p[1])S.su=p[1];if(S.data&&S.data.me.role==='coordinator'&&p[0]!=='home')S.cv='chart';if(p[0]==='home'&&S.data&&S.data.me.role==='coordinator')S.cv='inbasket';S.mopen=false}
+function setView(target){var p=String(target).split(':');S.touched=true;S.pop=null;S.fw=null;S.view=p[0];if(p[0]==='find')S.fc=p[1]||'book';if(p[0]==='settings')S.sp=p[1]||'hub';if(p[0]==='meds')S.mp=p[1]||'list';if(p[0]==='billing')S.bp=p[1]||'summary';if(p[0]==='record')S.rp=p[1]||'visits';if(p[0]==='messages'){S.mf=null;S.draftT=null}if(p[0]==='resources')S.ro=p[1]||null;if(p[0]==='run'&&p[1])S.ru=p[1];if(p[0]==='meet')S.mt=p[1]?+p[1]||0:0;if(p[0]==='build'&&p[1])S.su=p[1];if(S.data&&S.data.me.role==='coordinator'&&p[0]!=='home')S.cv='chart';if(p[0]==='home'&&S.data&&S.data.me.role==='coordinator')S.cv='inbasket';S.mopen=false}
 // When the patient is the one signed in, family pages say “you”, not their name (the intake’s first answer decides).
 function ptV(){var d=S.data;if(!d||!d.me||d.me.role!=='client')return false;var a=((d.intake||{}).answers||{})['0.1'];return !!(a&&/person having surgery/.test(a.a||''))}
 function yo(pf){var p=ptV();return {n:p?'you':pf,N:p?'You':pf,s:p?'your':pf+'’s',S:p?'Your':pf+'’s'}}
