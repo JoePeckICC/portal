@@ -37,7 +37,7 @@ async function handle(req, res, rawBuf) {
       if (c) {
         await db.q(`update clients set billing_status='Payment failed' where client_id=$1`, [c.client_id]);
         await core.autoMsg(c.client_id, 'A payment of $' + ((obj.amount_due || 0) / 100).toFixed(2) + ' did not go through. Please check the card under Billing → Payment method.');
-        await core.notifyCo(await core.coordinatorFor(c), 'billing', 'Payment failed — ' + famName(c.family_name), 'Stripe could not collect $' + ((obj.amount_due || 0) / 100).toFixed(2) + '. Stripe will retry; you may want to reach out.', '', 'Open the portal');
+        await core.notifyCo(await core.coordinatorFor(c), 'billing', 'Payment failed, ' + famName(c.family_name), 'Stripe could not collect $' + ((obj.amount_due || 0) / 100).toFixed(2) + '. Stripe will retry; you may want to reach out.', '', 'Open the portal');
       }
     } else if (ev.type === 'checkout.session.completed' && obj.mode === 'subscription' && obj.customer && obj.subscription) {
       // The family started their plan themselves (money.checkoutLink). Record it the way Start billing would.

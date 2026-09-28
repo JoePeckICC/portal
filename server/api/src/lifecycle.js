@@ -63,10 +63,10 @@ const TIMED = [
   { key: 's-7', anchor: 'surgery', after: -7, window: 2, hour: 9, kind: 'notes', subject: 'One week out', paras: [
     'One week. Here is the short list for the next seven days, in the order it matters.',
     'Sort the ride home and a backup driver. Write the one-page medication list. Pick the one person who sends updates so you are not the switchboard. Fill the freezer. Write your questions down as they come.',
-    'The readiness checklist in the portal has the things that cancel surgeries on the day — fasting times, medication stop dates, the report time. Tick them off with the whole household.',
+    'The readiness checklist in the portal has the things that cancel surgeries on the day, fasting times, medication stop dates, the report time. Tick them off with the whole household.',
     'If someone else is carrying the organizing, forward this to them.'], cta: 'Open the checklists', url: C.PORTAL_URL + '#plan' },
   { key: 's-1', anchor: 'surgery', after: -1, window: 1, hour: 18, kind: 'notes', subject: 'For tonight', paras: [
-    'Tonight, pack the bag with your own hands, even if you packed it already. The lists are in the portal — one for {patient}, one for whoever is staying.',
+    'Tonight, pack the bag with your own hands, even if you packed it already. The lists are in the portal, one for {patient}, one for whoever is staying.',
     'Then stop. The preparation is done. Get what sleep you can.'], cta: 'The packing lists', url: C.PORTAL_URL + '#plan' },
   { key: 's0', anchor: 'surgery', after: 0, window: 1, hour: 6, kind: 'notes', subject: 'Today', paras: [
     'Almost nothing is in your control now except staying steady. Bring the notebook. Ask who brings updates and when.',
@@ -77,7 +77,7 @@ const TIMED = [
     'Then upload the discharge papers in the portal, and we build the medication list from them.',
     'You are doing this right, even when it does not feel like it.'], cta: 'Before you leave', url: C.PORTAL_URL + '#plan' },
   { key: 's7', anchor: 'surgery', after: 7, window: 3, hour: 9, kind: 'notes', subject: 'A hundred small wins', paras: [
-    'A week in. Nobody claps for the walk to the mailbox, so I will. Every dose on time, every night slept, every day without a call to the hospital — those are the wins this week is made of.',
+    'A week in. Nobody claps for the walk to the mailbox, so I will. Every dose on time, every night slept, every day without a call to the hospital, those are the wins this week is made of.',
     'A bad day is a day, not a trend. If something worries you, message us and we will get you to the right person.'], cta: 'Open the portal' },
   { key: 's30', anchor: 'surgery', after: 30, window: 5, hour: 9, kind: 'notes', subject: 'The long middle', paras: [
     'A month. This is when the casseroles stop and the fatigue sets in, and nobody warns you. It is normal, it passes, and it is easier with someone in your corner.',
@@ -85,7 +85,7 @@ const TIMED = [
   { key: 's45c', anchor: 'surgery', after: 45, window: 5, hour: 9, kind: 'notes', to: 'family', subject: 'How are you holding up?', paras: [
     'This one is for you, not for {patient}. Six weeks of carrying someone is a long time, and the people asking “how is {patient}?” rarely ask how you are.',
     'So: how are you? Sleeping? Eating something that is not standing up at the counter? Has anyone taken a shift so you could leave the house?',
-    'Reply to this, or write it in your own check-in on the Home page — there is a caregiver version. Nothing you say there goes to {patient}.'], cta: 'Open the portal' },
+    'Reply to this, or write it in your own check-in on the Home page, there is a caregiver version. Nothing you say there goes to {patient}.'], cta: 'Open the portal' },
   { key: 'wb', anchor: 'gone', after: 45, window: 14, kind: 'notes', subject: 'Checking in on {patient}', paras: [
     'It has been about six weeks. No pitch, I just wanted to ask how {patient} is doing.',
     'If things have gotten complicated again, a follow-up surgery, a new diagnosis, a caregiver who is worn down, the door is open. Reply here or call me and we will pick the plan up where it left off. Your first month back is on me.'] },
@@ -227,7 +227,7 @@ async function paused(cl, c) {
 // The subscription ended (customer.subscription.deleted): record it, tell the family, tell the coordinator.
 async function ended(cl, sub) {
   const cd = (sub && sub.cancellation_details) || {};
-  const reason = [cd.feedback && ({ too_expensive: 'Too expensive', missing_features: 'Missing something', switched_service: 'Went elsewhere', unused: 'Did not use it', customer_service: 'Customer service', too_complex: 'Too complicated', low_quality: 'Not good enough', other: 'Other' }[cd.feedback] || cd.feedback), cd.comment].filter(Boolean).join(' — ');
+  const reason = [cd.feedback && ({ too_expensive: 'Too expensive', missing_features: 'Missing something', switched_service: 'Went elsewhere', unused: 'Did not use it', customer_service: 'Customer service', too_complex: 'Too complicated', low_quality: 'Not good enough', other: 'Other' }[cd.feedback] || cd.feedback), cd.comment].filter(Boolean).join(', ');
   await db.q(`update clients set cancelled_at=coalesce(cancelled_at, now()), billing_status='Cancelled', cancel_reason=$2 where client_id=$1`, [cl.client_id, reason || cl.cancel_reason || '']);
   await core.autoMsg(cl.client_id, 'Your membership has ended. Nothing more is charged. Your record stays, and you can come back any time from the Billing page.');
   const why = `<p style="font-size:14px;color:#5B6470;margin:0 0 16px">One click, if you are willing: why did you stop? ` + Object.keys(WHY).map(k => `<a href="${esc(C.PORTAL_URL + '?why=' + k)}" style="color:#1C2A3A">{why_${k}}</a>`).join(' · ') + `</p>`;
@@ -238,7 +238,7 @@ async function ended(cl, sub) {
     return m;
   });
   const wbDay = fmtDay(new Date(Date.now() + 45 * DAY));
-  await core.notifyCo(await core.coordinatorFor(cl), 'billing', 'Cancelled — ' + famName(cl.family_name), 'Their subscription was cancelled in Stripe.' + (reason ? ' Reason they gave: “' + reason + '.”' : ' No reason given.'), 'Records stay under retention. The 45-day check-in note is scheduled for ' + wbDay + '.', 'Open the portal');
+  await core.notifyCo(await core.coordinatorFor(cl), 'billing', 'Cancelled, ' + famName(cl.family_name), 'Their subscription was cancelled in Stripe.' + (reason ? ' Reason they gave: “' + reason + '.”' : ' No reason given.'), 'Records stay under retention. The 45-day check-in note is scheduled for ' + wbDay + '.', 'Open the portal');
   return sentNow;
 }
 // The one-click "why did you stop?" from the ended email.
@@ -247,7 +247,7 @@ async function leaveReason(ctx, p, c) {
   const cl = await core.clientById(ctx.clientId, c); if (!cl) return { ok: true };
   const v = await vars(cl, null); const label = fill(WHY[k], v);
   await db.q(`update clients set cancel_reason=$2 where client_id=$1`, [cl.client_id, [cl.cancel_reason, 'Family said: ' + label].filter(Boolean).join(' / ')], c);
-  await core.notifyCo(await core.coordinatorFor(cl), 'assist', 'Why they stopped — ' + famName(cl.family_name), (ctx.user.name || ctx.email) + ' answered the one-click question: ' + label, '', 'Open the portal');
+  await core.notifyCo(await core.coordinatorFor(cl), 'assist', 'Why they stopped, ' + famName(cl.family_name), (ctx.user.name || ctx.email) + ' answered the one-click question: ' + label, '', 'Open the portal');
   return { ok: true };
 }
 

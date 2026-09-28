@@ -64,7 +64,7 @@ async function handle(headers, body) {
   {
     const ctx = { email: 'booking-hook', role: 'system', clientId: cid };
     await core.audit(ctx, 'bookingSignup', { kind: 'Introductory Call' }, '');
-    await core.notifyCo(co, 'booking', 'New booking — ' + (name || email), 'A portal login was made for them from their Introductory Call booking. They can fill out the intake before your call.', '', 'Open the portal').catch(() => {});
+    await core.notifyCo(co, 'booking', 'New booking, ' + (name || email), 'A portal login was made for them from their Introductory Call booking. They can fill out the intake before your call.', '', 'Open the portal').catch(() => {});
   }
   return [200, { ok: true, created: true, url }];
 }

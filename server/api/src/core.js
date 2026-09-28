@@ -75,7 +75,7 @@ function coSettings(user) {
   if (!Array.isArray(s.blocked)) s.blocked = [];
   return s;
 }
-// Documents open through the API with a signed link (24 h, tied to the person and the file) — never a public URL.
+// Documents open through the API with a signed link (24 h, tied to the person and the file), never a public URL.
 function fileUrl(ctx, u) {
   if (!u.storage_key) return u.url || '';
   const { makeToken } = require('./auth');

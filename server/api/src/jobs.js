@@ -36,7 +36,7 @@ async function medReminders() {
   for (const cid of Object.keys(byClient)) {
     for (const k of ['now', 'soon', 'hour']) {
       const list = byClient[cid].filter(x => x.kind === k); if (!list.length) continue;
-      const body = list.map(x => x.m.name + (x.m.dose ? ' ' + x.m.dose : '') + ' — ' + x.t + (x.m.instructions ? ' (' + x.m.instructions + ')' : '')).join('\n');
+      const body = list.map(x => x.m.name + (x.m.dose ? ' ' + x.m.dose : '') + ', ' + x.t + (x.m.instructions ? ' (' + x.m.instructions + ')' : '')).join('\n');
       await core.notifyFamily(cid, 'meds', kinds[k] + ': ' + (list.length === 1 ? 'a medication' : list.length + ' medications'), k === 'now' ? 'Time to take:' : 'Coming up ' + kinds[k].toLowerCase() + ':', body + '\n\nCheck it off on your Home page once it is taken.', 'Open the portal');
     }
   }
@@ -62,7 +62,7 @@ async function dailyDigest() {
       let html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1C2A3A;max-width:560px"><p style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#C09B36;font-weight:700">${C.APP_NAME} · daily digest</p><p style="font-size:16px">${rows.length} thing${rows.length === 1 ? '' : 's'} since yesterday.</p>`;
       Object.keys(groups).forEach(k => { html += `<h3 style="font-size:14px;margin:18px 0 6px;border-bottom:1px solid #E3DED3;padding-bottom:4px">${esc(C.CO_KINDS[k] || k)} (${groups[k].length})</h3>`; groups[k].forEach(r => { html += `<p style="margin:0 0 10px;font-size:14px;line-height:1.45"><b>${esc(r.subject)}</b><br>${esc(r.lead)}${r.body ? '<br><span style="color:#5B6470;white-space:pre-wrap">' + esc(String(r.body).slice(0, 300)) + '</span>' : ''}</p>`; }); });
       html += `<p style="margin-top:20px"><a href="${C.PORTAL_URL}" style="display:inline-block;background:#C09B36;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:3px">Open the In Basket</a></p></div>`;
-      await mail.sendMail(u.email, `${C.APP_NAME}: your digest — ${rows.length} item${rows.length === 1 ? '' : 's'}`, html);
+      await mail.sendMail(u.email, `${C.APP_NAME}: your digest, ${rows.length} item${rows.length === 1 ? '' : 's'}`, html);
       await db.q(`update digest set sent_at=now() where item_id = any($1)`, [rows.map(r => r.item_id)]);
       sent++;
     }
@@ -80,7 +80,7 @@ async function twoDayReminders() {
   for (const a of rows) {
     const { localStamp } = require('./time');
     await core.notifyFamily(a.client_id, 'booking', 'In two days: ' + a.title, a.title + ' is ' + localStamp(a.starts_at) + (a.location ? ' · ' + a.location : '') + '.',
-      'Three things to have ready:\n1. Your questions, written down — the ones you think of at 2 am.\n2. The newest papers from the hospital or the surgeon, photographed if that is easier.\n3. Who else should be on the call, and whether they can make it.\n\nIf the time no longer works, change it in the portal under Find Care.', 'Open the portal');
+      'Three things to have ready:\n1. Your questions, written down, the ones you think of at 2 am.\n2. The newest papers from the hospital or the surgeon, photographed if that is easier.\n3. Who else should be on the call, and whether they can make it.\n\nIf the time no longer works, change it in the portal under Find Care.', 'Open the portal');
     await db.q(`insert into lifecycle_sent (client_id, key) values ($1, $2) on conflict do nothing`, [a.client_id, 'r2:' + a.appt_id]); sent++;
   }
   return { sent };
@@ -95,18 +95,18 @@ async function intakeNudges() {
     const key = 'ia:' + day;
     const done = await db.one(`select 1 from lifecycle_sent where client_id=$1 and key=$2`, [cl.client_id, key]); if (done) continue;
     const co = await core.coordinatorFor(cl);
-    await core.notifyFamily(cl.client_id, 'notes', 'Still here when you are ready', 'Your form is saved where you left it. Finish it when there is a quiet ten minutes — or answer the short version now and the rest later.', (co ? first(co.name) + ' is' : 'We are') + ' not going anywhere. Nothing happens on our side until you say so.', 'Open the form');
+    await core.notifyFamily(cl.client_id, 'notes', 'Still here when you are ready', 'Your form is saved where you left it. Finish it when there is a quiet ten minutes, or answer the short version now and the rest later.', (co ? first(co.name) + ' is' : 'We are') + ' not going anywhere. Nothing happens on our side until you say so.', 'Open the form');
     await db.q(`insert into lifecycle_sent (client_id, key) values ($1, $2) on conflict do nothing`, [cl.client_id, key]); sent++;
   }
   return { sent };
 }
-// A few hours after an appointment: "how did it go?" — three lines in the check-in, while it is fresh.
+// A few hours after an appointment: "how did it go?", three lines in the check-in, while it is fresh.
 async function reflections() {
   const rows = await db.all(`select a.* from appointments a where a.status<>'Cancelled' and a.starts_at < now() - interval '2 hours' and a.starts_at > now() - interval '5 hours'
     and not exists (select 1 from lifecycle_sent s where s.client_id=a.client_id and s.key='rf:'||a.appt_id)`);
   let sent = 0;
   for (const a of rows) {
-    await core.notifyFamily(a.client_id, 'booking', 'How did it go? — ' + a.title, 'While it is fresh: what did they say, what did you not get to ask, what changed?', 'Three lines in today’s check-in on your Home page is enough. Your coordinator reads it and follows up on anything left open.', 'Open the portal');
+    await core.notifyFamily(a.client_id, 'booking', 'How did it go?, ' + a.title, 'While it is fresh: what did they say, what did you not get to ask, what changed?', 'Three lines in today’s check-in on your Home page is enough. Your coordinator reads it and follows up on anything left open.', 'Open the portal');
     await db.q(`insert into lifecycle_sent (client_id, key) values ($1, $2) on conflict do nothing`, [a.client_id, 'rf:' + a.appt_id]); sent++;
   }
   return { sent };
@@ -120,7 +120,7 @@ async function circleNudges() {
   for (const cl of rows) {
     const n = (await db.one(`select count(*)::int n from circle where client_id=$1 and status='Active'`, [cl.client_id])).n;
     const last = (await db.one(`select max(posted_at) d from updates where client_id=$1 and visible_to_circle`, [cl.client_id])).d;
-    await core.notifyFamily(cl.client_id, 'message', 'The Circle has not heard in two days', n + (n === 1 ? ' person is' : ' people are') + ' following ' + (first(cl.patient_first_name) || 'the family') + ' and nothing has gone out ' + (last ? 'since the last update' : 'yet') + '. One line is enough — “quiet day, resting” counts. Or move the tracker; that posts for you.', '', 'Post an update');
+    await core.notifyFamily(cl.client_id, 'message', 'The Circle has not heard in two days', n + (n === 1 ? ' person is' : ' people are') + ' following ' + (first(cl.patient_first_name) || 'the family') + ' and nothing has gone out ' + (last ? 'since the last update' : 'yet') + '. One line is enough, “quiet day, resting” counts. Or move the tracker; that posts for you.', '', 'Post an update');
     await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object('circle_nudge_at', now()::text) where client_id=$1`, [cl.client_id]);
   }
   return { nudged: rows.length };
@@ -133,7 +133,7 @@ async function quietFamilies() {
     and coalesce((c.extra->>'quiet_alert_at')::timestamptz, now() - interval '100 days') < now() - ($1 || ' days')::interval`, [String(C.QUIET_DAYS)]);
   for (const cl of rows) {
     const co = await core.coordinatorFor(cl);
-    await core.notifyCo(co, 'quiet', 'Gone quiet — ' + famName(cl.family_name), 'Nobody from the ' + cl.family_name + ' household has signed in or written in ' + C.QUIET_DAYS + ' days. Stage: ' + (cl.current_stage || '—') + '. A call is usually the right move.', '', 'Open the chart');
+    await core.notifyCo(co, 'quiet', 'Gone quiet, ' + famName(cl.family_name), 'Nobody from the ' + cl.family_name + ' household has signed in or written in ' + C.QUIET_DAYS + ' days. Stage: ' + (cl.current_stage || 'Not set') + '. A call is usually the right move.', '', 'Open the chart');
     await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object('quiet_alert_at', now()::text) where client_id=$1`, [cl.client_id]);
   }
   return { flagged: rows.length };
@@ -145,7 +145,7 @@ async function retention() {
   const due = await db.all(`select client_id, family_name, archived_at, retain_until from clients where status='Archived' and retain_until is not null and retain_until <= current_date order by retain_until`);
   if (!due.length) return { due: 0 };
   for (const co of await db.all(`select email, name from users where lower(role)='coordinator' and active`)) {
-    await mail.notify(co.email, `${due.length} archived famil${due.length === 1 ? 'y has' : 'ies have'} reached the retention date`, 'These records are past the date you set to keep them. Nothing has been deleted. Open the archive to review and purge when you are ready.', due.map(d => `${d.family_name} — archived ${String(d.archived_at).slice(0, 10)}, keep until ${d.retain_until}`).join('\n'), 'Open the portal');
+    await mail.notify(co.email, `${due.length} archived famil${due.length === 1 ? 'y has' : 'ies have'} reached the retention date`, 'These records are past the date you set to keep them. Nothing has been deleted. Open the archive to review and purge when you are ready.', due.map(d => `${d.family_name}, archived ${String(d.archived_at).slice(0, 10)}, keep until ${d.retain_until}`).join('\n'), 'Open the portal');
   }
   return { due: due.length };
 }

@@ -1,6 +1,6 @@
 'use strict';
 // Text messages (2026-09-28): vendors live in their texts, so jobs and replies reach them there, with a link back
-// into the portal. Texts carry no health information — a first name, a time, a town, a link. Everything else
+// into the portal. Texts carry no health information, a first name, a time, a town, a link. Everything else
 // stays behind the sign-in. Sends through Twilio when TWILIO_SID, TWILIO_TOKEN and TWILIO_FROM are set;
 // until then (and in tests) they land in `sent` and the log, and the email copy still goes out.
 const sent = [];

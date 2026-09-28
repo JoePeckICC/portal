@@ -1,5 +1,5 @@
 'use strict';
-// Intake — consent, which questions show (conditions, modes, depth, the emergency path), the flag register, plan seeding.
+// Intake, consent, which questions show (conditions, modes, depth, the emergency path), the flag register, plan seeding.
 const C = require('./config');
 const db = require('./db');
 const { DK_, DISCUSS_, RNS_, EMERGENCY_, INTAKE_STEPS_, SVC_BY_TEXT, SVC_TEXT, DEPTH_OPTS, JUST_HANDLE, DEPTH_AREAS, intakeSpec } = require('./intakeSpec');
@@ -19,7 +19,8 @@ async function readIntake(clientId, c) {
   });
   return out;
 }
-const plainAnswer = v => { const s = v == null ? '' : String(v); return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(s) ? s.slice(0, 10) : s; };
+// No em dashes anywhere (Joe, 2026-09-28): answers saved before the wording changed read the same as the new wording.
+const plainAnswer = v => { const s = v == null ? '' : String(v).replace(/ \u2014 /g, ', '); return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(s) ? s.slice(0, 10) : s; };
 
 // answers = { id: { a, n } }; upserts each row.
 async function writeIntake(clientId, answers, by, c) {
@@ -149,9 +150,9 @@ function visibleAnswers(answers) {
 const isPatient = answers => roleOf(answers) === 'patient';
 
 // ---- flag register (family never sees these). The appendix of the master intake form, tier by tier.
-const T1 = 'Tier 1 — could derail the surgery or discharge', T1b = 'Tier 1b — could cancel the surgery on the day', T1c = 'Tier 1c — anesthesia history affecting the day',
-  T2 = "Tier 2 — conflicts the family hasn't connected", T3 = 'Tier 3 — slow-burn, name them to show foresight', T4 = 'Tier 4 — respect and standards, quiet failures if missed',
-  T5 = 'Tier 5 — income and licensing, the expensive surprises';
+const T1 = 'Tier 1, could derail the surgery or discharge', T1b = 'Tier 1b, could cancel the surgery on the day', T1c = 'Tier 1c, anesthesia history affecting the day',
+  T2 = "Tier 2, conflicts the family hasn't connected", T3 = 'Tier 3, slow-burn, name them to show foresight', T4 = 'Tier 4, respect and standards, quiet failures if missed',
+  T5 = 'Tier 5, income and licensing, the expensive surprises';
 const any_ = (a, id, ...v) => v.some(x => has(a, id, x));
 const LIFT = a => any_(a, 'I.3', 'No bending, lifting, or twisting') || /^Yes/.test(ans(a, 'I.1'));
 const BEND = a => any_(a, 'I.3', 'No bending, lifting, or twisting', 'No nose-blowing, no straws, no bending over');
@@ -164,85 +165,85 @@ const FLAG_RULES = [
   { tier: T1, label: 'No named escort home', id: 'L.1', test: a => !ans(a, 'L.1') || /haven't sorted/.test(ans(a, 'L.1')) },
   { tier: T1, label: 'Lives alone, no overnight person', id: 'A.2a', test: a => ans(a, 'A.2') === 'Lives alone' && !/^Yes/.test(ans(a, 'A.2a')) },
   { tier: T1, label: 'Same-day or one-night stay with no named adult picking them up', id: 'G.9a', test: a => /same day|One night/.test(ans(a, 'G.9')) && !/Someone named/.test(ans(a, 'G.9a')) },
-  { tier: T1, label: 'Steps at every entrance — check whether a ramp is even possible', id: 'K.1', test: a => ans(a, 'K.1') === 'Yes' && ans(a, 'K.1c') !== 'Right at the step' },
-  { tier: T1, label: 'Steps at every entrance and the door opens right at the step — a ramp is unlikely', id: 'K.1', test: a => ans(a, 'K.1') === 'Yes' && ans(a, 'K.1c') === 'Right at the step' },
+  { tier: T1, label: 'Steps at every entrance, check whether a ramp is even possible', id: 'K.1', test: a => ans(a, 'K.1') === 'Yes' && ans(a, 'K.1c') !== 'Right at the step' },
+  { tier: T1, label: 'Steps at every entrance and the door opens right at the step, a ramp is unlikely', id: 'K.1', test: a => ans(a, 'K.1') === 'Yes' && ans(a, 'K.1c') === 'Right at the step' },
   { tier: T1, label: 'No bath on the sleeping floor, with a mobility restriction', id: 'K.3e', test: a => ans(a, 'K.3e') === 'None' && MOBILITY(a) },
-  { tier: T1, label: 'No backup caregiver named (someone to step in if the main one cannot) — single point of failure on the whole plan', id: 'C.2c', test: a => !!ans(a, 'C.2c') && !/^Someone$/.test(ans(a, 'C.2c')) },
-  { tier: T1, label: "Advance directive exists but the hospital may not have it — fast, easy, ours to fix", id: 'C.3a', test: a => /^(No|Not sure)$/.test(ans(a, 'C.3a')) },
-  { tier: T1, label: 'Home or rehab unknown — changes the whole plan', id: 'G.10', test: a => /Not sure|don't know/.test(ans(a, 'G.10')) },
-  { tier: T1, label: 'EMERGENCY PATH — surgery already happened or is happening', id: 'G.6', test: a => ans(a, 'G.6') === EMERGENCY_ },
+  { tier: T1, label: 'No backup caregiver named (someone to step in if the main one cannot), single point of failure on the whole plan', id: 'C.2c', test: a => !!ans(a, 'C.2c') && !/^Someone$/.test(ans(a, 'C.2c')) },
+  { tier: T1, label: "Advance directive exists but the hospital may not have it, fast, easy, ours to fix", id: 'C.3a', test: a => /^(No|Not sure)$/.test(ans(a, 'C.3a')) },
+  { tier: T1, label: 'Home or rehab unknown, changes the whole plan', id: 'G.10', test: a => /Not sure|don't know/.test(ans(a, 'G.10')) },
+  { tier: T1, label: 'EMERGENCY PATH, surgery already happened or is happening', id: 'G.6', test: a => ans(a, 'G.6') === EMERGENCY_ },
   // Tier 1b
-  { tier: T1b, label: 'Fasting times unknown or not remembered — the most common same-day cancellation', id: 'H2.1', test: a => /don't remember|Not yet|don't know/.test(ans(a, 'H2.1')) },
+  { tier: T1b, label: 'Fasting times unknown or not remembered, the most common same-day cancellation', id: 'H2.1', test: a => /don't remember|Not yet|don't know/.test(ans(a, 'H2.1')) },
   { tier: T1b, label: "The household doesn't all know the fasting times", id: 'H2.2', test: a => /Not really|reminders/.test(ans(a, 'H2.2')) },
   { tier: T1b, label: 'Medication stop date unclear', id: 'H2.3', test: a => /not clear|don't know/.test(ans(a, 'H2.3')) },
-  { tier: T1b, label: 'Pre-op tests not all done — ours to chase', id: 'H2.6', test: a => /Some done|None yet|Not sure/.test(ans(a, 'H2.6')) },
-  { tier: T1b, label: 'Pre-op results never confirmed back and cleared — ours to chase', id: 'H2.7', test: a => /^No$|Hadn't thought/.test(ans(a, 'H2.7')) },
+  { tier: T1b, label: 'Pre-op tests not all done, ours to chase', id: 'H2.6', test: a => /Some done|None yet|Not sure/.test(ans(a, 'H2.6')) },
+  { tier: T1b, label: 'Pre-op results never confirmed back and cleared, ours to chase', id: 'H2.7', test: a => /^No$|Hadn't thought/.test(ans(a, 'H2.7')) },
   { tier: T1b, label: 'Insurance authorization not confirmed', id: 'H2.8', test: a => /waiting|Don't know/.test(ans(a, 'H2.8')) },
   { tier: T1b, label: 'Someone in the household is unwell right now', id: 'H2.10', test: a => /^Yes|getting over/.test(ans(a, 'H2.10')) },
   { tier: T1b, label: 'Dental work, an infection, or an open wound brewing', id: 'H2.11', test: a => any_(a, 'H2.11', 'Dental work or a tooth problem', 'A skin infection, rash, or open wound', 'An infection being treated', 'Something else') },
-  { tier: T1b, label: 'Report time and surgery time not both known — families routinely arrive late', id: 'H2.15', test: a => /one time but not|Not yet/.test(ans(a, 'H2.15')) },
+  { tier: T1b, label: 'Report time and surgery time not both known, families routinely arrive late', id: 'H2.15', test: a => /one time but not|Not yet/.test(ans(a, 'H2.15')) },
   { tier: T1b, label: "Jewelry or piercings that don't come out", id: 'H2.18', test: a => any_(a, 'H2.18', "Jewelry or piercings that don't come out easily") },
   { tier: T1b, label: 'Interpreter needed and possibly not booked', id: 'H2.19', test: a => /don't know if one's booked/.test(ans(a, 'H2.19')) },
   { tier: T1b, label: 'Nobody able to stay through the surgery', id: 'H2.20', test: a => ans(a, 'H2.20') === 'Nobody can stay' },
   // Tier 1c
-  { tier: T1c, label: 'Prior nausea, slow waking, or agitation — plan a longer day and the right person at the bedside', id: 'H2.12a', test: a => any_(a, 'H2.12a', 'Nausea or vomiting afterward', 'Took a long time to wake up', 'Confused or agitated on waking') },
-  { tier: T1c, label: "Family history of a serious anesthesia reaction — confirm they've told the anesthesia team", id: 'H2.14', test: a => ans(a, 'H2.14') === 'Yes' },
+  { tier: T1c, label: 'Prior nausea, slow waking, or agitation, plan a longer day and the right person at the bedside', id: 'H2.12a', test: a => any_(a, 'H2.12a', 'Nausea or vomiting afterward', 'Took a long time to wake up', 'Confused or agitated on waking') },
+  { tier: T1c, label: "Family history of a serious anesthesia reaction, confirm they've told the anesthesia team", id: 'H2.14', test: a => ans(a, 'H2.14') === 'Yes' },
   // Tier 2
-  { tier: T2, label: 'LIFTING CONFLICT — lifting restriction and a child under 5', id: 'I.3', test: a => LIFT(a) && ans(a, 'M.1') === 'Yes' && agesOf(a).some(n => n < 5) },
-  { tier: T2, label: 'BENDING CONFLICT — bending restriction and a cat litter box', id: 'I.3', test: a => BEND(a) && has(a, 'M.4', 'Cat') },
+  { tier: T2, label: 'LIFTING CONFLICT, lifting restriction and a child under 5', id: 'I.3', test: a => LIFT(a) && ans(a, 'M.1') === 'Yes' && agesOf(a).some(n => n < 5) },
+  { tier: T2, label: 'BENDING CONFLICT, bending restriction and a cat litter box', id: 'I.3', test: a => BEND(a) && has(a, 'M.4', 'Cat') },
   { tier: T2, label: 'Balance problems and daily stairs', id: 'I.3d', test: a => has(a, 'I.3', 'Dizziness or balance problems expected') && (ans(a, 'I.3d') === 'Yes' || ans(a, 'K.2') === 'Two or more') },
   { tier: T2, label: 'Balance problems and a pet underfoot', id: 'I.3f', test: a => has(a, 'I.3', 'Dizziness or balance problems expected') && ans(a, 'I.3f') === 'Yes' },
-  { tier: T2, label: 'STRANDED RISK — bedroom and bathroom on different floors, with a mobility restriction', id: 'K.3', test: a => cond({ differentFloors: true }, a) && MOBILITY(a) },
+  { tier: T2, label: 'STRANDED RISK, bedroom and bathroom on different floors, with a mobility restriction', id: 'K.3', test: a => cond({ differentFloors: true }, a) && MOBILITY(a) },
   { tier: T2, label: 'Big or jumpy dog and a lifting restriction', id: 'M.4a', test: a => (ans(a, 'M.4a') === 'Over 60 lb' || /Yes|Sometimes/.test(ans(a, 'M.4b'))) && LIFT(a) },
-  { tier: T2, label: 'HEAVY CARE LOAD — brace for 10+ weeks and no second adult', id: 'I.3g', test: a => has(a, 'I.3', 'Will wear a brace, collar, or helmet') && weeks(ans(a, 'I.3g')) >= 10 && (ans(a, 'A.2') === 'Lives alone' || /haven't figured/.test(ans(a, 'C.2'))) },
+  { tier: T2, label: 'HEAVY CARE LOAD, brace for 10+ weeks and no second adult', id: 'I.3g', test: a => has(a, 'I.3', 'Will wear a brace, collar, or helmet') && weeks(ans(a, 'I.3g')) >= 10 && (ans(a, 'A.2') === 'Lives alone' || /haven't figured/.test(ans(a, 'C.2'))) },
   { tier: T2, label: 'Must sleep propped up, no recliner, bedroom upstairs', id: 'I.3t', test: a => has(a, 'I.3', 'Needs to sleep propped up, head elevated') && ans(a, 'I.3t') === 'No' && (ans(a, 'I.3u') === 'Upstairs' || ans(a, 'K.3') === 'Upstairs') },
   { tier: T2, label: 'Walker needed and narrow doorways', id: 'I.4b', test: a => /cane or walker|wheelchair/.test(ans(a, 'I.4')) && (ans(a, 'I.4b') === 'Yes' || has(a, 'K.6', 'Tight hallways or doorways')) },
   { tier: T2, label: 'Children at home during a multi-night stay', id: 'M.1', test: a => ans(a, 'M.1') === 'Yes' && /4–7|More than/.test(ans(a, 'G.9')) },
   { tier: T2, label: "The patient doesn't fully know the family is doing this", id: 'D.1', test: a => /unsure|Not yet/.test(ans(a, 'D.1')) || ans(a, '0.5') === 'Not yet' },
   // Tier 3
-  { tier: T3, label: '4 or more doctors or facilities — each needs its own records release', id: 'G.11', test: a => ans(a, 'G.11') === '4 or more' },
-  { tier: T3, label: 'Self-employed or gig caregiver with no real leave — income stops when they stop', id: 'N.2', test: a => /self-employed/.test(ans(a, 'N.2')) },
+  { tier: T3, label: '4 or more doctors or facilities, each needs its own records release', id: 'G.11', test: a => ans(a, 'G.11') === '4 or more' },
+  { tier: T3, label: 'Self-employed or gig caregiver with no real leave, income stops when they stop', id: 'N.2', test: a => /self-employed/.test(ans(a, 'N.2')) },
   { tier: T3, label: '8 or more medications, or a complex schedule', id: 'J.5', test: a => /8\+/.test(ans(a, 'J.5')) || any_(a, 'J.6', 'Doses at odd hours, including overnight', 'Something needs refrigeration', "An injection or something that isn't just a pill") },
   { tier: T3, label: 'Pharmacy closed weekends', id: 'J.4c', test: a => ans(a, 'J.4c') === 'No' },
   { tier: T3, label: 'No primary caregiver identified', id: 'C.2', test: a => /haven't figured/.test(ans(a, 'C.2')) },
   { tier: T3, label: 'No instruction sheets received', id: 'H.2', test: a => /Haven't received/.test(ans(a, 'H.2')) },
-  { tier: T3, label: 'Help offered but unorganized — an easy win', id: 'O.3', test: a => /nothing's organized/.test(ans(a, 'O.3')) },
-  { tier: T3, label: 'Medicaid ride benefit never used — a free win', id: 'E.0', test: a => /^No$|Didn't know/.test(ans(a, 'E.0')) },
-  { tier: T3, label: 'VA travel reimbursement unused — a free win', id: 'E.0b', test: a => /haven't used|Never heard/.test(ans(a, 'E.0b')) },
-  { tier: T3, label: 'VA Caregiver Support Program not in place — a free win', id: 'E.0c', test: a => /^No$|Never heard/.test(ans(a, 'E.0c')) },
+  { tier: T3, label: 'Help offered but unorganized, an easy win', id: 'O.3', test: a => /nothing's organized/.test(ans(a, 'O.3')) },
+  { tier: T3, label: 'Medicaid ride benefit never used, a free win', id: 'E.0', test: a => /^No$|Didn't know/.test(ans(a, 'E.0')) },
+  { tier: T3, label: 'VA travel reimbursement unused, a free win', id: 'E.0b', test: a => /haven't used|Never heard/.test(ans(a, 'E.0b')) },
+  { tier: T3, label: 'VA Caregiver Support Program not in place, a free win', id: 'E.0c', test: a => /^No$|Never heard/.test(ans(a, 'E.0c')) },
   { tier: T3, label: 'Caregiver running on empty before surgery', id: 'P.1', test: a => ans(a, 'P.1') === 'Running on empty' },
   { tier: T3, label: 'A prior bad experience with the system', id: 'P.5', test: a => /didn't go well/.test(ans(a, 'P.5')) },
   { tier: T3, label: 'Cost is a significant worry', id: 'Q.4', test: a => /^Yes/.test(ans(a, 'Q.4')) },
   { tier: T3, label: 'Surgery already rescheduled more than once', id: 'G.6c', test: a => ans(a, 'G.6c') === 'Yes, more than once' },
-  { tier: T3, label: "House access not thought about — will break on day one", id: 'K.8', test: a => /Haven't thought/.test(ans(a, 'K.8')) },
+  { tier: T3, label: "House access not thought about, will break on day one", id: 'K.8', test: a => /Haven't thought/.test(ans(a, 'K.8')) },
   { tier: T3, label: 'Surgery not scheduled yet', id: 'G.6', test: a => ans(a, 'G.6') === 'Not scheduled yet' },
   { tier: T3, label: 'No name for the surgery yet', id: 'G.4', test: a => /don't have a name/.test(ans(a, 'G.4')) },
   { tier: T3, label: 'Still waiting on the diagnosis', id: 'G.1', test: a => /waiting to find out/.test(ans(a, 'G.1')) },
   { tier: T3, label: 'Length of stay unknown', id: 'G.9', test: a => ans(a, 'G.9') === DK_ },
   // Tier 4
-  { tier: T4, label: "Outside food can't come into the house — a meal train is off; plan catering or in-kitchen help", id: 'O2.2b', test: a => /^No/.test(ans(a, 'O2.2b')) || /^No/.test(ans(a, 'O2.2g')) },
-  { tier: T4, label: 'Shabbat — food ready before sundown Friday', id: 'O2.2d', test: a => /^Yes|Somewhat/.test(ans(a, 'O2.2d')) },
-  { tier: T4, label: 'Passover in the recovery window — start weeks early', id: 'O2.2e', test: a => ans(a, 'O2.2e') === 'Passover' },
-  { tier: T4, label: 'Ramadan — meal timing shifts to pre-dawn and after sunset', id: 'O2.2i', test: a => ans(a, 'O2.2i') === 'Yes' },
-  { tier: T4, label: 'Severe allergy — brief every provider in writing', id: 'O2.4a', test: a => /^Severe/.test(ans(a, 'O2.4a')) },
+  { tier: T4, label: "Outside food can't come into the house, a meal train is off; plan catering or in-kitchen help", id: 'O2.2b', test: a => /^No/.test(ans(a, 'O2.2b')) || /^No/.test(ans(a, 'O2.2g')) },
+  { tier: T4, label: 'Shabbat, food ready before sundown Friday', id: 'O2.2d', test: a => /^Yes|Somewhat/.test(ans(a, 'O2.2d')) },
+  { tier: T4, label: 'Passover in the recovery window, start weeks early', id: 'O2.2e', test: a => ans(a, 'O2.2e') === 'Passover' },
+  { tier: T4, label: 'Ramadan, meal timing shifts to pre-dawn and after sunset', id: 'O2.2i', test: a => ans(a, 'O2.2i') === 'Yes' },
+  { tier: T4, label: 'Severe allergy, brief every provider in writing', id: 'O2.4a', test: a => /^Severe/.test(ans(a, 'O2.4a')) },
   { tier: T4, label: 'The cook is the patient', id: 'O2.7', test: a => /person having surgery/.test(ans(a, 'O2.7')) },
   { tier: T4, label: "“We'd rather not, honestly” about people in the home", id: 'O3.1', test: a => /rather not, honestly/.test(ans(a, 'O3.1')) },
-  { tier: T4, label: "Something they'd rather we didn't touch — never override this", id: 'O3.15', test: a => !!ans(a, 'O3.15').trim() },
+  { tier: T4, label: "Something they'd rather we didn't touch, never override this", id: 'O3.15', test: a => !!ans(a, 'O3.15').trim() },
   { tier: T4, label: 'Something the patient is adamant about keeping', id: 'D.6', test: a => filledNot(a, 'D.6', 'Not that I know of') },
   { tier: T4, label: "Something the patient would rather we didn't discuss with family", id: '0.4', test: a => filledNot(a, '0.4', RNS_) },
   { tier: T4, label: "Someone not to contact, or something to keep private", id: 'O.11', test: a => filledNot(a, 'O.11', RNS_) },
   { tier: T4, label: 'Landlord permission needed for modifications', id: 'K.7b', test: a => /landlord/.test(ans(a, 'K.7b')) },
-  { tier: T4, label: "“We'd rather not ask” the faith community — do not go around them", id: 'O.10a', test: a => /rather not ask/.test(ans(a, 'O.10a')) },
-  { tier: T4, label: 'Something wanted before surgery (prayer, blessing, someone present) — easy to forget, matters enormously', id: 'O.10c', test: a => filledNot(a, 'O.10c', 'Nothing specific') },
+  { tier: T4, label: "“We'd rather not ask” the faith community, do not go around them", id: 'O.10a', test: a => /rather not ask/.test(ans(a, 'O.10a')) },
+  { tier: T4, label: 'Something wanted before surgery (prayer, blessing, someone present), easy to forget, matters enormously', id: 'O.10c', test: a => filledNot(a, 'O.10c', 'Nothing specific') },
   // Tier 5
-  { tier: T5, label: 'Licensed job — medical certification is its own process, often months. Start early.', id: 'N.1b', test: a => !!ans(a, 'N.1b') && !/^No license needed$/.test(ans(a, 'N.1b')) },
-  { tier: T5, label: 'Physical job and a lifting restriction — return to work is far out', id: 'N.1', test: a => /physical|mixed/.test(ans(a, 'N.1')) && LIFT(a) },
+  { tier: T5, label: 'Licensed job, medical certification is its own process, often months. Start early.', id: 'N.1b', test: a => !!ans(a, 'N.1b') && !/^No license needed$/.test(ans(a, 'N.1b')) },
+  { tier: T5, label: 'Physical job and a lifting restriction, return to work is far out', id: 'N.1', test: a => /physical|mixed/.test(ans(a, 'N.1')) && LIFT(a) },
   { tier: T5, label: 'Employer not told yet, with an absence coming', id: 'N.1c', test: a => ans(a, 'N.1c') === 'Not yet' },
-  { tier: T5, label: "Someone in the family with relevant expertise — don't duplicate what they've done", id: 'N.2b', test: a => ans(a, 'N.2b') === 'Yes' },
+  { tier: T5, label: "Someone in the family with relevant expertise, don't duplicate what they've done", id: 'N.2b', test: a => ans(a, 'N.2b') === 'Yes' },
   // How they chose to fill it out
-  { tier: 'Mode', label: 'EMERGENCY PATH — short form only; they can circle back for the rest', id: 'G.6', test: a => emergencyPath(a) },
-  { tier: 'Mode', label: 'Quick mode — a delegating family, not a lesser file. The meeting does more work; present assumptions as assumptions.', id: '0.1a', test: a => modeOf(a) === 'quick' && !!ans(a, '0.1a') },
-  { tier: 'Mode', label: 'Thorough mode — accuracy over warmth; they will notice if the plan contradicts what they said', id: '0.1a', test: a => modeOf(a) === 'thorough' },
+  { tier: 'Mode', label: 'EMERGENCY PATH, short form only; they can circle back for the rest', id: 'G.6', test: a => emergencyPath(a) },
+  { tier: 'Mode', label: 'Quick mode, a delegating family, not a lesser file. The meeting does more work; present assumptions as assumptions.', id: '0.1a', test: a => modeOf(a) === 'quick' && !!ans(a, '0.1a') },
+  { tier: 'Mode', label: 'Thorough mode, accuracy over warmth; they will notice if the plan contradicts what they said', id: '0.1a', test: a => modeOf(a) === 'thorough' },
 ];
 // Every place the family wrote something (answers and notes), as { id, text }.
 function writtenBits(all) {
@@ -273,34 +274,34 @@ function medicalQuestions(all) {
 }
 function intakeFlags(all) {
   const answers = visibleAnswers(all), out = [];
-  allergyMentions(all).forEach(x => out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'Allergy mentioned — make sure it is on the chart: “' + x.text + '”', id: x.id }));
+  allergyMentions(all).forEach(x => out.push({ tier: 'Tier 1, could derail the surgery or discharge', label: 'Allergy mentioned, make sure it is on the chart: “' + x.text + '”', id: x.id }));
   // Other things they wrote that change how we work: questions to us, a rideshare home, contact instructions, language.
   { const seen = new Set(medicalQuestions(all).map(x => x.text));
     writtenBits(all).forEach(bt => {
       const t = bt.text;
-      if (/\b(uber|lyft|taxi|cab|rideshare|ride share)\b/i.test(t) && /home|discharge|pick/i.test(t)) out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'They mention a rideshare or taxi for the ride home: “' + snip(t, t.search(/uber|lyft|taxi|cab|ride ?share/i)) + '”', id: bt.id });
+      if (/\b(uber|lyft|taxi|cab|rideshare|ride share)\b/i.test(t) && /home|discharge|pick/i.test(t)) out.push({ tier: 'Tier 1, could derail the surgery or discharge', label: 'They mention a rideshare or taxi for the ride home: “' + snip(t, t.search(/uber|lyft|taxi|cab|ride ?share/i)) + '”', id: bt.id });
       else if (/\b(copy|cc)\b.{0,40}\b(me|my|him|her)\b|\bnot on (the )?billing\b|\bdon'?t (call|email|text)\b|\bonly (call|email|text)\b|paper cop|by (mail|post)\b|print(ed)? (copies|out)|hard of hearing|\bdeaf|hearing aid|interpreter|large print|sign language|can'?t see well|low vision/i.test(t)) out.push({ tier: 'Mode', label: 'How to reach them, in their words: “' + snip(t, 0) + '”', id: bt.id });
       else if (t.indexOf('?') > 0 && !seen.has(snip(t, t.indexOf('?')))) out.push({ tier: 'Mode', label: 'A question they asked us in the form: “' + snip(t, Math.max(0, t.lastIndexOf('.', t.indexOf('?')) + 1)) + '”', id: bt.id });
     });
-    const lang = ans(all, 'A.1'); if (lang && lang !== 'English') out.push({ tier: 'Mode', label: 'Language: ' + lang + (det(all, 'A.1') ? ' — ' + det(all, 'A.1') : ''), id: 'A.1' });
+    const lang = ans(all, 'A.1'); if (lang && lang !== 'English') out.push({ tier: 'Mode', label: 'Language: ' + lang + (det(all, 'A.1') ? ', ' + det(all, 'A.1') : ''), id: 'A.1' });
   }
-  distressMentions(all).forEach(x => out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'DISTRESS in their words — reach out today; if there is any risk, 988 (or 911 if someone is in danger): “' + x.text + '”', id: x.id }));
-  medicalQuestions(all).forEach(x => out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'Medical question in their words — pass it to the surgeon’s office, do not answer it: “' + x.text + '”', id: x.id }));
+  distressMentions(all).forEach(x => out.push({ tier: 'Tier 1, could derail the surgery or discharge', label: 'DISTRESS in their words, reach out today; if there is any risk, 988 (or 911 if someone is in danger): “' + x.text + '”', id: x.id }));
+  medicalQuestions(all).forEach(x => out.push({ tier: 'Tier 1, could derail the surgery or discharge', label: 'Medical question in their words, pass it to the surgeon’s office, do not answer it: “' + x.text + '”', id: x.id }));
   // Filled in on an older version of the form: the answers the current form needs are listed, so nothing is assumed.
-  const sent = /Submitted|Updated after submitting/.test(String((all._status && all._status.a) || '')); const miss = sent ? missingRequired(all) : []; if (miss.length) out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'Required answers still blank (the form changed after they filled it in): ' + miss.join(', '), id: miss[0].split(' ')[0] });
+  const sent = /Submitted|Updated after submitting/.test(String((all._status && all._status.a) || '')); const miss = sent ? missingRequired(all) : []; if (miss.length) out.push({ tier: 'Tier 1, could derail the surgery or discharge', label: 'Required answers still blank (the form changed after they filled it in): ' + miss.join(', '), id: miss[0].split(' ')[0] });
   FLAG_RULES.forEach(r => { try { if (r.test(answers)) out.push({ tier: r.tier, label: r.label, id: r.id }); } catch {} });
   // Decide-as-I-go: the areas they went deep on are their priorities (better signal than O3.14).
   if (modeOf(answers) === 'decide') {
-    const deep = DEPTH_AREAS.filter(k => ans(answers, 'F.d.' + k) === DEPTH_OPTS[0]).map(k => SVC_TEXT[k].split(/ — |,/)[0].toLowerCase());
-    const handed = DEPTH_AREAS.filter(k => ans(answers, 'F.d.' + k) === JUST_HANDLE).map(k => SVC_TEXT[k].split(/ — |,/)[0].toLowerCase());
-    if (deep.length) out.push({ tier: 'Mode', label: 'Went deep on: ' + deep.join(', ') + ' — their priorities', id: 'F' });
-    if (handed.length) out.push({ tier: 'Mode', label: 'Handed over: ' + handed.join(', ') + ' — plan on judgment, then confirm', id: 'F' });
+    const deep = DEPTH_AREAS.filter(k => ans(answers, 'F.d.' + k) === DEPTH_OPTS[0]).map(k => SVC_TEXT[k].split(/, |,/)[0].toLowerCase());
+    const handed = DEPTH_AREAS.filter(k => ans(answers, 'F.d.' + k) === JUST_HANDLE).map(k => SVC_TEXT[k].split(/, |,/)[0].toLowerCase());
+    if (deep.length) out.push({ tier: 'Mode', label: 'Went deep on: ' + deep.join(', ') + ', their priorities', id: 'F' });
+    if (handed.length) out.push({ tier: 'Mode', label: 'Handed over: ' + handed.join(', ') + ', plan on judgment, then confirm', id: 'F' });
   }
   visibleQs(answers).forEach(q => {
     const a = ans(answers, q.id);
-    if (a === DISCUSS_ || a === 'Rather discuss in person') out.push({ tier: 'Bring to the meeting', label: q.id + ' — asked to discuss in person.', id: q.id });
-    else if (a === DK_) out.push({ tier: 'Bring to the meeting', label: q.id + " — \"I don't know\"" + (answers[q.id].n ? ' (they added a note)' : ''), id: q.id });
-    else if (a === RNS_) out.push({ tier: 'Declined', label: q.id + ' — declined. Information, not a gap: never raise it unless they open it.', id: q.id });
+    if (a === DISCUSS_ || a === 'Rather discuss in person') out.push({ tier: 'Bring to the meeting', label: q.id + ', asked to discuss in person.', id: q.id });
+    else if (a === DK_) out.push({ tier: 'Bring to the meeting', label: q.id + ", \"I don't know\"" + (answers[q.id].n ? ' (they added a note)' : ''), id: q.id });
+    else if (a === RNS_) out.push({ tier: 'Declined', label: q.id + ', declined. Information, not a gap: never raise it unless they open it.', id: q.id });
   });
   return out;
 }
@@ -325,15 +326,15 @@ function seedRules(all, client) {
     if (/^Yes/.test(ans(a, 'A.2a'))) add(FS, 'Confirm who stays the first night or two', det(a, 'A.2a'));
     else add(FS, 'Someone with ' + name + ' the first night or two', 'Lives alone. Ask the surgeon’s office whether someone needs to be there the first night or two.' + said('A.2'));
   }
-  if (ans(a, 'G.6') === 'Not scheduled yet') add(CC, 'Surgery date — hold the plan until it is set', 'Nothing gets booked against a date that does not exist yet.');
-  if (emergency) add(UA, 'Where things stand today', [ans(a, 'G.6a'), ans(a, 'G.6b'), ans(a, 'G.6e') && 'With them: ' + ans(a, 'G.6e'), ans(a, 'G.6f') && 'Call first: ' + ans(a, 'G.6f')].filter(Boolean).join(' — '));
+  if (ans(a, 'G.6') === 'Not scheduled yet') add(CC, 'Surgery date, hold the plan until it is set', 'Nothing gets booked against a date that does not exist yet.');
+  if (emergency) add(UA, 'Where things stand today', [ans(a, 'G.6a'), ans(a, 'G.6b'), ans(a, 'G.6e') && 'With them: ' + ans(a, 'G.6e'), ans(a, 'G.6f') && 'Call first: ' + ans(a, 'G.6f')].filter(Boolean).join(', '));
   if (/don't have a name/.test(ans(a, 'G.4'))) add(UA, "Get the surgery's name, and whether it is open or minimally invasive", 'The same operation done two ways can mean one night in the hospital or five.');
-  if (/waiting to find out/.test(ans(a, 'G.1'))) add(UA, 'Waiting on the diagnosis — check in after the next appointment');
+  if (/waiting to find out/.test(ans(a, 'G.1'))) add(UA, 'Waiting on the diagnosis, check in after the next appointment');
   if (/Not sure|don't know/.test(ans(a, 'G.10'))) add(UA, 'Find out: straight home, or rehab first', "Changes the whole plan. Ask the surgeon's office or the discharge planner.");
   if (/rehab/.test(ans(a, 'G.10'))) add(CC, 'Rehab facility: which one, how far, and a visiting plan', det(a, 'G.10a'));
   if (/4–7|More than/.test(ans(a, 'G.9'))) add(FS, 'Household coverage while ' + name + ' is in the hospital', 'Several days where the house runs without them.' + (ans(a, 'G.9c') ? ' Days that worry them: ' + ans(a, 'G.9c') : ''));
   if (ans(a, 'M.1') === 'Yes') add(FS, 'Childcare for surgery week', det(a, 'M.1') ? 'Ages: ' + det(a, 'M.1') : '');
-  if (ans(a, 'M.4') && ans(a, 'M.4') !== 'No') add(FS, 'Pet care for the hospital days', (ans(a, 'M.4p') || ans(a, 'M.4')) + (ans(a, 'M.4f') ? ' — ' + ans(a, 'M.4f') : ''));
+  if (ans(a, 'M.4') && ans(a, 'M.4') !== 'No') add(FS, 'Pet care for the hospital days', (ans(a, 'M.4p') || ans(a, 'M.4')) + (ans(a, 'M.4f') ? ', ' + ans(a, 'M.4f') : ''));
   if (/Someone else/.test(ans(a, 'C.6'))) add(CC, 'Confirm the one contact for the surgical team: ' + det(a, 'C.6').slice(0, 80), 'Give the hospital one name and number so messages never cross.');
   if (/Nobody's been designated/.test(ans(a, 'C.6'))) add(CC, 'Name one contact for the surgical team', 'Several of them are calling. One named person keeps the information clean.');
   if (!/^Someone$/.test(ans(a, 'C.2c'))) add(FS, 'Name a backup caregiver', 'Who steps in if the main caregiver gets sick or hits a wall. Decide it while it is easy.');

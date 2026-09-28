@@ -291,6 +291,14 @@ const STEPS = [
      loaned_at timestamptz, due_back text not null default '', job_id text not null default '', history jsonb not null default '[]'::jsonb,
      created_at timestamptz not null default now(), updated_at timestamptz not null default now())`,
   `create index if not exists equipment_city_idx on equipment(state, city, status)`,
+  // ---- tips from families for the next family, and what is helping (handlers/tips.js); nothing is deleted
+  `create table if not exists tips (
+     tip_id text primary key, client_id text references clients(client_id) on delete set null, kind text not null default 'tip',
+     place text not null default '', text text not null default '', status text not null default 'New', created_by text not null default '',
+     created_at timestamptz not null default now(), reviewed_by text not null default '', reviewed_at timestamptz)`,
+  `create index if not exists tips_place_idx on tips(status, lower(place))`,
+  // a support team member's line about themselves, shown to families on their profile
+  `alter table vendors add column if not exists bio text not null default ''`,
   // ---- the circle's casting call: a request can go to the family's circle first (see handlers/jobs.js)
   `alter table help_items add column if not exists job_id text not null default ''`,   // a vendor's usual free hours (handlers/jobs.js)
   `do $$ begin if not exists (select 1 from pg_constraint where conname='users_role_chk' and pg_get_constraintdef(oid) like '%vendor%') then

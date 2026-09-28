@@ -23,7 +23,7 @@ async function stripeProduct() {
   if (PRODUCT_ID) return PRODUCT_ID;
   const row = await db.one(`select value from settings where key='STRIPE_PRODUCT_ID'`);
   if (row) return (PRODUCT_ID = row.value);
-  const pr = await stripe('POST', '/v1/products', { name: C.APP_NAME + ' — Care coordination' });
+  const pr = await stripe('POST', '/v1/products', { name: C.APP_NAME + ', Care coordination' });
   await db.q(`insert into settings (key,value) values ('STRIPE_PRODUCT_ID',$1) on conflict (key) do update set value=excluded.value`, [pr.id]);
   return (PRODUCT_ID = pr.id);
 }
@@ -72,7 +72,7 @@ async function markPaid(cust, inv) {
   await core.autoMsg(cl.client_id, 'Your first payment is in and your portal is open.');
   for (const u of await db.all(`select email from users where client_id=$1 and active and lower(role) in ('client','family')`, [cl.client_id]))
     await mail.notify(u.email, 'Your portal is open', 'Thank you. Your first payment is in, and your ' + C.APP_NAME + ' portal is open: the plan, messages with ' + (co ? co.name : 'your coordinator') + ', and updates for the people you choose.', '', 'Open the portal');
-  await core.notifyCo(co, 'assist', 'Paid — ' + famName(cl.family_name), 'Their first invoice is paid and the portal is open.', '', 'Open the portal');
+  await core.notifyCo(co, 'assist', 'Paid, ' + famName(cl.family_name), 'Their first invoice is paid and the portal is open.', '', 'Open the portal');
 }
 // Backstop for the webhook: an unpaid family with a Stripe customer gets checked on sign-in.
 async function syncPaid(cl) {

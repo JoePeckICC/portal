@@ -9,7 +9,7 @@ const { normEmail, esc, safeEqual, first } = require('./util');
 function secret() { if (!C.SESSION_SECRET) throw new Error('SESSION_SECRET is not set'); return C.SESSION_SECRET; }
 const sign = s => crypto.createHmac('sha256', secret()).update(s).digest('base64url');
 
-// token = base64url(email|kind|expiresMs|nonce|extra) + '.' + HMAC — same layout as the Apps Script, so links already in inboxes keep working after cutover if the secret is carried over.
+// token = base64url(email|kind|expiresMs|nonce|extra) + '.' + HMAC, same layout as the Apps Script, so links already in inboxes keep working after cutover if the secret is carried over.
 function makeToken(email, kind, minutes, extra) {
   const body = [normEmail(email), kind, String(Date.now() + minutes * 60000), crypto.randomUUID(), String(extra || '')].join('|');
   const b = Buffer.from(body, 'utf8').toString('base64url');
