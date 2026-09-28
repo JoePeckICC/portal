@@ -1348,11 +1348,11 @@ function vendorCalendar(){
 // Beside it: what is coming up, the coordinator, the hospital care team, and help at home, each a box.
 function findView(){
   var d=S.data;S.fc=S.fc||'book';
-  if(S.fc==='team'||S.fc==='vendors'||S.fc==='ref')return teamView(S.fc==='team'?'hosp':'home');
+  if(S.fc==='team'||S.fc==='vendors'||S.fc==='ref'){var tp=el('<div><a href="#" class="small back" style="display:inline-block;margin-bottom:10px">‹ Find Care</a><div class="head"><div class="k">Find Care</div><h1>Your team</h1></div></div>');$('.back',tp).onclick=function(ev){ev.preventDefault();S.fc='book';render();scrollTo(0,0)};tp.appendChild(teamView());return tp}
   if(S.fc==='help'){S.fw=S.fw||'svc:Pet care';S.fc='book'}
-  var v=el('<div><div class="head"><div class="k">Find Care</div><h1>What do you need?</h1></div><div class="cols"><section class="left"></section><aside class="stack"></aside></div></div>');
+  var v=el('<div><div class="head"><div class="k">Find Care</div><h1>How can we help?</h1></div><div class="cols"><section class="left"></section><aside class="stack"></aside></div></div>');
   $('.left',v).appendChild(findPick());
-  var side=$('aside',v);side.appendChild(comingUp());side.appendChild(coordBox());side.appendChild(teamBox('hosp'));side.appendChild(teamBox('home'));
+  var side=$('aside',v);side.appendChild(comingUp());side.appendChild(teamCard());side.appendChild(reachUs());
   return v}
 // The one scheduler: pick who or what, and the right form follows.
 function findPick(){
@@ -1412,49 +1412,46 @@ function comingUp(){
       $('.cx',r).onclick=function(ev){ev.preventDefault();if(!uiOk('Cancel this?'+(j.status==='Taken'?' '+j.vendor_name+' is told.':''),this,arguments))return;call('cancelJob',{jobId:j.job_id}).then(refresh).catch(alertErr)}}
     ul.appendChild(r)});
   return c}
-function coordBox(){
-  var d=S.data,co=d.me.role==='coordinator',cn=d.coordinator;
-  var c=el('<div class="card"><span class="k">'+(co?'Reach us':'Your coordinator')+'</span>'+(cn&&!co?'<p style="margin:8px 0 0"><b>'+esc(cn.name)+'</b></p>':'')+(BOOT.phone?'<p style="margin:4px 0 0"><a href="tel:'+esc(BOOT.phone)+'" style="font-size:20px;font-family:Fraunces,Georgia,serif">'+esc(BOOT.phone)+'</a></p>':'')+(co?'':'<p style="margin:8px 0 0"><a href="#" class="small msg">Message '+esc(first(cn&&cn.name)||'them')+'</a></p>')+'<p class="small muted" style="margin:8px 0 0">If this is a medical emergency, call 911. In a crisis, call or text 988.</p></div>');
-  var m=$('.msg',c);if(m)m.onclick=function(ev){ev.preventDefault();S.touched=true;S.view='messages';render()};
-  return c}
-// A box that opens its own page: the hospital care team, or help at home.
-function teamBox(kind){
-  var d=S.data,hosp=kind==='hosp',rows=hosp?(d.careTeam||[]).filter(function(m){return m.kind==='provider'}):(d.topics||[]).filter(function(t){return t.kind==='vendor'}).map(function(t){return{name:(t.extra||{}).vendor_name||'Vendor'}}).concat((d.careTeam||[]).filter(function(m){return m.kind==='vendor'})).concat((d.referrals||[]).map(function(r){return{name:r.vendor}}));
-  var names=rows.map(function(m){return m.name}).slice(0,3).join(', ')+(rows.length>3?' and '+(rows.length-3)+' more':'');
-  var c=el('<a href="#" class="card tbox" style="display:block;text-decoration:none;color:inherit"><span class="k" style="display:flex;justify-content:space-between">'+(hosp?'Hospital care team':'Help at home')+'<span aria-hidden="true">›</span></span><p class="small '+(rows.length?'':'muted')+'" style="margin:8px 0 0">'+(rows.length?esc(names):(hosp?'The surgeon, nurses and clinic at the hospital. Add them here.':'Dog walkers, meals, rides — the people who help at home.'))+'</p></a>');
-  c.onclick=function(ev){ev.preventDefault();S.fc=hosp?'team':'vendors';S.tadd=false;S.radd=false;render();scrollTo(0,0)};
+function reachUs(){
+  return el('<div class="card"><span class="k">Reach us</span>'+(BOOT.phone?'<p style="margin:8px 0 0"><a href="tel:'+esc(BOOT.phone)+'" style="font-size:20px;font-family:Fraunces,Georgia,serif">'+esc(BOOT.phone)+'</a></p>':'')+'<p class="small muted" style="margin:6px 0 0">If this is a medical emergency, call 911. In a crisis, call or text 988.</p></div>')}
+// Your team: the coordinator, the care team, and vendors at a glance; tap to open the full list.
+function teamCard(){
+  var d=S.data,cn=d.coordinator,prov=(d.careTeam||[]).filter(function(m){return m.kind==='provider'}).map(function(m){return m.name});
+  var vend=(d.topics||[]).filter(function(t){return t.kind==='vendor'}).map(function(t){return (t.extra||{}).vendor_name||'Vendor'}).concat((d.careTeam||[]).filter(function(m){return m.kind==='vendor'}).map(function(m){return m.name})).concat((d.referrals||[]).map(function(r){return r.vendor}));
+  function names(a,none){return a.length?esc(a.slice(0,3).join(', ')+(a.length>3?' and '+(a.length-3)+' more':'')):'<span class="muted">'+none+'</span>'}
+  var c=el('<a href="#" class="card tbox" style="display:block;text-decoration:none;color:inherit"><span class="k" style="display:flex;justify-content:space-between">Your team<span aria-hidden="true">›</span></span><div class="small" style="margin-top:10px;display:grid;gap:8px"><div><b>Coordinator</b><br>'+names(cn?[cn.name]:[],'Not assigned yet')+'</div><div><b>Care team</b><br>'+names(prov,'None added yet')+'</div><div><b>Vendors</b><br>'+names(vend,'None yet')+'</div></div></a>');
+  c.onclick=function(ev){ev.preventDefault();S.fc='team';S.tadd=false;S.radd=false;render();scrollTo(0,0)};
   return c}
 function dayKey(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
 function fmtHour(h){var d=new Date();d.setHours(h,0,0,0);return d.toLocaleTimeString(undefined,{hour:'numeric'})}
-function teamView(mode){
-  var hosp=mode==='hosp';
+function teamView(){
   var d=S.data,co=d.me.role==='coordinator',cn=d.coordinator,cf=first(cn&&cn.name)||'your coordinator',ST=BOOT.referralStatuses||['Suggested','Contacted','In place','Not needed'];
-  var pg0=el('<div><a href="#" class="small back" style="display:inline-block;margin-bottom:10px">‹ Find Care</a><div class="head"><div class="k">Find Care</div><h1>'+(hosp?'Hospital care team':'Help at home')+'</h1></div><div class="cols"><section class="left"></section><aside class="stack"></aside></div></div>');
-  $('.back',pg0).onclick=function(ev){ev.preventDefault();S.fc='book';render();scrollTo(0,0)};
-  var v=pg0,left=$('.left',v),side=$('aside',v);
+  var v=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>');var left=$('.left',v),side=$('aside',v);
   function card(m,role,sub,extra){return '<div class="mem"><div class="av">'+esc(initial(m.name))+'</div><div class="t"><b>'+esc(m.name)+'</b><div class="small muted">'+esc(role)+(sub?' · '+esc(sub):'')+'</div>'+(m.phone?'<div class="small"><a href="tel:'+esc(m.phone)+'">'+esc(m.phone)+'</a></div>':'')+(m.address?'<div class="small muted">'+esc(m.address)+'</div>':'')+(m.notes?'<div class="small muted">'+esc(m.notes)+'</div>':'')+'</div>'+(extra||'')+'</div>'}
+  if(cn){var cc=el('<div class="group"><span class="k">Your coordinator</span>'+card({name:cn.name,phone:BOOT.phone||''},'Care coordinator',BOOT.appName,co?'':'<span class="memacts"><a href="#" class="small msg">Message</a><a href="#" class="small bk">Schedule</a></span>')+'</div>');
+    var cm=$('.msg',cc);if(cm)cm.onclick=function(ev){ev.preventDefault();S.touched=true;S.view='messages';render()};var cb=$('.bk',cc);if(cb)cb.onclick=function(ev){ev.preventDefault();S.fc='book';render()};left.appendChild(cc)}
   // Care team: doctors, nurses, clinics.
-  var prov=(d.careTeam||[]).filter(function(m){return m.kind==='provider'}),pg=el('<div class="group"><span class="k">The people treating '+(co?'them':'you')+'</span></div>');
-  if(!prov.length)pg.appendChild(el('<div class="small muted" style="padding:8px 0">The surgeon, nurses, and clinic at the hospital — add them so '+(co?'the family has':'you have')+' every name and number in one place.</div>'));
+  var prov=(d.careTeam||[]).filter(function(m){return m.kind==='provider'}),pg=el('<div class="group"><span class="k">Care team</span></div>');
+  if(!prov.length)pg.appendChild(el('<div class="small muted" style="padding:8px 0">Doctors, nurses, clinics — add anyone '+(co?'the family sees':'you see')+'.</div>'));
   prov.forEach(function(m){var r=el(card(m,m.role||'Provider',m.org,'<a href="#" class="small x" style="color:var(--muted)">Remove</a>'));$('.x',r).onclick=function(ev){ev.preventDefault();if(uiOk('Remove '+m.name+'?',this,arguments))call('removeCareTeam',{memberId:m.member_id}).then(refresh).catch(alertErr)};
     // Records, one release per provider: the coordinator ticks; the family sees where it stands.
     var x=m.extra||{},rr=el('<div class="small" style="margin:6px 0 0 52px;display:flex;gap:14px;flex-wrap:wrap">'+[['release','Release signed',x.release_signed],['records','Records received',x.records_received]].map(function(k){return co?'<label style="display:flex;gap:6px;align-items:center;margin:0;font-weight:400"><input type="checkbox" data-k="'+k[0]+'" style="width:auto"'+(k[2]?' checked':'')+'>'+k[1]+(k[2]?' <span class="muted">'+esc(fmtShort(k[2]))+'</span>':'')+'</label>':'<span class="'+(k[2]?'':'muted')+'">'+(k[2]?'✓ '+k[1]:k[1]+': not yet')+'</span>'}).join('')+'</div>');$all('input',rr).forEach(function(i){i.onchange=function(){var q={memberId:m.member_id};q[this.getAttribute('data-k')]=this.checked;call('setProviderRecords',q).then(refresh).catch(alertErr)}});r.appendChild(rr);
     pg.appendChild(r)});
-  if(hosp)left.appendChild(pg);
+  left.appendChild(pg);
   // Vendors: the ones in the app (tap to message or schedule), then any added by hand, then referrals from the coordinator.
-  var vg=el('<div class="group"><span class="k">The people who help</span></div>'),app=(d.topics||[]).filter(function(t){return t.kind==='vendor'}),hand=(d.careTeam||[]).filter(function(m){return m.kind==='vendor'}),refs=(d.referrals||[]).slice().sort(function(a,b){return String(b.updated_at)>String(a.updated_at)?1:-1});
+  var vg=el('<div class="group"><span class="k">Vendors</span></div>'),app=(d.topics||[]).filter(function(t){return t.kind==='vendor'}),hand=(d.careTeam||[]).filter(function(m){return m.kind==='vendor'}),refs=(d.referrals||[]).slice().sort(function(a,b){return String(b.updated_at)>String(a.updated_at)?1:-1});
   if(!app.length&&!hand.length&&!refs.length)vg.appendChild(el('<div class="small muted" style="padding:8px 0">People who help at home — dog walkers, meals, rides. Ask on Get help, or ask '+esc(cf)+'.</div>'));
   app.forEach(function(t){var x=t.extra||{},r=el(card({name:x.vendor_name||'Vendor',phone:x.vendor_phone||''},x.service||'Vendor','',co?'':'<span class="memacts"><a href="#" class="small msg">Message</a><a href="#" class="small bk">Schedule</a></span>'));
     var m1=$('.msg',r);if(m1)m1.onclick=function(ev){ev.preventDefault();openTopic(t)};var b1=$('.bk',r);if(b1)b1.onclick=function(ev){ev.preventDefault();document.body.appendChild(imSchedPop(t))};vg.appendChild(r)});
   hand.forEach(function(m){var r=el(card(m,m.role||'Vendor',m.org,'<a href="#" class="small x" style="color:var(--muted)">Remove</a>'));$('.x',r).onclick=function(ev){ev.preventDefault();if(uiOk('Remove '+m.name+'?',this,arguments))call('removeCareTeam',{memberId:m.member_id}).then(refresh).catch(alertErr)};vg.appendChild(r)});
   refs.forEach(function(rf){var row=el('<div class="mem"><div class="av">'+esc(initial(rf.vendor))+'</div><div class="t"><b>'+esc(rf.vendor)+'</b><div class="small muted">'+esc(rf.service||'Referral')+' · referred by '+esc(co?'you':cf)+'</div>'+(rf.contact?'<div class="small">'+esc(rf.contact)+'</div>':'')+(rf.note?'<div class="small muted">'+esc(rf.note)+'</div>':'')+'</div><select aria-label="Where it stands">'+ST.map(function(s){return'<option'+(s===rf.status?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select></div>');$('select',row).onchange=function(){call('setReferralStatus',{referralId:rf.referral_id,status:this.value}).then(refresh).catch(alertErr)};vg.appendChild(row)});
-  if(!hosp)left.appendChild(vg);
+  left.appendChild(vg);
   // Adding someone by hand, and (for the coordinator) referring a vendor: a button until it is needed.
-  if(S.tadd){var f=el('<form class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="k">Add someone</span><button type="button" class="imlink cx">Cancel</button></div><div class="field" style="margin-top:10px"><label>Name</label><input name="name" required></div><div class="field"><label>Role</label><input name="role" placeholder="'+(hosp?'Surgeon, nurse, clinic':'Dog walker, meals, rides')+'"></div><div class="field"><label>Practice or company</label><input name="org"></div><div class="field"><label>Phone</label><input name="phone" type="tel"></div><div class="field"><label>Address</label><input name="address"></div><div class="field"><label>Notes</label><input name="notes" placeholder="Office hours, who to ask for"></div><div class="field"><label>They are</label><select name="kind"><option value="provider"'+(hosp?' selected':'')+'>Hospital care team</option><option value="vendor"'+(hosp?'':' selected')+'>Help at home</option></select></div><button class="btn block" type="submit">Add</button><p class="err"></p></form>');
+  if(S.tadd){var f=el('<form class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="k">Add someone</span><button type="button" class="imlink cx">Cancel</button></div><div class="field" style="margin-top:10px"><label>Name</label><input name="name" required></div><div class="field"><label>Role</label><input name="role" placeholder="Surgeon, home health nurse, dog walker"></div><div class="field"><label>Practice or company</label><input name="org"></div><div class="field"><label>Phone</label><input name="phone" type="tel"></div><div class="field"><label>Address</label><input name="address"></div><div class="field"><label>Notes</label><input name="notes" placeholder="Office hours, who to ask for"></div><div class="field"><label>They are</label><select name="kind"><option value="provider"'+(co?'':' selected')+'>Part of the care team</option><option value="vendor"'+(co?' selected':'')+'>A vendor</option></select></div><button class="btn block" type="submit">Add</button><p class="err"></p></form>');
     $('.cx',f).onclick=function(){S.tadd=false;render()};
     f.onsubmit=function(ev){ev.preventDefault();call('addCareTeam',formData(f)).then(function(){S.tadd=false;return refresh()}).catch(function(e){$('.err',f).textContent=e.message})};side.appendChild(f)}
   else{var ab=el('<button type="button" class="btn quiet" style="align-self:flex-start">+ Add someone</button>');ab.onclick=function(){S.tadd=true;render()};side.appendChild(ab)}
-  if(co&&!hosp){if(S.radd){var rf2=el('<form class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="k">Refer a vendor</span><button type="button" class="imlink cx">Cancel</button></div><div class="field" style="margin-top:10px"><label>Vendor</label><input name="vendor" required placeholder="Name of the business or person"></div><div class="field"><label>Service</label><input name="service" placeholder="Rides, meals, home health…"></div><div class="field"><label>Contact</label><input name="contact" placeholder="Phone or email"></div><div class="field"><label>Note for the family</label><textarea name="note" style="min-height:64px"></textarea></div><button class="btn block" type="submit">Add referral</button><p class="err"></p></form>');
+  if(co){if(S.radd){var rf2=el('<form class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="k">Refer a vendor</span><button type="button" class="imlink cx">Cancel</button></div><div class="field" style="margin-top:10px"><label>Vendor</label><input name="vendor" required placeholder="Name of the business or person"></div><div class="field"><label>Service</label><input name="service" placeholder="Rides, meals, home health…"></div><div class="field"><label>Contact</label><input name="contact" placeholder="Phone or email"></div><div class="field"><label>Note for the family</label><textarea name="note" style="min-height:64px"></textarea></div><button class="btn block" type="submit">Add referral</button><p class="err"></p></form>');
       $('.cx',rf2).onclick=function(){S.radd=false;render()};
       rf2.onsubmit=function(ev){ev.preventDefault();var b=$('button[type=submit]',rf2);b.disabled=true;call('addReferral',formData(rf2)).then(function(){S.radd=false;return savedRefresh('Referral added.')}).catch(function(e){$('.err',rf2).textContent=e.message;b.disabled=false})};side.appendChild(rf2)}
     else{var rb=el('<button type="button" class="btn quiet" style="align-self:flex-start">+ Refer a vendor</button>');rb.onclick=function(){S.radd=true;render()};side.appendChild(rb)}}
@@ -1466,7 +1463,7 @@ function drawerEl(){
   var d=S.data,co=d.me.role==='coordinator',fam=d.me.role==='family';
   var groups=[
     ['Home',[['home','Home']]],
-    ['Find Care',[['find:book','What do you need?'],['find:team','Hospital care team'],['find:vendors','Help at home']]],
+    ['Find Care',[['find:book','Find Care'],['find:team','Your team']]],
     ['Messaging',[['messages','Messages']]],
     ['My Record',[['record:visits','Visits'],['record:summary','Health summary'],['record:timeline','Timeline'],['record:docs','Documents'],['plan','The Cadence Plan'],['tasks','Tasks'],['updates','Updates'],[co?'intake':'settings:answers',co?'Intake':'My answers']]],
     co?['Sharing',[['circle','The Circle'],['settings:inner','Inner circle']]]:null,
