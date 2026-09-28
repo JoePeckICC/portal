@@ -79,8 +79,12 @@ const link = () => C.PORTAL_URL;
 async function vendorFor(ctx, c) { const vid = ctx.user && ctx.user.extra && ctx.user.extra.vendor_id; const v = vid ? await db.one(`select * from vendors where vendor_id=$1 and active`, [vid], c) : null; must(v, 'Your vendor account is not active. Ask your coordinator.'); return v; }
 // Reach a vendor where they are: a text if we have their cell, and an email as well.
 async function tellVendor(v, subject, text) { if (v.phone) await sms.send(v.phone, text); if (v.email) await mail.notify(v.email, subject, text, '', 'Open the portal'); }
-const jobPublicOpen = (j, cl) => ({ job_id: j.job_id, service: j.service, meet: (j.extra && j.extra.meet) || '', soon: (j.extra && j.extra.soon) || '', until: (j.extra && j.extra.until) || '', from: (j.extra && j.extra.from) || '', starts_at: j.starts_at, city: j.city, details: j.details, status: j.status, first_name: first(cl && cl.patient_first_name) || '', for_me: !!(j.extra && j.extra.for_vendor), family: j.extra && j.extra.for_vendor ? famName(cl && cl.family_name) : undefined });
-const jobPublicMine = (j, cl) => ({ ...jobPublicOpen(j, cl), family: famName(cl && cl.family_name), address: j.address, taken_at: j.taken_at, done_at: j.done_at, topic_id: (j.extra && j.extra.topic_id) || '' });
+// The answers to a request's questions (pickup, drop-off, how many kids…). Private ones — addresses — only show
+// once someone has taken the job, the same rule as the family's address.
+const infoOf = (j, all) => ((j.extra && j.extra.info) || []).filter(x => all || !x.p).map(x => ({ l: x.l, v: x.v }));
+function cleanInfo(a) { return (Array.isArray(a) ? a : []).slice(0, 12).map(x => ({ l: clean(x && x.l, 60).trim(), v: clean(x && x.v, 300).trim(), p: !!(x && x.p) })).filter(x => x.l && x.v); }
+const jobPublicOpen = (j, cl) => ({ job_id: j.job_id, service: j.service, info: infoOf(j, false), loan: !!(j.extra && j.extra.loan), meet: (j.extra && j.extra.meet) || '', soon: (j.extra && j.extra.soon) || '', until: (j.extra && j.extra.until) || '', from: (j.extra && j.extra.from) || '', starts_at: j.starts_at, city: j.city, details: j.details, status: j.status, first_name: first(cl && cl.patient_first_name) || '', for_me: !!(j.extra && j.extra.for_vendor), family: j.extra && j.extra.for_vendor ? famName(cl && cl.family_name) : undefined });
+const jobPublicMine = (j, cl) => ({ ...jobPublicOpen(j, cl), info: infoOf(j, true), family: famName(cl && cl.family_name), address: j.address, taken_at: j.taken_at, done_at: j.done_at, topic_id: (j.extra && j.extra.topic_id) || '' });
 
 // ---- the coordinator: invite a vendor from the list to sign in
 async function inviteVendor(ctx, p, c) {
@@ -108,6 +112,9 @@ async function requestJob(ctx, p, c) {
   const when = soon ? new Date(Date.now() + SOON[soon][1] * 86400e3) : stay ? new Date(localToIso(stay.from + 'T15:00')) : new Date(p.startsAt);
   must(!isNaN(when), 'When do you need it?'); must(soon || stay || when > new Date(Date.now() - 3600e3), 'Pick a time that has not passed');
   const timing = soon ? { soon } : stay ? stay : {};
+  // Medical equipment is borrowed from the coordinator's loan closet, not bought from a vendor: it goes to the coordinator.
+  const loan = !p.topicId && service === 'Medical equipment';
+  const info = cleanInfo(p.info); if (info.length) timing.info = info; if (loan) timing.loan = true;
   const client = await core.clientById(ctx.clientId, c), place = cityOf(client);
   // Asked from a conversation with a vendor: it goes to that vendor alone, and lives in that same thread.
   const vt = p.topicId ? await db.one(`select * from topics where client_id=$1 and topic_id=$2 and kind='vendor'`, [ctx.clientId, String(p.topicId)], c) : null;
@@ -124,6 +131,7 @@ async function requestJob(ctx, p, c) {
     await db.q(`update topics set last_at=now() where topic_id=$1`, [vt.topic_id], c);
     return { job: j, _after: () => tellVendor(direct, 'New request from ' + famName(client.family_name), C.APP_NAME + ' — a family ' + (meet ? 'would like to ' + meetTxt(meet) : 'you have helped asked for you: ' + svc.toLowerCase()) + ', ' + whenTxt0 + '. Accept or pass: ' + link()) };
   }
+  if (loan) return { job: j, _after: async () => { const co = await core.coordinatorFor(client); await core.notifyCo(co, 'message', 'Equipment to borrow — ' + famName(client.family_name), (ctx.user.name || 'The family') + ' would like to borrow: ' + info.map(x => x.l + ': ' + x.v).join('; ') + '.', j.details, 'Open the chart'); } };
   const after = async () => {
     const vs = await db.all(`select v.* from vendors v join users u on lower(u.role)='vendor' and u.active and u.extra->>'vendor_id'=v.vendor_id where v.active and lower(v.city)=lower($1) and v.service=$2 and ($3='' or v.state='' or v.state=$3)`, [city, svc, j.state]);
     const whenTxt = whenLabel({ starts_at: when, extra: timing });
@@ -153,7 +161,7 @@ async function cancelJob(ctx, p, c) {
 // ---- the vendor: take it, finish it
 async function takeJob(ctx, p, c) {
   must(ctx.role === 'vendor', 'Not allowed'); const v = await vendorFor(ctx, c);
-  const r = await db.q(`update jobs set status='Taken', vendor_id=$2, taken_at=now() where job_id=$1 and status='Open' and (extra->>'for_vendor'=$2 or (coalesce(extra->>'for_vendor','')='' and lower(city)=lower($3) and service=$4)) returning *`, [String(p.jobId || ''), v.vendor_id, v.city, v.service], c);
+  const r = await db.q(`update jobs set status='Taken', vendor_id=$2, taken_at=now() where job_id=$1 and status='Open' and (extra->>'for_vendor'=$2 or (coalesce(extra->>'for_vendor','')='' and coalesce(extra->>'loan','')='' and lower(city)=lower($3) and service=$4)) returning *`, [String(p.jobId || ''), v.vendor_id, v.city, v.service], c);
   const j = r.rows ? r.rows[0] : r[0]; must(j, 'Someone else already took this one.');
   const client = await core.clientById(j.client_id, c);
   const whenTxt = whenLabel(j, true);
@@ -190,7 +198,7 @@ async function finishJob(ctx, p, c) {
 async function vendorBoot(ctx, out) {
   const v = await vendorFor(ctx);
   out.vendor = { name: v.name, service: v.service, city: v.city, state: v.state, phone: v.phone, hours: normHours(v.hours) };
-  const open = await db.all(`select j.*, c.patient_first_name, c.family_name from jobs j join clients c on c.client_id=j.client_id where j.status='Open' and j.starts_at > now() - interval '1 hour' and (j.extra->>'for_vendor'=$3 or (coalesce(j.extra->>'for_vendor','')='' and lower(j.city)=lower($1) and j.service=$2)) order by j.starts_at`, [v.city, v.service, v.vendor_id]);
+  const open = await db.all(`select j.*, c.patient_first_name, c.family_name from jobs j join clients c on c.client_id=j.client_id where j.status='Open' and j.starts_at > now() - interval '1 hour' and (j.extra->>'for_vendor'=$3 or (coalesce(j.extra->>'for_vendor','')='' and coalesce(j.extra->>'loan','')='' and lower(j.city)=lower($1) and j.service=$2)) order by j.starts_at`, [v.city, v.service, v.vendor_id]);
   const mine = await db.all(`select j.*, c.patient_first_name, c.family_name from jobs j join clients c on c.client_id=j.client_id where j.vendor_id=$1 and j.status in ('Taken','Done') order by j.starts_at desc limit 60`, [v.vendor_id]);
   out.openJobs = open.map(j => jobPublicOpen(j, j)); out.myJobs = mine.map(j => jobPublicMine(j, j));
   const topics = await db.all(`select * from topics where kind='vendor' and extra->>'vendor_email'=$1 order by created_at`, [ctx.email]);
@@ -204,7 +212,7 @@ async function vendorBoot(ctx, out) {
 // Jobs for a family's own pages (and the coordinator's view of that family).
 async function jobsFor(clientId) {
   const rows = await db.all(`select j.*, v.name as vendor_name, v.phone as vendor_phone from jobs j left join vendors v on v.vendor_id=coalesce(j.vendor_id, j.extra->>'for_vendor') where j.client_id=$1 and j.status <> 'Cancelled' order by j.starts_at desc limit 40`, [clientId]);
-  return rows.map(j => ({ job_id: j.job_id, service: j.service, meet: (j.extra && j.extra.meet) || '', soon: (j.extra && j.extra.soon) || '', until: (j.extra && j.extra.until) || '', from: (j.extra && j.extra.from) || '', address: j.address || '', starts_at: j.starts_at, city: j.city, details: j.details, status: j.status, vendor_name: j.vendor_name || '', direct: !!(j.extra && j.extra.for_vendor), topic_id: (j.extra && j.extra.topic_id) || '', taken_at: j.taken_at, done_at: j.done_at }));
+  return rows.map(j => ({ job_id: j.job_id, service: j.service, info: infoOf(j, true), loan: !!(j.extra && j.extra.loan), meet: (j.extra && j.extra.meet) || '', soon: (j.extra && j.extra.soon) || '', until: (j.extra && j.extra.until) || '', from: (j.extra && j.extra.from) || '', address: j.address || '', starts_at: j.starts_at, city: j.city, details: j.details, status: j.status, vendor_name: j.vendor_name || '', direct: !!(j.extra && j.extra.for_vendor), topic_id: (j.extra && j.extra.topic_id) || '', taken_at: j.taken_at, done_at: j.done_at }));
 }
 // Only handlers are enumerable: everything enumerable here becomes a callable action.
 module.exports = { inviteVendor, requestJob, saveCareNote, cancelJob, takeJob, passJob, finishJob, saveHours, vendorTimes };
