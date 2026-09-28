@@ -7,7 +7,7 @@ const SECURITY = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Frame-Options': 'DENY',
-  'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
+  'Permissions-Policy': 'geolocation=(), microphone=(self), camera=()',   // self: the voice button needs the mic; nothing else may ask
   'Content-Security-Policy': [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline'",

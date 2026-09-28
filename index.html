@@ -54,8 +54,9 @@ input,select,textarea,button{scroll-margin-top:110px}
 .ic-cta--sm:hover{background:var(--gold);color:var(--ink)}
 
 /* welcome band + tiles */
-.hero{position:relative;background:var(--ink);padding:34px 20px 0;text-align:center;overflow:visible;overflow-x:clip}
-.hero .curve{position:absolute;left:-10%;right:-10%;bottom:-120px;height:220px;border-radius:50%;background:var(--ground);pointer-events:none}
+.hero{position:relative;background:var(--ink) linear-gradient(160deg,#1A2736 0%,#1F3144 50%,#28425D 100%);padding:34px 20px 0;text-align:center;overflow:visible;overflow-x:clip}
+.hero .curve{position:absolute;left:0;right:0;bottom:-1px;height:120px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120' preserveAspectRatio='none'%3E%3Cpath fill='%23F6F4EF' d='M0 120 L0 100 L230 100 C560 100 880 40 1210 40 L1440 40 L1440 120 Z'/%3E%3C/svg%3E") bottom/100% 100% no-repeat;pointer-events:none}
+@media (max-width:760px){.hero .curve{height:60px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 60' preserveAspectRatio='none'%3E%3Cpath fill='%23F6F4EF' d='M0 60 L0 52 L90 52 C160 52 240 24 310 24 L400 24 L400 60 Z'/%3E%3C/svg%3E")}}
 .hero .hero-in{position:relative;min-height:96px}
 .hero .hello{font-family:'Fraunces',Georgia,serif;font-size:40px;font-weight:500;letter-spacing:-.01em;color:#fff;margin:8px 0 0}
 .tiles{position:relative;display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin:26px auto 0;transform:translateY(46px);max-width:1400px}
@@ -200,6 +201,25 @@ input,select,textarea,button{scroll-margin-top:110px}
 .top{height:68px;padding:0 48px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:var(--panel)}
 .center{max-width:680px;margin:0 auto;padding:44px 24px 60px}
 
+.hs{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+.hs .hsec h2.k{margin:0 0 4px;font-size:12px;font-family:'Manrope',system-ui,sans-serif}.hs .hnone{margin:10px 0 0}.hs .hmore{display:inline-block;padding:10px 0 0}
+.hs .card{margin:0}
+.medalert{background:#fff;border:1px solid var(--line);border-left:5px solid var(--gold);border-radius:3px;padding:18px 22px}
+.medalert .mar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0 2px}
+.medalert .man{font-family:'Fraunces',Georgia,serif;font-size:24px;line-height:1.2}.medalert .man span{font-family:'Manrope',system-ui,sans-serif;font-size:16px;color:var(--muted)}.medalert .mai{font-size:14px;color:var(--muted);margin-top:2px}
+.medalert .mab{height:52px;min-width:120px;font-size:17px;flex-shrink:0}
+.tm.gone .t,.tm.gone .tt{color:var(--muted)}
+.dgoal .row.done .t{color:var(--muted);text-decoration:line-through}.dgoal .row.done .d{text-decoration:none}
+.hosp{background:#fff;border:1px solid var(--line);border-left:5px solid var(--gold);border-radius:3px;padding:18px 22px}
+.hosp .hn{font-family:'Fraunces',Georgia,serif;font-size:26px;line-height:1.2;margin:6px 0 8px}
+.hosp .ha,.hosp .hp{display:block;font-size:17px;font-weight:600;padding:4px 0}
+.hosp .hw{display:block;width:100%;text-align:left;margin-top:10px;border:0;border-top:1px solid var(--line);background:none;cursor:pointer;padding:12px 0 0;font-size:14px;color:var(--gold-ink);font-weight:700}.hosp .hw:hover{color:var(--ink)}
+.tap{cursor:pointer}.medalert.tap:hover,.hsec.tap:hover .tm{border-color:var(--gold)}
+.sheet{position:fixed;inset:0;z-index:1200;background:var(--ground);display:flex;flex-direction:column}.sheet .mapfsh{background:#fff}.sheet .shb{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}.sheet .shi{max-width:760px;margin:0 auto;padding:20px 16px 40px}.sheet .cmap iframe{height:min(60vh,520px)}
+.hgo{border-left:4px solid var(--gold);padding:4px 0 4px 16px}.hgo .hgt{font-family:'Fraunces',Georgia,serif;font-size:26px;line-height:1.2;margin:4px 0 2px}
+.hck{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px;background:#fff;border:1px solid var(--line);border-radius:3px;text-decoration:none;color:var(--ink)}.hck:hover{border-color:var(--gold)}
+.hero .hsub{position:relative;color:rgba(255,255,255,.82);font-size:15px;font-weight:600;margin-top:4px}
+@media (max-width:760px){.medalert,.hosp{padding:16px}.medalert .man{font-size:21px}.medalert .mar{flex-wrap:wrap}.medalert .mab{width:100%}}
 .brief{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr);gap:36px}
 .bd{display:flex;align-items:baseline;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:6px}
 .bd h2{font-size:32px}
@@ -266,7 +286,7 @@ input,select,textarea,button{scroll-margin-top:110px}
 .days{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px}.days .day{display:flex;flex-direction:column;align-items:center;gap:0;min-width:52px;padding:8px 4px;border:1px solid var(--line);border-radius:3px;background:#fff;text-decoration:none;color:var(--ink);font-size:11px;text-transform:uppercase;letter-spacing:.06em}.days .day b{font-size:18px;font-family:'Fraunces',Georgia,serif;font-weight:500;letter-spacing:0}.days .day.on{border-color:var(--gold);background:var(--tint)}
 .times{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.tslot{padding:8px 12px;border:1px solid var(--line);border-radius:3px;background:#fff;text-decoration:none;color:var(--ink);font-size:14px;font-weight:700}.tslot.on{background:var(--gold);color:#fff;border-color:var(--gold)}
 .ib.menu{margin-left:10px}
-.chipwrap{position:relative}
+.chipwrap{position:relative;flex-shrink:0}.sitebar-in .sitenav,.sitebar-in .whoami{flex-shrink:0}.sitebar-in .lk{min-width:0}.sitebar-in .lk .ib{flex-shrink:0}.sitebar-in .lk .lockup{min-width:0;overflow:hidden}.chip{flex-shrink:0;white-space:nowrap}@media (max-width:420px){.chip .nm,.chip>svg{display:none}.sitenav .chip .av{display:flex}.sitebar-in{gap:10px}}
 .chip{display:flex;align-items:center;gap:8px;background:var(--tint);border:0;border-radius:22px;padding:4px 12px 4px 4px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:var(--ink)}
 .chip .av{width:32px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',Georgia,serif;font-size:14px}
 .chipmenu{display:none;position:absolute;right:0;top:46px;width:250px;background:#fff;border:1px solid #CDD7E0;border-radius:6px;box-shadow:0 12px 32px rgba(28,42,58,.18);padding:6px 0;z-index:60;text-align:left}
@@ -375,9 +395,9 @@ input,select,textarea,button{scroll-margin-top:110px}
 .bnote{font-size:13px;color:var(--muted);line-height:1.5}
 @media (max-width: 1100px){.bld{grid-template-columns:1fr}.bdoc{position:static}.bfr{height:420px;min-height:0}}
 /* chat bubble */
-.bub-wrap{position:fixed;right:22px;bottom:22px;z-index:70;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.bub-wrap{position:fixed;right:22px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:70;display:flex;flex-direction:row;align-items:flex-end;gap:10px}.bub-wrap .bub-btn{order:2;flex-shrink:0;position:relative}.bub-n{position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#7A2E2E;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #fff}.bub-un{display:block;margin:4px 0 6px;font-weight:700;color:var(--gold-ink)}.bub-wrap.open .bub-btn{display:none}.bub-wrap.open .bub-box{width:340px}@media (max-width:420px){.bub-wrap{right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px))}.bub-wrap.open .bub-box{width:calc(100vw - 28px)!important}}
 .bub-btn{width:56px;height:56px;border-radius:28px;border:0;background:var(--gold);box-shadow:0 8px 24px rgba(28,42,58,.25);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}.bub-btn svg{width:26px;height:26px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.bub-box{display:none;width:280px;background:#fff;border:1px solid var(--line);border-radius:10px 10px 2px 10px;padding:12px 14px;box-shadow:0 8px 24px rgba(28,42,58,.16);font-size:13px}.bub-wrap.open .bub-box{display:block}.bub-box textarea{min-height:70px;font-size:14px}
+.bub-box{display:none;width:280px;background:#fff;border:1px solid var(--line);border-radius:10px 10px 10px 10px;padding:12px 14px;box-shadow:0 8px 24px rgba(28,42,58,.16);font-size:13px}.bub-wrap.open .bub-box{display:block}.bub-box textarea{min-height:70px;font-size:14px}
 @media (max-width: 760px){.wsbar{flex-wrap:wrap;height:auto;padding:6px 12px;gap:6px 10px}.wsrole{display:none}.wsright{order:2;gap:8px}.wsnav{order:3;width:100%;gap:16px}.wsnav a{padding:8px 0}.wsfind{width:120px}.wsneeds{display:none}.wsbody{padding:8px}.wr{display:flex!important;flex-wrap:wrap;gap:4px 10px}.wr>div{min-width:0}.wr>div:first-child{flex:1 1 100%}.wh{display:none!important}.ibstats{flex-wrap:wrap}.wsbar .chip .nm{display:none}.wspage .wrap{margin:8px auto!important}}
 @media (max-width: 1100px){.ibx{grid-template-columns:1fr}.wshome{flex-direction:column}.wsnote{width:auto}.wsnp{position:static}.wschart{flex-direction:column}.wsside{width:auto;border-right:0;border-bottom:1px solid var(--line)}.sgrid,.wstwo,.lts{grid-template-columns:1fr}}
 
@@ -738,6 +758,7 @@ function gate(){
 
 function shell(){
   var d=S.data, me=d.me, co=d.me.role==='coordinator';
+  if(S.view!=='home'&&S.sheet){S.sheet=null;document.body.style.overflow=''}if(!S.sheet)$all('body>.sheet').forEach(function(x){x.remove()});
   var unread=d.topics?unreadTotal():0;
   var pending=d.intake&&!isSub(d.intake);
   var drafts=co?(d.plan||[]).filter(isDraft).length:0;
@@ -745,7 +766,7 @@ function shell(){
   var fam=me.role==='family';
   if(!co&&locked)S.view='intake';else if(!co&&pending&&!fam)S.view='intake';
   if(fam&&S.view==='intake'&&!locked)S.view='home';
-  var tabs=co?[['plan','Plan'],['intake','Intake'],['tasks','Tasks'],['messages','Messages'],['find','Find Care'],['meds','Medications'],['updates','Updates'],['circle','Circle']]:((pending||locked)?[['intake','Intake']]:fam?[['plan','Plan'],['tasks','Tasks'],['messages','Messages'],['find','Find Care'],['meds','Medications'],['record','My Record'],['resources','Resources'],['updates','Updates'],['circle','Circle']]:[['plan','Plan'],['tasks','Tasks'],['messages','Messages'],['find','Find Care'],['meds','Medications'],['record','My Record'],['resources','Resources'],['updates','Updates'],['circle','Circle'],['intake','Intake']]);
+  var tabs=co?[['plan','Plan'],['intake','Intake'],['tasks','Tasks'],['messages','Messages'],['find','Find Care'],['meds','Medications'],['updates','Updates'],['circle','Circle']]:((pending||locked)?[['intake','Intake']]:[['plan','Plan'],['tasks','Tasks'],['messages','Messages'],['find','Find Care'],['meds','Medications'],['circle','Inner Circle']]);
   var s=el('<div class="site">'+sitebar(co||!(pending||locked))+'<section class="hero"><div class="curve"></div><div class="hero-in"><div class="k" id="kick"></div><h1 class="hello" id="hello"></h1></div><nav class="tiles" aria-label="Portal"></nav></section><div class="main"><div class="wrap" id="view"></div></div></div>');
   var who=$('.whoami',s);
   if(co){
@@ -758,8 +779,10 @@ function shell(){
   var mb=$('#menub',s);if(mb){mb.onclick=function(ev){ev.preventDefault();S.drawer=true;render()};s.appendChild(drawerEl())}
   var hb=$('#homeb',s);if(hb)hb.onclick=function(ev){ev.preventDefault();S.touched=true;S.view='home';render()};
   var c=d.client,stage=c&&(c.current_stage||BOOT.stages[0]);
-  $('#hello',s).textContent='Welcome, '+(me.goes_by||first(me.name)||'friend')+'.';
+  if(!co&&!locked&&c){var HP=homePhase(c);$('#kick',s).textContent=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});$('#hello',s).textContent=HP.stage;var hsub=HP.dts===null?'':HP.dts===0?'Surgery is today':(HP.ph==='pre'&&HP.dts>0)?HP.dts+' day'+(HP.dts===1?'':'s')+' to surgery':'';if(hsub)$('.hello',s).insertAdjacentHTML('afterend','<div class="hsub">'+esc(hsub)+'</div>');}
+  else{$('#hello',s).textContent='Welcome, '+(me.goes_by||first(me.name)||'friend')+'.';
   $('#kick',s).textContent=!c?'':(co?famName(c.family_name)+(stage?' · '+stage:''):(locked?(isSub(d.intake)?'Your intake is in':'Before we meet'):(stage||'')+(c.surgery_date?' · Surgery '+fmtDate(c.surgery_date):'')));
+  }
   var nav=$('.tiles',s);
   tabs.forEach(function(t){
     var pill=(t[0]==='messages'&&unread)?unread:(t[0]==='intake'&&pending&&!co)?'!':(t[0]==='plan'&&drafts)?drafts:'';
@@ -883,8 +906,131 @@ function erCard(){
   var b=$('button.block',c),f=$('form',c);b.onclick=function(){b.style.display='none';f.style.display='';$('input',f).focus()};$('button.quiet',f).onclick=function(){f.style.display='none';b.style.display=''};
   f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f);busy($('button[type=submit]',f),true,'Paging…');call('erAlert',fd).then(function(){c.innerHTML='<div class="k">Paged</div><p style="margin:8px 0 0">'+esc(cf)+' has been paged and will call '+esc(fd.hospital)+' ahead of you. If it is life-threatening, call <b>911</b> first — do not drive.</p><p class="small muted" style="margin:8px 0 0">Your Health summary (under My Record) is the one page to hand triage.</p>'}).catch(function(e){$('.err',f).textContent=e.message;busy($('button[type=submit]',f),false,'Page '+cf)})};
   return c}
+// Home for the family (2026-09-28, Joe): one clean column, built for today and for the phase they are in.
+// Top: a dose that is due and not ticked. Hospital day: the tracker and the walk with the map. Before surgery: today,
+// the to-dos and the next appointment, no hospital navigation. After: medications, the check-in, who to call.
+var PH_PRE=['Diagnosis','The countdown','The last week'],PH_DAY=['The day of surgery','At the hospital','In surgery'],PH_ICU=['ICU'];
+function homePhase(c){var st=c.current_stage||BOOT.stages[0],sd=toDate(c.surgery_date),t0=new Date();t0.setHours(0,0,0,0);
+  var dts=sd?Math.round((new Date(sd.getFullYear(),sd.getMonth(),sd.getDate())-t0)/864e5):null;
+  var ph=PH_PRE.indexOf(st)>=0?'pre':PH_DAY.indexOf(st)>=0?'day':PH_ICU.indexOf(st)>=0?'icu':'after';
+  if(dts===0&&ph==='pre')ph='day';   // the date wins over a stage nobody has moved yet
+  return {stage:st,ph:ph,dts:dts}}
+function goalsCard(co){
+  var goals=(S.data.goals||[]).filter(function(g){return g.status==='Active'&&!(g.extra&&g.extra.day)});
+  var gc=el('<div class="card"><span class="k">Goals</span><div class="gl"></div><form class="gf" style="margin-top:10px;display:flex;gap:8px"><input name="title" placeholder="Add a goal" aria-label="Add a goal" style="flex-grow:1"><button class="btn quiet" type="submit" style="height:auto">Add</button></form><p class="err small"></p></div>');
+  if(!goals.length)$('.gl',gc).appendChild(el('<div class="small muted" style="padding:8px 0">'+(co?'None yet. Add the ones you agreed on in the first meeting.':'What do you want to be true by surgery day? Write one down.')+'</div>'));
+  goals.forEach(function(g){var r=el('<div class="row" style="padding:10px 0"><button type="button" class="chk rd" aria-pressed="false" aria-label="Goal reached: '+esc(g.title)+'"></button><div class="t" style="font-size:15px">'+esc(g.title)+(g.detail?'<div class="d">'+esc(g.detail)+'</div>':'')+'</div><span class="tag">Goal</span></div>');$('.chk',r).onclick=function(){this.classList.add('on');call('setGoalStatus',{goalId:g.goal_id,status:'Done'}).then(refresh).then(function(){toast('Goal done: '+g.title,function(){call('setGoalStatus',{goalId:g.goal_id,status:'Active'}).then(refresh).catch(alertErr)})}).catch(alertErr)};$('.gl',gc).appendChild(r)});
+  $('.gf',gc).onsubmit=function(ev){ev.preventDefault();var f=this,t=$('input',f).value;if(!t.trim()){$('.err',gc).textContent='Write the goal first.';$('input',f).focus();return}$('button',f).disabled=true;call('addGoal',{title:t}).then(refresh).catch(function(e){$('.err',gc).textContent=e.message;$('button',f).disabled=false})};
+  return gc}
+// The dose that is due now (or within 15 minutes) and not ticked. Light, not heavy: it is a nudge, not an alarm.
+function medAlertEl(){
+  var now=Date.now(),due=medDoses().filter(function(x){return !x.taken&&!(x.row&&x.row.status==='Vomited')&&x.due.getTime()-now<=60*60000});
+  if(!due.length)return null;
+  var a=el('<section class="medalert" role="alert"><div class="k">'+(due.some(function(x){return x.late})?'Medication overdue':due.some(function(x){return x.due.getTime()<=now})?'Medication due now':'Medication due soon')+'</div><div class="mal"></div></section>');
+  due.forEach(function(x){var r=el('<div class="mar"><div><div class="man">'+esc(x.m.name)+(x.dose?' <span>'+esc(x.dose)+'</span>':'')+'</div><div class="mai">'+esc(fmtTime(x.due))+(x.late?' · late':'')+(x.m.instructions?' · '+esc(x.m.instructions):'')+'</div></div><button type="button" class="btn mab">Taken</button></div>');
+    $('button',r).onclick=function(){if(x.m.high&&!uiOk('Give '+x.m.name+(x.dose?' '+x.dose:'')+' now? It is a high-alert medication — check the dose and that nobody else has given it.',this,arguments))return;busy(this,true,'Saving…');call('takeDose',{medId:x.m.med_id,dueAt:x.key}).then(refresh).catch(alertErr)};
+    $('.mal',a).appendChild(r)});
+  a.classList.add('tap');a.onclick=function(ev){if(ev.target.closest('button'))return;S.sheet='meds';render()};
+  return a}
+// Later today: the doses still ahead. The family also sees the ones already given, and by whom — the patient does not.
+function medLaterEl(){
+  var now=Date.now(),fam=S.data.me.role==='family',ds=medDoses().filter(function(x){var soon=x.due.getTime()-now<=60*60000;return x.taken?fam:!soon});
+  if(!ds.length)return null;
+  var c=el('<section class="hsec"><h2 class="k">'+(fam?'Medications today':'Later today')+'</h2><div></div></section>'),l=$('div',c);
+  c.classList.add('tap');c.onclick=function(){S.sheet='meds';render()};
+  ds.forEach(function(x){l.appendChild(el('<div class="tm'+(x.taken?' gone':'')+'"><div class="tt">'+esc(fmtTime(x.due))+'</div><div class="t">'+esc(x.m.name)+(x.dose?' <span class="muted">'+esc(x.dose)+'</span>':'')+(x.taken?'<div class="d">Given'+(x.row&&x.row.by?' by '+esc(first(userName(x.row.by))):'')+(x.row&&x.row.taken_at?' at '+esc(fmtTime(x.row.taken_at)):'')+'</div>':'')+'</div></div>'))});
+  return c}
+// Where to go, first thing, on a hospital day: the name, the address that opens Maps, the number that dials.
+function hospTopEl(w,ap,tmr){
+  var q=encodeURIComponent(w.address||w.name),c=el('<section class="hosp"><div class="k">'+(ap?(tmr?'Tomorrow · ':'')+esc(ap.title)+(hasTime(ap.starts_at)?' · '+esc(fmtTime(toDate(ap.starts_at))):''):'Where you are going')+'</div><div class="hn">'+esc(w.name)+'</div>'+(w.address?'<a class="ha" href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noopener">'+esc(w.address)+'</a>':'')+(w.phone?'<a class="hp" href="tel:'+esc(w.phone.replace(/[^\d+]/g,''))+'">'+esc(w.phone)+'</a>':'')+(ap&&ap.note?'<div class="small muted" style="margin-top:6px">'+esc(ap.note)+'</div>':'')+'<button type="button" class="hw">Parking, the walk in, and the campus map ›</button></section>');
+  $('.hw',c).onclick=function(){S.sheet='hosp';render()};
+  return c}
+function dayGoalEl(){
+  var today=dayKey(new Date()),g=(S.data.goals||[]).filter(function(x){return x.extra&&x.extra.day===today&&x.status!=='Removed'})[0];
+  var c=el('<section class="hsec dgoal"><h2 class="k">Today’s goal</h2></section>');
+  if(g){var on=g.status==='Done',r=el('<div class="row'+(on?' done':'')+'"><button type="button" class="chk rd'+(on?' on':'')+'" aria-pressed="'+on+'" aria-label="Goal reached: '+esc(g.title)+'"></button><div class="t">'+esc(g.title)+(on?'<div class="d">Done. Well done.</div>':'')+'</div></div>');
+    $('.chk',r).onclick=function(){this.classList.toggle('on',!on);call('setGoalStatus',{goalId:g.goal_id,status:on?'Active':'Done'}).then(refresh).catch(alertErr)};c.appendChild(r);return c}
+  var f=el('<form style="display:flex;gap:8px;margin-top:6px"><input name="title" maxlength="200" placeholder="One thing you want to do today" aria-label="Today’s goal" style="flex-grow:1"><button class="btn quiet" type="submit" style="height:auto">Set</button></form>');
+  f.onsubmit=function(ev){ev.preventDefault();var t=$('input',f).value.trim();if(!t){$('input',f).focus();return}$('button',f).disabled=true;call('addGoal',{title:t,day:today}).then(refresh).catch(function(e){$('button',f).disabled=false;alertErr(e)})};
+  c.appendChild(f);return c}
+// A full-screen page over Home, with a clear way back. It is drawn by Home itself, so it stays current after each tick.
+function sheetEl(title,body){
+  var o=el('<div class="sheet" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><div class="mapfsh"><b>'+esc(title)+'</b><button type="button" class="btn sm">Close</button></div><div class="shb"><div class="shi"></div></div></div>');
+  $('.shi',o).appendChild(body);document.body.style.overflow='hidden';
+  function close(){S.sheet=null;document.body.style.overflow='';document.removeEventListener('keydown',k,true);render()}
+  function k(ev){if(!o.isConnected){document.removeEventListener('keydown',k,true);return}if(ev.key==='Escape')close()}
+  o.addEventListener('click',function(ev){if(ev.target.closest('a[href^="#"]')){S.sheet=null;document.body.style.overflow='';o.remove()}},true);
+  $('.mapfsh button',o).onclick=close;document.addEventListener('keydown',k,true);setTimeout(function(){var b=$('.mapfsh button',o);if(b&&!o.contains(document.activeElement))b.focus()},0);
+  return o}
+function hospSheetBody(){
+  var d=S.data,b=el('<div class="stack"></div>'),we=walkEl(d.walk);if(we)b.appendChild(we);
+  var hf=factsEl(d.hospital,d.walk,false);if(hf)b.appendChild(hf);var oe=outsideEl(d.outside);if(oe)b.appendChild(oe);return b}
+function medSheetBody(){var b=el('<div class="stack"></div>');b.appendChild(homeMedsCard());
+  var ms=(S.data.meds||[]).filter(function(m){return m.status==='Accepted'});
+  if(ms.length){var c=el('<div class="card"><span class="k">Everything you take</span><div></div></div>');ms.forEach(function(m){$('div',c).appendChild(el('<div class="row" style="padding:10px 0"><div class="t"><b>'+esc(m.name)+'</b>'+(m.dose?' <span class="muted">'+esc(m.dose)+'</span>':'')+'<div class="d">'+esc(m.frequency==='As needed'?'As needed':String(m.times||'').split(',').filter(function(t){return /^\d{2}:\d{2}$/.test(t.trim())}).map(function(t){return fmtTime(new Date('2000-01-01T'+t.trim()+':00'))}).join(', '))+(m.instructions?' · '+esc(m.instructions):'')+'</div></div></div>'))});b.appendChild(c)}
+  return b}
+// Opening the app with a dose missed: say so once, plainly, with the three things they can do about it.
+function missedDoseDlg(){
+  var S_=S.missSeen=S.missSeen||{},cf=first(S.data.coordinator&&S.data.coordinator.name)||'your coordinator',late=medDoses().filter(function(x){return x.late&&!S_[x.key+x.m.med_id]});
+  if(!late.length||$('.uidlg.miss'))return;var x=late[0];late.forEach(function(y){S_[y.key+y.m.med_id]=1});
+  var o=el('<div class="uidlg miss" role="alertdialog" aria-modal="true" aria-labelledby="mdh"><div class="uibox"><div class="k">Missed dose</div><h2 id="mdh" style="margin:6px 0 4px;font-size:24px">'+esc(x.m.name)+(x.dose?' '+esc(x.dose):'')+'</h2><p class="muted">Due at '+esc(fmtTime(x.due))+' and not ticked off yet.'+(late.length>1?' '+(late.length-1)+' more '+(late.length===2?'is':'are')+' late too.':'')+'</p><div style="display:flex;flex-direction:column;gap:8px"><button type="button" class="btn" data-a="took">I took it</button><button type="button" class="btn quiet" data-a="ask" style="height:46px">I missed this dose</button><button type="button" class="btn quiet" data-a="no" style="height:46px">Not now</button></div><p class="small muted" style="margin:12px 0 0">Do not double up to catch up unless the team says to.</p></div></div>');
+  function close(){o.remove()}
+  $('[data-a=took]',o).onclick=function(){busy(this,true,'Saving…');call('takeDose',{medId:x.m.med_id,dueAt:x.key}).then(function(){close();return refresh()}).catch(alertErr)};
+  $('[data-a=ask]',o).onclick=function(){busy(this,true,'Asking…');call('missedDose',{medId:x.m.med_id,dueAt:x.key}).then(function(){close();go('meds:list');toast(cf+' knows, and will be in touch about what to do next.')}).catch(alertErr)};
+  $('[data-a=no]',o).onclick=close;o.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
+  document.body.appendChild(o);setTimeout(function(){$('[data-a=took]',o).focus()},0)}
+function homeSimple(){
+  var d=S.data,c=d.client,cn=d.coordinator,cf=first(cn&&cn.name)||'your coordinator';
+  if(!S.homeTick)S.homeTick=setInterval(function(){if(S.session&&S.view==='home'&&document.visibilityState==='visible'&&!document.activeElement.matches('input,textarea,select'))refresh()},90000);
+  var P=homePhase(c),now=new Date(),t0=new Date(now.getFullYear(),now.getMonth(),now.getDate()),t1=new Date(t0.getTime()+864e5);
+  var tasks=d.tasks||[],appts=d.appointments||[],plan=(d.plan||[]).filter(function(p){return !isDraft(p)});
+  var v=el('<div class="hs"></div>');
+  function sec(title,body){var s=el('<section class="hsec"><h2 class="k">'+esc(title)+'</h2></section>');s.appendChild(body);v.appendChild(s)}
+  // Every block below earns its place: it shows only when there is something in it for today.
+  // 1. a hospital day: where to go, on top
+  var apToday=appts.filter(function(a){var w=toDate(a.starts_at);return w&&w>=t0&&w<t1});
+  function atHosp(a){var w=d.walk;if(!w)return false;var L=String(a.location||'').toLowerCase(),N=String(w.name||'').toLowerCase();return /surgery|pre-?op|admission/i.test(a.title||'')||(L&&N&&(L.indexOf(N)>=0||N.indexOf(L)>=0||N.split(/\W+/).filter(function(x){return x.length>3}).some(function(x){return L.indexOf(x)>=0})))}
+  var t2=new Date(t1.getTime()+864e5),hospAp=apToday.filter(atHosp)[0],hospTm=hospAp?null:appts.filter(function(a){var w=toDate(a.starts_at);return w&&w>=t1&&w<t2&&atHosp(a)})[0],hospDay=P.ph==='day'||P.ph==='icu';
+  if(d.walk&&(hospAp||hospTm||hospDay))v.appendChild(hospTopEl(d.walk,hospAp||hospTm,!!hospTm));
+  // 2. a dose that is due, then the rest of today's
+  var ma=medAlertEl();if(ma)v.appendChild(ma);
+  // 3. surgery day and ICU: where things are
+  if(hospDay){var tr=trackerFor(d);if(tr)v.appendChild(tr)}
+  // 4. what is theirs to do today
+  var list=el('<div></div>');
+  apToday.filter(function(a){return a!==hospAp}).forEach(function(a){list.appendChild(el('<div class="tm hot"><div class="tt">'+esc(hasTime(a.starts_at)?fmtTime(toDate(a.starts_at)):'Today')+'</div><div class="t">'+esc(a.title)+(a.location||a.note?'<div class="d">'+esc([a.location,a.note].filter(Boolean).join(' · '))+'</div>':'')+'</div></div>'))});
+  (d.meds||[]).forEach(function(m){if(m.status==='Stopped')return;var h=medHoldDate(m);if(h&&h>=t0&&h<t1)list.appendChild(el('<div class="tm hot"><div class="tt">Today</div><div class="t">Last day of '+esc(m.name)+' before surgery — stop after today<div class="d">The team says when it restarts.</div></div></div>'))});
+  plan.forEach(function(p){if(p.status==='Done'||!famPlan(p))return;var w=toDate(p.target_date);if(w&&w>=t0&&w<t1)list.appendChild(el('<div class="tm"><div class="tt">Today</div><div class="t">'+esc(p.item)+(p.detail?'<div class="d">'+esc(p.detail)+'</div>':'')+'</div></div>'))});
+  (d.topics||[]).filter(function(t){return t.status!=='Archived'&&t.kind!=='auto'&&topicUnread(t)>0}).slice(0,2).forEach(function(t){var r=el('<div class="row"><span class="chk" aria-hidden="true"></span><div class="t">'+esc(cf)+' wrote — '+esc(t.title)+'</div><a href="#messages" class="btn sm quiet">Read</a></div>');$('a',r).onclick=function(ev){ev.preventDefault();openTopic(t)};list.appendChild(r)});
+  var mineAll=tasks.filter(function(t){return t.status!=='Done'&&famTask(t)}).sort(function(a,b){var x=toDate(a.due_date),y=toDate(b.due_date);return (x?x.getTime():9e15)-(y?y.getTime():9e15)});
+  mineAll.slice(0,3).forEach(function(t){var w=toDate(t.due_date);var r=el('<div class="row"><button type="button" class="chk" aria-pressed="false" aria-label="Mark done: '+esc(t.title)+'"></button><div class="t">'+esc(t.title)+'<div class="d">'+[w?(w>=t0&&w<t1?'Today':w<t0?'Was due '+fmtDate(w):'By '+fmtDate(w)):'',t.notes].filter(Boolean).map(esc).join(' · ')+'</div></div></div>');$('.chk',r).onclick=function(){this.classList.add('on');call('setTaskStatus',{taskId:t.task_id,status:'Done'}).then(refresh).catch(alertErr)};list.appendChild(r)});
+  if(mineAll.length>3){var mo=el('<a href="#tasks" class="small hmore">'+(mineAll.length-3)+' more on your list ›</a>');mo.onclick=function(ev){ev.preventDefault();go('tasks')};list.appendChild(mo)}
+  if(list.children.length)sec('Today',list);
+  var ml=medLaterEl();if(ml)v.appendChild(ml);
+  // 5. before surgery: the next appointment, only when there is one, and this phase's checklist while it is unfinished
+  if(P.ph==='pre'){
+    var nx=appts.filter(function(a){var w=toDate(a.starts_at);return w&&w>=t1&&a!==hospTm})[0];
+    if(nx)sec('Next appointment',el('<div class="ap"><span><b>'+esc(fmtWhen(nx.starts_at))+'</b> — '+esc(nx.title)+(nx.location?', '+esc(nx.location):'')+'</span></div>'));
+    var cl=(d.checklists||[]).filter(function(l){return l.when===P.stage})[0];
+    if(cl){var dn=cl.items.filter(function(i){return tickOf(cl.id,i.id)}).length;if(dn<cl.items.length){var ca=el('<a href="#plan" class="hck"><span><b>'+esc(cl.title)+'</b><span class="small muted"> · '+dn+' of '+cl.items.length+' done</span></span><span aria-hidden="true">›</span></a>');ca.onclick=function(ev){ev.preventDefault();go('plan')};v.appendChild(ca)}}
+  }
+  // 6. after the hospital: the surgeon's own call-now list, when there is one
+  if(P.ph==='after'){var rf=redFlagsEl(false);if(rf)v.appendChild(rf)}
+  // 7. one goal for the day, theirs to set
+  v.appendChild(dayGoalEl());
+  // 8. one question a day, gone once answered
+  var ck=(d.checkins||[]).filter(function(x){var k=toDate(x.at);return k&&ymdLocal(k)===ymdLocal(new Date())&&x.by===d.me.email})[0];if(!ck)v.appendChild(checkinEl());
+  // 8. something the coordinator picked, until it is opened
+  var hr=d.recommended;if(hr&&!hr.opened_at){var hc=el('<a href="#resources" class="hck"><span><span class="small muted">'+esc(first(userName(hr.by)))+' picked this for you</span><br><b>'+esc(hr.title)+'</b></span><span aria-hidden="true">›</span></a>');hc.onclick=function(ev){ev.preventDefault();S.touched=true;S.view='resources';S.ro=null;if(S.res&&S.res.cid===S.clientId){openRes(hr.resource_id)}else{S.resLoading=true;loadRes().then(function(){S.resLoading=false;openRes(hr.resource_id)}).catch(function(){S.resLoading=false;render()})}};v.appendChild(hc)}
+  $all('body>.sheet').forEach(function(x){x.remove()});
+  if(!S.sheet)setTimeout(missedDoseDlg,300);
+  if(S.sheet==='hosp'&&d.walk)document.body.appendChild(sheetEl(d.walk.name,hospSheetBody()));
+  else if(S.sheet==='meds')document.body.appendChild(sheetEl('Medications today',medSheetBody()));
+  else if(document.body.style.overflow==='hidden'&&!$('.mapfs'))document.body.style.overflow='';
+  return v}
 function homeView(){
   var d=S.data,c=d.client,me=d.me,co=me.role==='coordinator',cn=d.coordinator,cf=first(cn&&cn.name)||'your coordinator';
+  if(!co)return homeSimple();
   if(!co&&!S.homeTick)S.homeTick=setInterval(function(){if(S.session&&S.view==='home'&&document.visibilityState==='visible'&&!document.activeElement.matches('input,textarea,select'))refresh()},90000);
   var stage=c.current_stage||BOOT.stages[0],pf=first(c.patient_first_name)||c.family_name;
   var now=new Date(),t0=new Date(now.getFullYear(),now.getMonth(),now.getDate()),t1=new Date(t0.getTime()+864e5),since=new Date(t0.getTime()-864e5);
@@ -1047,12 +1193,23 @@ function drawerEl(){
     ['Find Care',[['find:book','Schedule an appointment'],['find:team','View care team'],['find:ref','Referrals']]],
     ['Messaging',[['messages','Message Center']]],
     ['My Record',[['record:visits','Visits'],['record:summary','Health summary'],['record:timeline','Timeline'],['record:docs','Documents'],['plan','The Cadence Plan'],['tasks','Tasks'],['updates','Updates'],[co?'intake':'settings:answers',co?'Intake':'My answers']]],
-    ['Sharing',[['circle','The Circle'],['settings:inner','Inner circle']]],
+    co?['Sharing',[['circle','The Circle'],['settings:inner','Inner circle']]]:null,
     ['Pharmacy',[['meds:list','Medications'],['meds:refills','Refills & pharmacy'],['meds:papers','Discharge papers']]],
     ['Billing',[['billing:summary','Billing summary'],['billing:vendors','Vendors'],['billing:assist','Financial assistance'],['billing:method','Payment method']]],
     ['Resources',[['resources','Resources']]],
     ['Settings',[['settings:hub','Your account']]]
-  ];
+  ];groups=groups.filter(Boolean);
+  // For a family the menu follows the phase: what they reach for most comes first. Home first, Settings last, always.
+  if(!co&&d.client){
+    var ph=homePhase(d.client).ph,ORDER={pre:['Home','Messaging','Find Care','My Record','Pharmacy','Resources','Billing','Settings'],day:['Home','Messaging','My Record','Pharmacy','Find Care','Resources','Billing','Settings'],after:['Home','Pharmacy','Messaging','Find Care','My Record','Resources','Billing','Settings']}[ph==='icu'?'day':ph];
+    groups.sort(function(a,b){return ORDER.indexOf(a[0])-ORDER.indexOf(b[0])});
+    var rec=groups.filter(function(x){return x[0]==='My Record'})[0];
+    if(rec)rec[1]=ph==='pre'?[['plan','The Cadence Plan'],['tasks','Tasks'],['record:visits','Visits'],['record:docs','Documents'],['record:summary','Health summary'],['record:timeline','Timeline'],['updates','Updates'],['settings:answers','My answers']]
+      :ph==='after'?[['plan','The Cadence Plan'],['updates','Updates'],['tasks','Tasks'],['record:summary','Health summary'],['record:visits','Visits'],['record:docs','Documents'],['record:timeline','Timeline'],['settings:answers','My answers']]
+      :[['updates','Updates'],['plan','The Cadence Plan'],['tasks','Tasks'],['record:summary','Health summary'],['record:docs','Documents'],['record:visits','Visits'],['record:timeline','Timeline'],['settings:answers','My answers']];
+    var ph2=groups.filter(function(x){return x[0]==='Pharmacy'})[0];
+    if(ph2&&ph!=='pre')ph2[1]=[['meds:list','Medications'],['meds:papers','Discharge papers'],['meds:refills','Refills & pharmacy']];
+  }
   var w=el('<div class="drawer-wrap'+(S.drawer?' open':'')+'"><div class="drawer-bg"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Menu"><div class="dh"><b>'+esc(BOOT.appName)+'</b><a href="#" class="dx" aria-label="Close">×</a></div><div class="dg"></div></aside></div>');
   var g=$('.dg',w);
   groups.forEach(function(gr){var s=el('<div class="dgroup"><div class="k">'+esc(gr[0])+'</div></div>');gr[1].forEach(function(it){var a=el('<a href="#" class="di'+(it[2]?' soon':'')+'">'+esc(it[1])+(it[2]?'<span>coming</span>':'')+'</a>');a.onclick=function(ev){ev.preventDefault();if(it[2])return;S.drawer=false;go(it[0])};s.appendChild(a)});g.appendChild(s)});
@@ -1266,11 +1423,11 @@ function homeMedsCard(){
   if(!doses.length){l.appendChild(el('<div class="small muted" style="padding:8px 0">'+((d.meds||[]).length?(word==='Pending review'?'Your list is waiting on '+esc(cf)+'’s review.':'Nothing scheduled today.'):'Add your medications, or upload a photo of your list and '+esc(cf)+' will build it.')+'</div>'));return c}
   var apap=doses.filter(function(x){return x.m.apap}).map(function(x){return x.m.name}).filter(function(v,i,a){return a.indexOf(v)===i});
   if(apap.length>1)l.appendChild(el('<div class="small" style="padding:6px 0;color:#7A2E2E">Acetaminophen is in more than one of these ('+esc(apap.join(', '))+'). Count every source against the daily limit the team gave.</div>'));
-  doses.forEach(function(x){var vom=x.row&&x.row.status==='Vomited';var r=el('<div class="dose'+(x.taken?' done':'')+(x.late?' late':'')+'"><button type="button" class="chk'+(x.taken?' on':'')+'" aria-label="Taken"></button><div class="t"><b>'+esc(fmtTime(x.due))+'</b> '+esc(x.m.name)+(x.dose?' <span class="muted">'+esc(x.dose)+'</span>':'')+(x.m.high?' <span class="hi" title="High-alert medication: the portal asks before each tick">high-alert</span>':'')+(x.shifted?' <span class="small muted">moved</span>':'')+(x.m.instructions?'<div class="d">'+esc(x.m.instructions)+'</div>':'')+(x.taken&&x.row?'<div class="d">Given'+(x.row.by?' by '+esc(first(userName(x.row.by))):'')+(x.row.taken_at?' at '+esc(fmtTime(x.row.taken_at)):'')+'</div>':'')+(vom?'<div class="d" style="color:#7A2E2E">Vomited after this dose. Do not repeat it unless the team says to.</div>':'')+(x.late&&!co?'<div class="d"><a href="#" class="miss">Missed it? Ask '+esc(cf)+' to check in</a> · <a href="#" class="latex">Taking it now, late</a></div>':'')+(x.taken&&!vom?'<div class="d"><a href="#" class="vom muted">Vomited after taking it</a></div>':'')+'</div></div>');
+  doses.forEach(function(x){var vom=x.row&&x.row.status==='Vomited';var r=el('<div class="dose'+(x.taken?' done':'')+(x.late?' late':'')+'"><button type="button" class="chk'+(x.taken?' on':'')+'" aria-label="Taken"></button><div class="t"><b>'+esc(fmtTime(x.due))+'</b> '+esc(x.m.name)+(x.dose?' <span class="muted">'+esc(x.dose)+'</span>':'')+(x.m.high?' <span class="hi" title="High-alert medication: the portal asks before each tick">high-alert</span>':'')+(x.shifted?' <span class="small muted">moved</span>':'')+(x.m.instructions?'<div class="d">'+esc(x.m.instructions)+'</div>':'')+(x.taken&&x.row?'<div class="d">Given'+(x.row.by?' by '+esc(first(userName(x.row.by))):'')+(x.row.taken_at?' at '+esc(fmtTime(x.row.taken_at)):'')+'</div>':'')+(vom?'<div class="d" style="color:#7A2E2E">Vomited after this dose. Do not repeat it unless the team says to.</div>':'')+(x.late&&!co?'<div class="d"><a href="#" class="miss">I missed this dose</a> · <a href="#" class="latex">Taking it now, late</a></div>':'')+(x.taken&&!vom?'<div class="d"><a href="#" class="vom muted">Vomited after taking it</a></div>':'')+'</div></div>');
     $('.chk',r).onclick=function(){var was=x.taken;if(!was&&x.m.high&&!uiOk('Give '+x.m.name+(x.dose?' '+x.dose:'')+' now? It is a high-alert medication — check the dose and that nobody else has given it.',this,arguments))return;this.classList.toggle('on',!was);call('takeDose',{medId:x.m.med_id,dueAt:x.key,undo:was}).then(refresh).catch(alertErr)};
     var vb=$('.vom',r);if(vb)vb.onclick=function(ev){ev.preventDefault();if(!uiOk('Log that '+x.m.name+' came back up? The portal will not re-dose; it tells you to ask the team.',this,arguments))return;call('doseNote',{medId:x.m.med_id,dueAt:x.key,status:'Vomited'}).then(refresh).catch(alertErr)};
     var lx=$('.latex',r);if(lx)lx.onclick=function(ev){ev.preventDefault();var mins=Math.round((Date.now()-x.due.getTime())/60000),later=doses.filter(function(y){return y.m.med_id===x.m.med_id&&y.due>x.due&&!y.taken}).length;call('takeDose',{medId:x.m.med_id,dueAt:x.key}).then(function(){if(later&&mins>=90)uiConfirmCb('Taken about '+Math.round(mins/60*10)/10+' hours late. Move the rest of today’s '+x.m.name+' doses later by the same amount? (Ask the team if you are not sure — some medicines should not move.)',function(){call('shiftDoses',{medId:x.m.med_id,day:x.key.slice(0,10),minutes:mins,after:x.t}).then(refresh).catch(alertErr)});}).then(refresh).catch(alertErr)};
-    var ms=$('.miss',r);if(ms)ms.onclick=function(ev){ev.preventDefault();ms.textContent='Asking…';call('missedDose',{medId:x.m.med_id,dueAt:x.key}).then(function(){ms.textContent=cf+' has been asked to check in.'}).catch(alertErr)};
+    var ms=$('.miss',r);if(ms)ms.onclick=function(ev){ev.preventDefault();ms.textContent='Asking…';call('missedDose',{medId:x.m.med_id,dueAt:x.key}).then(function(){ms.textContent=cf+' knows, and will be in touch.'}).catch(alertErr)};
     l.appendChild(r)});
   return c;
 }
@@ -1992,12 +2149,11 @@ function recPanel(){
 }
 // ---------------------------------------------------------------- chat bubble (family side)
 function bubbleEl(){
-  var d=S.data,cn=d.coordinator,cf=first(cn&&cn.name)||'your coordinator';
-  var w=el('<div class="bub-wrap'+(S.bub?' open':'')+'"><div class="bub-box"><b>Ask '+esc(cf)+' anything</b><div class="small muted" style="margin:2px 0 8px">Lands in your “Question for '+esc(cf)+'” topic. Replies within a business day. Urgent → call '+esc(BOOT.phone||'')+'.</div><textarea placeholder="Type a question…"></textarea><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px"><button class="btn quiet sm cl" type="button">Close</button><button class="btn sm snd" type="button">Send</button></div><p class="err"></p></div><button class="bub-btn" aria-label="Ask a question" aria-expanded="'+(S.bub?'true':'false')+'"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button></div>');
-  $('.bub-btn',w).onclick=function(){S.bub=!S.bub;w.classList.toggle('open',S.bub);this.setAttribute('aria-expanded',String(S.bub));if(S.bub)$('textarea',w).focus()};
-  $('.cl',w).onclick=function(){S.bub=false;w.classList.remove('open');$('.bub-btn',w).setAttribute('aria-expanded','false');$('.bub-btn',w).focus()};
-  w.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.bub)$('.cl',w).onclick()});
-  $('.snd',w).onclick=function(){var ta=$('textarea',w),b=this;if(!ta.value.trim()){$('.err',w).textContent='Write your question first.';ta.focus();return}$('.err',w).textContent='';b.disabled=true;var t=(d.topics||[]).filter(function(x){return x.kind==='question'&&x.status!=='Archived'})[0];var p=t?Promise.resolve({topic:t}):call('newTopic',{kind:'question'});p.then(function(r){return (S.ib=null,call)('sendMessage',{topicId:r.topic.topic_id,body:ta.value}).then(function(){return r.topic})}).then(function(topic){S.bub=false;return refresh().then(function(){var tt=(S.data.topics||[]).filter(function(x){return String(x.topic_id)===String(topic.topic_id)})[0];if(tt)openTopic(tt)})}).catch(function(e){$('.err',w).textContent=e.message;b.disabled=false})};
+  // The bubble is a door to the Message Center, on every page, with the unread count on it. No box of its own.
+  var d=S.data,cf=first(d.coordinator&&d.coordinator.name)||'your coordinator',un=d.topics?unreadTotal():0;
+  if(S.view==='messages')return document.createComment('bubble');
+  var w=el('<div class="bub-wrap"><a href="#messages" class="bub-btn" aria-label="Messages with '+esc(cf)+(un?', '+un+' unread':'')+'"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'+(un?'<span class="bub-n" aria-hidden="true">'+un+'</span>':'')+'</a></div>');
+  $('a',w).onclick=function(ev){ev.preventDefault();go('messages')};
   return w;
 }
 
@@ -2011,6 +2167,7 @@ function tasksView(){
   block('In motion',open);block('Done',done);
   if(!d.tasks||!d.tasks.length)left.appendChild(el('<p class="muted">Nothing here yet.</p>'));
   if(co){var f=el('<form class="card"><div class="k" style="margin-bottom:12px">Add a task</div><div class="field"><label>Task</label><input name="title" required></div><div class="field"><label>Category</label><select name="category">'+BOOT.categories.map(function(s){return'<option>'+esc(s)+'</option>'}).join('')+'</select></div><div class="field"><label>Due (optional)</label><input name="due_date" type="date"></div><div class="field"><label>Notes the family will see (optional)</label><textarea name="notes" style="min-height:64px"></textarea></div><button class="btn block" type="submit">Add</button><p class="err"></p></form>');f.onsubmit=function(ev){ev.preventDefault();call('addTask',formData(f)).then(refresh).catch(function(e){$('.err',f).textContent=e.message})};$('aside',cols).appendChild(f)}
+  if(!co){var ta=$('aside',cols);ta.appendChild(goalsCard(false));var pe=peerEl(false);if(pe)ta.appendChild(pe)}
   v.appendChild(cols);return v;
 }
 
