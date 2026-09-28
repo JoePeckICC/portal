@@ -167,7 +167,7 @@ const FLAG_RULES = [
   { tier: T1, label: 'Steps at every entrance — check whether a ramp is even possible', id: 'K.1', test: a => ans(a, 'K.1') === 'Yes' && ans(a, 'K.1c') !== 'Right at the step' },
   { tier: T1, label: 'Steps at every entrance and the door opens right at the step — a ramp is unlikely', id: 'K.1', test: a => ans(a, 'K.1') === 'Yes' && ans(a, 'K.1c') === 'Right at the step' },
   { tier: T1, label: 'No bath on the sleeping floor, with a mobility restriction', id: 'K.3e', test: a => ans(a, 'K.3e') === 'None' && MOBILITY(a) },
-  { tier: T1, label: 'No backup caregiver — single point of failure on the whole plan', id: 'C.2c', test: a => !/^Someone$/.test(ans(a, 'C.2c')) },
+  { tier: T1, label: 'No backup caregiver named (someone to step in if the main one cannot) — single point of failure on the whole plan', id: 'C.2c', test: a => !!ans(a, 'C.2c') && !/^Someone$/.test(ans(a, 'C.2c')) },
   { tier: T1, label: "Advance directive exists but the hospital may not have it — fast, easy, ours to fix", id: 'C.3a', test: a => /^(No|Not sure)$/.test(ans(a, 'C.3a')) },
   { tier: T1, label: 'Home or rehab unknown — changes the whole plan', id: 'G.10', test: a => /Not sure|don't know/.test(ans(a, 'G.10')) },
   { tier: T1, label: 'EMERGENCY PATH — surgery already happened or is happening', id: 'G.6', test: a => ans(a, 'G.6') === EMERGENCY_ },
@@ -244,8 +244,30 @@ const FLAG_RULES = [
   { tier: 'Mode', label: 'Quick mode — a delegating family, not a lesser file. The meeting does more work; present assumptions as assumptions.', id: '0.1a', test: a => modeOf(a) === 'quick' && !!ans(a, '0.1a') },
   { tier: 'Mode', label: 'Thorough mode — accuracy over warmth; they will notice if the plan contradicts what they said', id: '0.1a', test: a => modeOf(a) === 'thorough' },
 ];
+// Every place the family wrote something (answers and notes), as { id, text }.
+function writtenBits(all) {
+  const out = [];
+  Object.keys(all || {}).forEach(k => { if (k[0] === '_') return; const v = all[k] || {}; [v.a, v.n].forEach(t => { t = String(t || '').trim(); if (t.length >= 3) out.push({ id: k.split('_')[0], text: t }); }); });
+  return out;
+}
+const snip = (t, i, n = 160) => { const s = Math.max(0, i - 60); return (s ? '…' : '') + t.slice(s, s + n).replace(/\s+/g, ' ').trim() + (s + n < t.length ? '…' : ''); };
+// Allergies the family mentioned anywhere (the form has no allergy question; people write them in notes).
+function allergyMentions(all) {
+  const seen = new Set(), out = [];
+  writtenBits(all).forEach(b => { const m = /allerg|anaphyla|epi-?pen/i.exec(b.text); if (!m || b.text === 'Food allergies' || /^Food allergies(; |$)/.test(b.text)) return; const t = snip(b.text, m.index); if (!seen.has(t)) { seen.add(t); out.push({ id: b.id, text: t }); } });
+  return out.slice(0, 6);
+}
+// Medical questions in their own words: we pass these to the care team, we never answer them.
+const MED_Q = /\b(should (i|we|he|she|they) (stop|start|take|keep|skip)|is (that|it|this) (bad|normal|safe|okay|ok|serious|dangerous)|(might|may|have to|need to) (cancel|postpone)|stop (taking )?(my |his |her |their )?(metformin|insulin|aspirin|blood thinner|eliquis|warfarin|plavix|meds|medication)|how (long|much) (will|should) (it|the) (hurt|bleed|swell)|what (dose|should (i|we) take))/i;
+function medicalQuestions(all) {
+  const out = [];
+  writtenBits(all).forEach(b => { const m = MED_Q.exec(b.text); if (m) out.push({ id: b.id, text: snip(b.text, m.index) }); });
+  return out.slice(0, 6);
+}
 function intakeFlags(all) {
   const answers = visibleAnswers(all), out = [];
+  allergyMentions(all).forEach(x => out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'Allergy mentioned — make sure it is on the chart: “' + x.text + '”', id: x.id }));
+  medicalQuestions(all).forEach(x => out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'Medical question in their words — pass it to the surgeon’s office, do not answer it: “' + x.text + '”', id: x.id }));
   // Filled in on an older version of the form: the answers the current form needs are listed, so nothing is assumed.
   const sent = /Submitted|Updated after submitting/.test(String((all._status && all._status.a) || '')); const miss = sent ? missingRequired(all) : []; if (miss.length) out.push({ tier: 'Tier 1 — could derail the surgery or discharge', label: 'Required answers still blank (the form changed after they filled it in): ' + miss.join(', '), id: miss[0].split(' ')[0] });
   FLAG_RULES.forEach(r => { try { if (r.test(answers)) out.push({ tier: r.tier, label: r.label, id: r.id }); } catch {} });
@@ -339,4 +361,4 @@ async function specFor() {
   try { names = (await db.all(`select name from hospital_walks order by name`)).map(r => r.name); } catch (e) {}
   return intakeSpec(names);
 }
-module.exports = { specFor, intakeSpec, readIntake, writeIntake, visibleQs, visibleAnswers, walk, cond, emergencyPath, missingRequired, phoneOk, initialsProblem, tidyAnswer, ans, has, det, detailId, isPatient, roleOf, modeOf, servicesOf, intakeFlags, seedPlan, DK_, DISCUSS_, RNS_, EMERGENCY_ };
+module.exports = { allergyMentions, medicalQuestions, specFor, intakeSpec, readIntake, writeIntake, visibleQs, visibleAnswers, walk, cond, emergencyPath, missingRequired, phoneOk, initialsProblem, tidyAnswer, ans, has, det, detailId, isPatient, roleOf, modeOf, servicesOf, intakeFlags, seedPlan, DK_, DISCUSS_, RNS_, EMERGENCY_ };

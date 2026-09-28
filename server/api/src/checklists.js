@@ -52,7 +52,7 @@ const CHECKLISTS = [
   { id: 'equip', title: 'Equipment: rent, buy, or insurance', when: 'On the way home', lead: 'What the team ordered, and whether it fits through the door. Ask the case manager which of these insurance covers — most cover a walker and a commode, few cover a shower chair.', items: [
     { id: 'list', text: 'You have the list of equipment the team ordered, in writing', note: 'Walker, commode, shower chair, hospital bed, oxygen — whatever is on it.' },
     { id: 'who', text: 'You know who delivers each item, and when', note: 'The DME company’s name and number. Ask: “before we get home, or after?”' },
-    { id: 'cover', text: 'You asked which items insurance covers and which you pay for', note: 'Covered items usually need a prescription. Get it before discharge.' },
+    { id: 'cover', text: 'You asked which items insurance covers and which you pay for', note: 'Ask whether a prescription is needed for it to be covered.' },
     { id: 'door', text: 'Doorway widths are measured — bathroom and bedroom', note: 'A standard walker needs about 24 inches; a wheelchair about 32. A tape measure tonight saves a return trip.' },
     { id: 'rent', text: 'For anything short-term, you priced renting against buying', note: 'A shower chair is often cheaper to buy. A hospital bed is almost always rented.' },
     { id: 'lend', text: 'You asked the church, the neighbors, or a loan closet before buying', note: 'Many towns have a medical equipment loan closet. Ask the coordinator.' },

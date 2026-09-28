@@ -71,6 +71,7 @@ function coSettings(user) {
   const j = user && user.co_settings && typeof user.co_settings === 'object' ? user.co_settings : {};
   ['blocked', 'digestHour', 'title', 'tagline', 'sigFileId', 'lastDigest'].forEach(k => { if (j[k] !== undefined) s[k] = j[k]; });
   if (j.notify) Object.keys(C.CO_KINDS).forEach(k => { if (j.notify[k]) s.notify[k] = j.notify[k]; });
+  ['er', 'urgent', 'medical'].forEach(k => { if (s.notify[k] === 'off') s.notify[k] = 'instant'; });   // safety alerts are never off
   if (!Array.isArray(s.blocked)) s.blocked = [];
   return s;
 }
