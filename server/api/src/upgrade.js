@@ -281,6 +281,7 @@ const STEPS = [
      created_at timestamptz not null default now(), taken_at timestamptz, done_at timestamptz, extra jsonb not null default '{}'::jsonb)`,
   `create index if not exists jobs_open_idx on jobs(status, city, service)`,
   `create index if not exists jobs_client_idx on jobs(client_id)`,
+  `alter table vendors add column if not exists hours jsonb not null default '{}'::jsonb`,   // a vendor's usual free hours (handlers/jobs.js)
   `do $$ begin if not exists (select 1 from pg_constraint where conname='users_role_chk' and pg_get_constraintdef(oid) like '%vendor%') then
       alter table users drop constraint if exists users_role_chk;
       alter table users add constraint users_role_chk check (role in ('client','family','supporter','coordinator','vendor')); end if; end $$`,
