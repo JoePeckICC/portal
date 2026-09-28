@@ -1342,18 +1342,40 @@ function vendorCalendar(){
     jobs.filter(function(j){return j.status==='Taken'}).forEach(function(j){L.push('BEGIN:VEVENT','UID:'+j.job_id+'@incadencecare.com','DTSTAMP:'+z(Date.now()),'DTSTART:'+z(j.starts_at),'DURATION:PT1H','SUMMARY:'+e(vjWhat(j)+' — '+j.family),'LOCATION:'+e(j.address),'DESCRIPTION:'+e(j.details)+' — details and messages in the portal','END:VEVENT')});
     L.push('END:VCALENDAR');var a=document.createElement('a');a.href='data:text/calendar;charset=utf-8,'+encodeURIComponent(L.join('\r\n'));a.download='incadence-jobs.ics';document.body.appendChild(a);a.click();a.remove()};
   return w}
-// The family's side: ask for help, and see who has it. Same as scheduling a vendor: what for, the day on a
-// calendar, a time from the list, and the usual note already filled in.
-function helpView(){
-  var d=S.data,co=d.me.role==='coordinator',svc=d.jobServices||['Pet care','Meals','Rides','Childcare','Help at home','Other'],jobs=d.jobs||[],cn=d.careNotes||{},t0=new Date();t0.setHours(0,0,0,0);
-  var st=S.hst=S.hst||{m:0,day:null,slot:'',svc:'Pet care',note:null,touched:false};
-  var v=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',v);
-  var card=el('<div class="card"><span class="k">What do you need?</span><div class="hb"></div></div>');left.appendChild(card);
+// ---------------------------------------------------------------- find care (2026-09-28, Joe)
+// One place to set up the care someone needs. "What do you need?" first — a call with the coordinator, a vendor
+// the family already uses, or a kind of help at home — then the same calendar and time list for all of them.
+// Beside it: what is coming up, the coordinator, the hospital care team, and help at home, each a box.
+function findView(){
+  var d=S.data;S.fc=S.fc||'book';
+  if(S.fc==='team'||S.fc==='vendors'||S.fc==='ref')return teamView(S.fc==='team'?'hosp':'home');
+  if(S.fc==='help'){S.fw=S.fw||'svc:Pet care';S.fc='book'}
+  var v=el('<div><div class="head"><div class="k">Find Care</div><h1>What do you need?</h1></div><div class="cols"><section class="left"></section><aside class="stack"></aside></div></div>');
+  $('.left',v).appendChild(findPick());
+  var side=$('aside',v);side.appendChild(comingUp());side.appendChild(coordBox());side.appendChild(teamBox('hosp'));side.appendChild(teamBox('home'));
+  return v}
+// The one scheduler: pick who or what, and the right form follows.
+function findPick(){
+  var d=S.data,co=d.me.role==='coordinator',cf=first(d.coordinator&&d.coordinator.name)||'your coordinator',svc=d.jobServices||['Pet care','Meals','Rides','Childcare','Help at home','Other'];
+  var vts=(d.topics||[]).filter(function(t){return t.kind==='vendor'});
+  if(S.bk&&S.bk.done){var a=S.bk.done,c0=el('<div class="card"><div class="k">Booked</div><h2 style="margin:8px 0">'+esc(a.title)+'</h2><p>'+esc(fmtWhen(a.starts_at))+' · '+esc(a.location)+'</p><p class="muted">'+esc(a.note)+'. An invite is in your email'+(a.link?', with the video link':'')+'.</p><p><button class="btn quiet" type="button">Set up something else</button></p></div>');$('button',c0).onclick=function(){S.bk=null;render()};return c0}
+  var w=S.fw=S.fw||'co';
+  var c=el('<div class="card"><div class="field" style="margin:0"><label>Who or what</label><select class="fw"><optgroup label="Your coordinator"><option value="co">'+(co?'A call with the family':'A call with '+esc(cf))+'</option></optgroup>'+(vts.length?'<optgroup label="People you already use">'+vts.map(function(t){var x=t.extra||{};return'<option value="v:'+esc(t.topic_id)+'">'+esc(x.vendor_name||'Vendor')+' — '+esc(String(x.service||'').toLowerCase())+'</option>'}).join('')+'</optgroup>':'')+'<optgroup label="Help at home">'+svc.map(function(x){return'<option value="svc:'+esc(x)+'">'+esc(x)+'</option>'}).join('')+'</optgroup></select></div><div class="fwb"></div></div>');
+  var sel=$('.fw',c);sel.value=w;if(sel.value!==w){w=S.fw='co';sel.value='co'}
+  sel.onchange=function(){S.fw=this.value;S.vst=null;S.hst=null;render()};
+  var b=$('.fwb',c);
+  if(w==='co')b.appendChild(coSched(function(ap){S.bk={done:ap};refresh()}));
+  else if(w.indexOf('v:')===0){var t=vts.filter(function(x){return x.topic_id===w.slice(2)})[0];b.appendChild(imSchedPop(t,true))}
+  else b.appendChild(helpForm(w.slice(4)));
+  return c}
+// Asking for help at home: the day, a time, and the usual note already filled in. Sent to trusted people nearby.
+function helpForm(service){
+  var d=S.data,co=d.me.role==='coordinator',cn=d.careNotes||{},t0=new Date();t0.setHours(0,0,0,0);
+  if(!S.hst||S.hst.svc!==service)S.hst={m:0,day:null,slot:'',svc:service,note:null,touched:false};
+  var st=S.hst,card=el('<div><div class="hb"></div></div>');
   function keep(){var ta=$('.hb textarea',card);if(ta)st.note=ta.value}
   function draw(){keep();var b=$('.hb',card);b.innerHTML='';
     var saved=cn[st.svc]||'';if(st.note===null||!st.touched)st.note=saved;
-    var ws=el('<div class="field" style="margin-top:10px"><label>Kind of help</label><select name="service">'+svc.map(function(x){return'<option'+(x===st.svc?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></div>');
-    $('select',ws).onchange=function(){keep();st.svc=this.value;st.touched=false;draw()};b.appendChild(ws);
     var base=new Date(t0.getFullYear(),t0.getMonth()+st.m,1),y=base.getFullYear(),mo=base.getMonth();
     var c=el('<div class="vcal" style="border:0;padding:8px 0 0"><div class="vch"><button type="button" class="imico pv" aria-label="Previous month"'+(st.m<=0?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><b>'+esc(base.toLocaleDateString(undefined,{month:'long',year:'numeric'}))+'</b><button type="button" class="imico nx" aria-label="Next month"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button></div><div class="vgrid"></div></div>');
     $('.pv',c).onclick=function(){if(st.m>0){st.m--;draw()}};$('.nx',c).onclick=function(){st.m++;draw()};
@@ -1366,79 +1388,73 @@ function helpView(){
     else{var ts=imTimes(st.day);var tf=el('<div class="field"><label>Time on '+esc(st.day.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}))+'</label><select name="t" required><option value="">Pick a time</option>'+ts.map(function(w){var k=w.toISOString();return'<option value="'+k+'"'+(st.slot===k?' selected':'')+'>'+esc(fmtTime(w))+'</option>'}).join('')+'</select></div>');$('select',tf).onchange=function(){st.slot=this.value};f.appendChild(tf)}
     var nf=el('<div class="field"><label>'+(saved&&!co?'Your usual note (loaded — change it for this time if you need to)':'Anything they should know')+'</label><textarea maxlength="600" style="min-height:70px" placeholder="Biscuit needs two walks. The key is under the mat.">'+esc(st.note||'')+'</textarea>'+(co?'':'<label class="small" style="display:flex;gap:8px;align-items:center;margin-top:6px;font-weight:400"><input type="checkbox" class="keep" style="width:auto"'+(saved?'':' checked')+'> Keep this as my usual note</label>')+'<div class="small muted" style="margin-top:4px">Leave out anything medical — this goes to the vendor.</div></div>');
     $('textarea',nf).oninput=function(){st.touched=true};f.appendChild(nf);
-    f.appendChild(el('<button class="btn" type="submit">Ask for help</button>'));
+    f.appendChild(el('<button class="btn block" type="submit">Ask for help</button>'));
     f.appendChild(el('<p class="small muted" style="margin:10px 0 0">'+(co?'Trusted vendors near the family are told by text; the first to take it has it.':'Trusted people near you are told right away. The first to take it has it, and you will see who.')+'</p>'));
     f.appendChild(el('<p class="err"></p>'));
     f.onsubmit=function(ev){ev.preventDefault();keep();var err=$('.err',f);if(!st.day||!st.slot){err.textContent=st.day?'Pick a time.':'Pick the day.';return}
       var kp=$('.keep',f),note=st.note||'';busy($('button[type=submit]',f),true,'Sending…');
       (kp&&kp.checked&&note.trim()!==saved.trim()?call('saveCareNote',{service:st.svc,text:note}):Promise.resolve()).then(function(){return call('requestJob',{service:st.svc,startsAt:st.slot,details:note})}).then(function(){S.hst=null;toast('Sent. We will show you who takes it.');return refresh()}).catch(function(e){err.textContent=e.message;busy($('button[type=submit]',f),false,'Ask for help')})};
     b.appendChild(f)}
-  draw();
-  var l=el('<div class="card" style="margin-top:14px"><span class="k">Your requests</span><div></div></div>'),lb=$('div',l);
-  if(!jobs.length)lb.appendChild(el('<p class="small muted" style="margin:8px 0 0">Nothing asked for yet.</p>'));
-  jobs.forEach(function(j){var st2=j.status==='Open'?(j.direct&&j.vendor_name?'Waiting for '+esc(j.vendor_name)+' to confirm':'Waiting for someone to take it'):j.status==='Taken'?'<b>'+esc(j.vendor_name)+'</b> has this covered':j.status==='Done'?'Done':j.status==='Declined'?esc(j.vendor_name||'They')+' can’t make it':esc(j.status);
-    var r=el('<div class="row"><div class="t"><b>'+esc(j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':j.service)+'</b> · '+esc(fmtWhen(j.starts_at))+'<div class="d">'+st2+'</div></div><span style="display:flex;gap:10px;align-items:center">'+(j.topic_id?'<a href="#" class="small msg">Message</a>':'')+((j.status==='Open'||j.status==='Taken')?'<a href="#" class="small cx">Cancel</a>':'')+'</span></div>');
-    var mg=$('.msg',r);if(mg)mg.onclick=function(ev){ev.preventDefault();var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t)};
-    var cx=$('.cx',r);if(cx)cx.onclick=function(ev){ev.preventDefault();if(!uiOk('Cancel this request?'+(j.status==='Taken'?' '+j.vendor_name+' is told.':''),this,arguments))return;call('cancelJob',{jobId:j.job_id}).then(refresh).catch(alertErr)};lb.appendChild(r)});
-  left.appendChild(l);
-  return v}
-// ---------------------------------------------------------------- find care: booking, care team, referrals
-function findView(){
-  var d=S.data,co=d.me.role==='coordinator';S.fc=S.fc||'book';
-  var v=el('<div><div class="head"><div class="k">Find Care</div><h1>'+(co?'Time, people and vendors for '+esc(famLower(d.client.family_name))+'.':'Time with '+esc(first(d.coordinator&&d.coordinator.name)||'your coordinator')+', and the people around you.')+'</h1></div><div class="subnav"></div><div id="fcv"></div></div>');
-  var nav=$('.subnav',v);[['book','Schedule'],['help','Get help'],['team','Care team']].forEach(function(t){var a=el('<a href="#" class="'+(S.fc===t[0]?'on':'')+'">'+t[1]+'</a>');a.onclick=function(ev){ev.preventDefault();S.fc=t[0];render()};nav.appendChild(a)});
-  $('#fcv',v).appendChild(({book:bookView,help:helpView,team:teamView,ref:teamView}[S.fc]||bookView)());
-  return v;
-}
+  draw();return card}
+// Coming up: calls with the coordinator and help that is booked or asked for, soonest first.
+function comingUp(){
+  var d=S.data,co=d.me.role==='coordinator',t0=new Date(),items=[];t0.setHours(0,0,0,0);
+  (d.appointments||[]).forEach(function(a){var w=toDate(a.starts_at);if(w&&w>=t0)items.push({w:w,a:a})});
+  (d.jobs||[]).forEach(function(j){var w=toDate(j.starts_at);if(w&&w>=t0&&(j.status==='Open'||j.status==='Taken'))items.push({w:w,j:j})});
+  items.sort(function(x,y){return x.w-y.w});
+  var c=el('<div class="card"><span class="k">Coming up</span><div class="ul"></div></div>'),ul=$('.ul',c);
+  if(!items.length)ul.appendChild(el('<div class="small muted" style="padding:8px 0">Nothing set up yet.</div>'));
+  items.forEach(function(it){var r;
+    if(it.a){var a=it.a;r=el('<div class="ap" style="flex-direction:column;align-items:flex-start;gap:2px"><b>'+esc(fmtWhen(a.starts_at))+'</b><span>'+esc(a.title)+(a.location?' · '+esc(a.location):'')+'</span>'+(a.note?'<span class="small muted">'+esc(a.note)+'</span>':'')+(a.link?'<a href="'+esc(a.link)+'" target="_blank" rel="noopener" class="small">Join the video call</a>':'')+((a.event_id||co)?'<a href="#" class="small x" style="color:var(--muted)">Cancel</a>':'')+'</div>');var x=$('.x',r);if(x)x.onclick=function(ev){ev.preventDefault();if(uiOk('Cancel '+a.title+'?',this,arguments))call('cancelAppointment',{apptId:a.appt_id}).then(refresh).catch(alertErr)}}
+    else{var j=it.j,stx=j.status==='Open'?(j.direct&&j.vendor_name?'Waiting for '+esc(j.vendor_name)+' to confirm':'Waiting for someone to take it'):'<b>'+esc(j.vendor_name)+'</b> has this covered';
+      r=el('<div class="ap" style="flex-direction:column;align-items:flex-start;gap:2px"><b>'+esc(fmtWhen(j.starts_at))+'</b><span>'+esc(j.meet?'Meet first ('+(j.meet==='phone'?'phone call':'in person')+')':j.service)+'</span><span class="small muted">'+stx+'</span><span style="display:flex;gap:12px">'+(j.topic_id?'<a href="#" class="small msg">Message</a>':'')+'<a href="#" class="small cx" style="color:var(--muted)">Cancel</a></span></div>');
+      var mg=$('.msg',r);if(mg)mg.onclick=function(ev){ev.preventDefault();var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t)};
+      $('.cx',r).onclick=function(ev){ev.preventDefault();if(!uiOk('Cancel this?'+(j.status==='Taken'?' '+j.vendor_name+' is told.':''),this,arguments))return;call('cancelJob',{jobId:j.job_id}).then(refresh).catch(alertErr)}}
+    ul.appendChild(r)});
+  return c}
+function coordBox(){
+  var d=S.data,co=d.me.role==='coordinator',cn=d.coordinator;
+  var c=el('<div class="card"><span class="k">'+(co?'Reach us':'Your coordinator')+'</span>'+(cn&&!co?'<p style="margin:8px 0 0"><b>'+esc(cn.name)+'</b></p>':'')+(BOOT.phone?'<p style="margin:4px 0 0"><a href="tel:'+esc(BOOT.phone)+'" style="font-size:20px;font-family:Fraunces,Georgia,serif">'+esc(BOOT.phone)+'</a></p>':'')+(co?'':'<p style="margin:8px 0 0"><a href="#" class="small msg">Message '+esc(first(cn&&cn.name)||'them')+'</a></p>')+'<p class="small muted" style="margin:8px 0 0">If this is a medical emergency, call 911. In a crisis, call or text 988.</p></div>');
+  var m=$('.msg',c);if(m)m.onclick=function(ev){ev.preventDefault();S.touched=true;S.view='messages';render()};
+  return c}
+// A box that opens its own page: the hospital care team, or help at home.
+function teamBox(kind){
+  var d=S.data,hosp=kind==='hosp',rows=hosp?(d.careTeam||[]).filter(function(m){return m.kind==='provider'}):(d.topics||[]).filter(function(t){return t.kind==='vendor'}).map(function(t){return{name:(t.extra||{}).vendor_name||'Vendor'}}).concat((d.careTeam||[]).filter(function(m){return m.kind==='vendor'})).concat((d.referrals||[]).map(function(r){return{name:r.vendor}}));
+  var names=rows.map(function(m){return m.name}).slice(0,3).join(', ')+(rows.length>3?' and '+(rows.length-3)+' more':'');
+  var c=el('<a href="#" class="card tbox" style="display:block;text-decoration:none;color:inherit"><span class="k" style="display:flex;justify-content:space-between">'+(hosp?'Hospital care team':'Help at home')+'<span aria-hidden="true">›</span></span><p class="small '+(rows.length?'':'muted')+'" style="margin:8px 0 0">'+(rows.length?esc(names):(hosp?'The surgeon, nurses and clinic at the hospital. Add them here.':'Dog walkers, meals, rides — the people who help at home.'))+'</p></a>');
+  c.onclick=function(ev){ev.preventDefault();S.fc=hosp?'team':'vendors';S.tadd=false;S.radd=false;render();scrollTo(0,0)};
+  return c}
 function dayKey(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
-function bookView(){
-  var d=S.data,co=d.me.role==='coordinator',cn=d.coordinator,cf=first(cn&&cn.name)||'your coordinator',KINDS=BOOT.bookKinds||{};
-  var B=S.bk=S.bk||{kind:'',mode:'',about:'',phone:(d.client&&d.client.phone)||'',day:'',slot:'',slots:null};
-  var v=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>');var left=$('.left',v);
-  if(B.done){var a=B.done;left.appendChild(el('<div class="card"><div class="k">Booked</div><h2 style="margin:8px 0">'+esc(a.title)+'</h2><p>'+esc(fmtWhen(a.starts_at))+' · '+esc(a.location)+'</p><p class="muted">'+esc(a.note)+'. An invite is in your email'+(a.link?', with the video link':'')+'.</p><p><button class="btn quiet" type="button">Book another</button></p></div>'));$('button',left).onclick=function(){S.bk=null;render()};}
-  else{
-    var card=el('<div class="card"><span class="k">Schedule a time with '+esc(cf)+'</span></div>');
-    card.appendChild(coSched(function(ap){S.bk={done:ap};refresh()}));
-    left.appendChild(card);
-  }
-  var side=$('aside',v),t0=new Date();t0.setHours(0,0,0,0);
-  var up=(d.appointments||[]).filter(function(a){var w=toDate(a.starts_at);return w&&w>=t0});
-  var c=el('<div class="card"><span class="k">Coming up</span><div class="ul"></div></div>');
-  if(!up.length)$('.ul',c).appendChild(el('<div class="small muted" style="padding:8px 0">Nothing booked yet.</div>'));
-  up.forEach(function(a){var r=el('<div class="ap" style="flex-direction:column;align-items:flex-start;gap:2px"><b>'+esc(fmtWhen(a.starts_at))+'</b><span>'+esc(a.title)+(a.location?' · '+esc(a.location):'')+'</span>'+(a.note?'<span class="small muted">'+esc(a.note)+'</span>':'')+(a.link?'<a href="'+esc(a.link)+'" target="_blank" rel="noopener" class="small">Join the video call</a>':'')+((a.event_id||co)?'<a href="#" class="small x" style="color:var(--muted)">Cancel</a>':'')+'</div>');var x=$('.x',r);if(x)x.onclick=function(ev){ev.preventDefault();if(uiOk('Cancel '+a.title+'?',this,arguments))call('cancelAppointment',{apptId:a.appt_id}).then(refresh).catch(alertErr)};$('.ul',c).appendChild(r)});
-  side.appendChild(c);
-  if(BOOT.phone)side.appendChild(el('<div class="card"><span class="k">Reach us</span><p style="margin:8px 0 0"><a href="tel:'+esc(BOOT.phone)+'" style="font-size:20px;font-family:Fraunces,Georgia,serif">'+esc(BOOT.phone)+'</a></p><p class="small muted" style="margin:6px 0 0">If this is a medical emergency, call 911. In a crisis, call or text 988.</p></div>'));
-  return v;
-}
 function fmtHour(h){var d=new Date();d.setHours(h,0,0,0);return d.toLocaleTimeString(undefined,{hour:'numeric'})}
-function teamView(){
+function teamView(mode){
+  var hosp=mode==='hosp';
   var d=S.data,co=d.me.role==='coordinator',cn=d.coordinator,cf=first(cn&&cn.name)||'your coordinator',ST=BOOT.referralStatuses||['Suggested','Contacted','In place','Not needed'];
-  var v=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>');var left=$('.left',v),side=$('aside',v);
+  var pg0=el('<div><a href="#" class="small back" style="display:inline-block;margin-bottom:10px">‹ Find Care</a><div class="head"><div class="k">Find Care</div><h1>'+(hosp?'Hospital care team':'Help at home')+'</h1></div><div class="cols"><section class="left"></section><aside class="stack"></aside></div></div>');
+  $('.back',pg0).onclick=function(ev){ev.preventDefault();S.fc='book';render();scrollTo(0,0)};
+  var v=pg0,left=$('.left',v),side=$('aside',v);
   function card(m,role,sub,extra){return '<div class="mem"><div class="av">'+esc(initial(m.name))+'</div><div class="t"><b>'+esc(m.name)+'</b><div class="small muted">'+esc(role)+(sub?' · '+esc(sub):'')+'</div>'+(m.phone?'<div class="small"><a href="tel:'+esc(m.phone)+'">'+esc(m.phone)+'</a></div>':'')+(m.address?'<div class="small muted">'+esc(m.address)+'</div>':'')+(m.notes?'<div class="small muted">'+esc(m.notes)+'</div>':'')+'</div>'+(extra||'')+'</div>'}
-  if(cn){var cc=el('<div class="group"><span class="k">Your coordinator</span>'+card({name:cn.name,phone:BOOT.phone||''},'Care coordinator',BOOT.appName,co?'':'<span class="memacts"><a href="#" class="small msg">Message</a><a href="#" class="small bk">Schedule</a></span>')+'</div>');
-    var cm=$('.msg',cc);if(cm)cm.onclick=function(ev){ev.preventDefault();S.touched=true;S.view='messages';render()};var cb=$('.bk',cc);if(cb)cb.onclick=function(ev){ev.preventDefault();S.fc='book';render()};left.appendChild(cc)}
   // Care team: doctors, nurses, clinics.
-  var prov=(d.careTeam||[]).filter(function(m){return m.kind==='provider'}),pg=el('<div class="group"><span class="k">Care team</span></div>');
-  if(!prov.length)pg.appendChild(el('<div class="small muted" style="padding:8px 0">Doctors, nurses, clinics — add anyone '+(co?'the family sees':'you see')+'.</div>'));
+  var prov=(d.careTeam||[]).filter(function(m){return m.kind==='provider'}),pg=el('<div class="group"><span class="k">The people treating '+(co?'them':'you')+'</span></div>');
+  if(!prov.length)pg.appendChild(el('<div class="small muted" style="padding:8px 0">The surgeon, nurses, and clinic at the hospital — add them so '+(co?'the family has':'you have')+' every name and number in one place.</div>'));
   prov.forEach(function(m){var r=el(card(m,m.role||'Provider',m.org,'<a href="#" class="small x" style="color:var(--muted)">Remove</a>'));$('.x',r).onclick=function(ev){ev.preventDefault();if(uiOk('Remove '+m.name+'?',this,arguments))call('removeCareTeam',{memberId:m.member_id}).then(refresh).catch(alertErr)};
     // Records, one release per provider: the coordinator ticks; the family sees where it stands.
     var x=m.extra||{},rr=el('<div class="small" style="margin:6px 0 0 52px;display:flex;gap:14px;flex-wrap:wrap">'+[['release','Release signed',x.release_signed],['records','Records received',x.records_received]].map(function(k){return co?'<label style="display:flex;gap:6px;align-items:center;margin:0;font-weight:400"><input type="checkbox" data-k="'+k[0]+'" style="width:auto"'+(k[2]?' checked':'')+'>'+k[1]+(k[2]?' <span class="muted">'+esc(fmtShort(k[2]))+'</span>':'')+'</label>':'<span class="'+(k[2]?'':'muted')+'">'+(k[2]?'✓ '+k[1]:k[1]+': not yet')+'</span>'}).join('')+'</div>');$all('input',rr).forEach(function(i){i.onchange=function(){var q={memberId:m.member_id};q[this.getAttribute('data-k')]=this.checked;call('setProviderRecords',q).then(refresh).catch(alertErr)}});r.appendChild(rr);
     pg.appendChild(r)});
-  left.appendChild(pg);
+  if(hosp)left.appendChild(pg);
   // Vendors: the ones in the app (tap to message or schedule), then any added by hand, then referrals from the coordinator.
-  var vg=el('<div class="group"><span class="k">Vendors</span></div>'),app=(d.topics||[]).filter(function(t){return t.kind==='vendor'}),hand=(d.careTeam||[]).filter(function(m){return m.kind==='vendor'}),refs=(d.referrals||[]).slice().sort(function(a,b){return String(b.updated_at)>String(a.updated_at)?1:-1});
+  var vg=el('<div class="group"><span class="k">The people who help</span></div>'),app=(d.topics||[]).filter(function(t){return t.kind==='vendor'}),hand=(d.careTeam||[]).filter(function(m){return m.kind==='vendor'}),refs=(d.referrals||[]).slice().sort(function(a,b){return String(b.updated_at)>String(a.updated_at)?1:-1});
   if(!app.length&&!hand.length&&!refs.length)vg.appendChild(el('<div class="small muted" style="padding:8px 0">People who help at home — dog walkers, meals, rides. Ask on Get help, or ask '+esc(cf)+'.</div>'));
   app.forEach(function(t){var x=t.extra||{},r=el(card({name:x.vendor_name||'Vendor',phone:x.vendor_phone||''},x.service||'Vendor','',co?'':'<span class="memacts"><a href="#" class="small msg">Message</a><a href="#" class="small bk">Schedule</a></span>'));
     var m1=$('.msg',r);if(m1)m1.onclick=function(ev){ev.preventDefault();openTopic(t)};var b1=$('.bk',r);if(b1)b1.onclick=function(ev){ev.preventDefault();document.body.appendChild(imSchedPop(t))};vg.appendChild(r)});
   hand.forEach(function(m){var r=el(card(m,m.role||'Vendor',m.org,'<a href="#" class="small x" style="color:var(--muted)">Remove</a>'));$('.x',r).onclick=function(ev){ev.preventDefault();if(uiOk('Remove '+m.name+'?',this,arguments))call('removeCareTeam',{memberId:m.member_id}).then(refresh).catch(alertErr)};vg.appendChild(r)});
   refs.forEach(function(rf){var row=el('<div class="mem"><div class="av">'+esc(initial(rf.vendor))+'</div><div class="t"><b>'+esc(rf.vendor)+'</b><div class="small muted">'+esc(rf.service||'Referral')+' · referred by '+esc(co?'you':cf)+'</div>'+(rf.contact?'<div class="small">'+esc(rf.contact)+'</div>':'')+(rf.note?'<div class="small muted">'+esc(rf.note)+'</div>':'')+'</div><select aria-label="Where it stands">'+ST.map(function(s){return'<option'+(s===rf.status?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select></div>');$('select',row).onchange=function(){call('setReferralStatus',{referralId:rf.referral_id,status:this.value}).then(refresh).catch(alertErr)};vg.appendChild(row)});
-  left.appendChild(vg);
+  if(!hosp)left.appendChild(vg);
   // Adding someone by hand, and (for the coordinator) referring a vendor: a button until it is needed.
-  if(S.tadd){var f=el('<form class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="k">Add someone</span><button type="button" class="imlink cx">Cancel</button></div><div class="field" style="margin-top:10px"><label>Name</label><input name="name" required></div><div class="field"><label>Role</label><input name="role" placeholder="Surgeon, home health nurse, dog walker"></div><div class="field"><label>Practice or company</label><input name="org"></div><div class="field"><label>Phone</label><input name="phone" type="tel"></div><div class="field"><label>Address</label><input name="address"></div><div class="field"><label>Notes</label><input name="notes" placeholder="Office hours, who to ask for"></div><div class="field"><label>They are</label><select name="kind"><option value="provider"'+(co?'':' selected')+'>Part of the care team</option><option value="vendor"'+(co?' selected':'')+'>A vendor</option></select></div><button class="btn block" type="submit">Add</button><p class="err"></p></form>');
+  if(S.tadd){var f=el('<form class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="k">Add someone</span><button type="button" class="imlink cx">Cancel</button></div><div class="field" style="margin-top:10px"><label>Name</label><input name="name" required></div><div class="field"><label>Role</label><input name="role" placeholder="'+(hosp?'Surgeon, nurse, clinic':'Dog walker, meals, rides')+'"></div><div class="field"><label>Practice or company</label><input name="org"></div><div class="field"><label>Phone</label><input name="phone" type="tel"></div><div class="field"><label>Address</label><input name="address"></div><div class="field"><label>Notes</label><input name="notes" placeholder="Office hours, who to ask for"></div><div class="field"><label>They are</label><select name="kind"><option value="provider"'+(hosp?' selected':'')+'>Hospital care team</option><option value="vendor"'+(hosp?'':' selected')+'>Help at home</option></select></div><button class="btn block" type="submit">Add</button><p class="err"></p></form>');
     $('.cx',f).onclick=function(){S.tadd=false;render()};
     f.onsubmit=function(ev){ev.preventDefault();call('addCareTeam',formData(f)).then(function(){S.tadd=false;return refresh()}).catch(function(e){$('.err',f).textContent=e.message})};side.appendChild(f)}
   else{var ab=el('<button type="button" class="btn quiet" style="align-self:flex-start">+ Add someone</button>');ab.onclick=function(){S.tadd=true;render()};side.appendChild(ab)}
-  if(co){if(S.radd){var rf2=el('<form class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="k">Refer a vendor</span><button type="button" class="imlink cx">Cancel</button></div><div class="field" style="margin-top:10px"><label>Vendor</label><input name="vendor" required placeholder="Name of the business or person"></div><div class="field"><label>Service</label><input name="service" placeholder="Rides, meals, home health…"></div><div class="field"><label>Contact</label><input name="contact" placeholder="Phone or email"></div><div class="field"><label>Note for the family</label><textarea name="note" style="min-height:64px"></textarea></div><button class="btn block" type="submit">Add referral</button><p class="err"></p></form>');
+  if(co&&!hosp){if(S.radd){var rf2=el('<form class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="k">Refer a vendor</span><button type="button" class="imlink cx">Cancel</button></div><div class="field" style="margin-top:10px"><label>Vendor</label><input name="vendor" required placeholder="Name of the business or person"></div><div class="field"><label>Service</label><input name="service" placeholder="Rides, meals, home health…"></div><div class="field"><label>Contact</label><input name="contact" placeholder="Phone or email"></div><div class="field"><label>Note for the family</label><textarea name="note" style="min-height:64px"></textarea></div><button class="btn block" type="submit">Add referral</button><p class="err"></p></form>');
       $('.cx',rf2).onclick=function(){S.radd=false;render()};
       rf2.onsubmit=function(ev){ev.preventDefault();var b=$('button[type=submit]',rf2);b.disabled=true;call('addReferral',formData(rf2)).then(function(){S.radd=false;return savedRefresh('Referral added.')}).catch(function(e){$('.err',rf2).textContent=e.message;b.disabled=false})};side.appendChild(rf2)}
     else{var rb=el('<button type="button" class="btn quiet" style="align-self:flex-start">+ Refer a vendor</button>');rb.onclick=function(){S.radd=true;render()};side.appendChild(rb)}}
@@ -1450,7 +1466,7 @@ function drawerEl(){
   var d=S.data,co=d.me.role==='coordinator',fam=d.me.role==='family';
   var groups=[
     ['Home',[['home','Home']]],
-    ['Find Care',[['find:book','Schedule'],['find:help','Get help'],['find:team','Care team']]],
+    ['Find Care',[['find:book','What do you need?'],['find:team','Hospital care team'],['find:vendors','Help at home']]],
     ['Messaging',[['messages','Messages']]],
     ['My Record',[['record:visits','Visits'],['record:summary','Health summary'],['record:timeline','Timeline'],['record:docs','Documents'],['plan','The Cadence Plan'],['tasks','Tasks'],['updates','Updates'],[co?'intake':'settings:answers',co?'Intake':'My answers']]],
     co?['Sharing',[['circle','The Circle'],['settings:inner','Inner circle']]]:null,
@@ -2518,13 +2534,13 @@ function imEr(){
 var SVC_DO={'Pet care':'walk your dog','Meals':'bring a meal','Rides':'give you a ride','Childcare':'watch the kids','Help at home':'help at home','Lodging':'help with lodging','Medical equipment':'bring equipment'};
 // Scheduling a vendor: pick a day on the calendar, pick a time from a list, and the family's usual note is already there.
 function imTimes(day){var out=[],now=new Date();for(var h=6;h<=21;h++)[0,30].forEach(function(mm){var w=new Date(day);w.setHours(h,mm,0,0);if(w>now)out.push(w)});return out}
-function imSchedPop(t){
+function imSchedPop(t,inline){
   var d=S.data,x=t.extra||{},nm=first(x.vendor_name||'them'),what=SVC_DO[x.service]||'help',t0=new Date();t0.setHours(0,0,0,0);
   var H=x.vendor_hours||{},off=H.off||[],hrs=!H.open&&(H.week||[]).some(Boolean)?H:null;
-  var saved=(d.careNotes||{})[x.service]||'',st={m:0,day:null,note:saved,ask:'',kind:'job',times:{},slot:''};
-  var o=el('<div class="uidlg schp" role="dialog" aria-modal="true" aria-label="Schedule '+esc(nm)+'"><div class="uibox"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><b style="font-size:18px">Schedule '+esc(nm)+'</b><button type="button" class="imlink cx">Cancel</button></div><div class="schb"></div></div></div>');
+  var saved=(d.careNotes||{})[x.service]||'',st0={tid:t.topic_id,m:0,day:null,note:saved,ask:'',kind:'job',times:{},slot:''},st=inline?(S.vst&&S.vst.tid===t.topic_id?S.vst:(S.vst=st0)):st0;
+  var o=inline?el('<div class="coinl"><div class="schb"></div></div>'):el('<div class="uidlg schp" role="dialog" aria-modal="true" aria-label="Schedule '+esc(nm)+'"><div class="uibox"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><b style="font-size:18px">Schedule '+esc(nm)+'</b><button type="button" class="imlink cx">Cancel</button></div><div class="schb"></div></div></div>');
   function close(){o.remove()}
-  $('.cx',o).onclick=close;o.onclick=function(ev){if(ev.target===o)close()};o.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
+  if(!inline){$('.cx',o).onclick=close;o.onclick=function(ev){if(ev.target===o)close()};o.addEventListener('keydown',function(e){if(e.key==='Escape')close()})}
   // A day is open when it is inside their usual hours and not a day off (or any day, if they have not set hours).
   function dayOpen(dt){if(dt<t0||off.indexOf(dayKey(dt))>=0)return false;if(!hrs)return imTimes(dt).length>0;var w=hrs.week[dt.getDay()];if(!w)return false;if(dt.getTime()===t0.getTime()){var e=new Date(dt);var p=w.to.split(':');e.setHours(+p[0],+p[1]-30,0,0);return e.getTime()>Date.now()+3600e3}return true}
   function load(day){var k=dayKey(day);if(!hrs){st.times[k]=imTimes(day).map(function(w){return w.toISOString()});return}if(st.times[k])return;call('vendorTimes',{topicId:t.topic_id,date:k}).then(function(r){st.times[k]=r.any?imTimes(day).map(function(w){return w.toISOString()}):r.times;draw()}).catch(function(){st.times[k]=[];draw()})}
@@ -2549,10 +2565,11 @@ function imSchedPop(t){
     var f=el('<form class="schf"><div class="field"><label>Time on '+esc(st.day.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}))+'</label>'+tsel+'</div>'+(meet?'<div class="field"><label>Anything you want to ask '+esc(nm)+' (optional)</label><textarea name="n" maxlength="600" style="min-height:64px">'+esc(st.ask)+'</textarea></div>':'<div class="field"><label>'+(saved?'Your usual note (loaded — change it for this visit if you need to)':'Your note for '+esc(nm))+'</label><textarea name="n" maxlength="600" style="min-height:70px" placeholder="Biscuit: two walks, leash by the door, key under the mat">'+esc(st.note)+'</textarea><label class="small" style="display:flex;gap:8px;align-items:center;margin-top:6px;font-weight:400"><input type="checkbox" class="keep" style="width:auto"'+(saved?'':' checked')+'> Keep this as my usual note</label></div>')+'<button class="btn block" type="submit">Send request</button><p class="err"></p></form>');
     var tp=$('select[name=t]',f);if(tp)tp.onchange=function(){st.slot=this.value};
     f.onsubmit=function(ev){ev.preventDefault();keep();if(!st.slot){$('.err',f).textContent='Pick a time.';return}var note=meet?st.ask:st.note,kp=$('.keep',f),keepIt=!meet&&kp&&kp.checked;busy($('button[type=submit]',f),true,'Sending…');
-      (keepIt&&note.trim()!==saved.trim()?call('saveCareNote',{service:x.service,text:note}):Promise.resolve()).then(function(){return call('requestJob',{topicId:t.topic_id,startsAt:st.slot,details:note,meet:meet?st.kind:''})}).then(function(){close();S.minfo=false;toast('Sent to '+nm+'. You will see here when they confirm.');return refresh()}).catch(function(e){$('.err',f).textContent=e.message;busy($('button[type=submit]',f),false,'Send request');if(/not free/.test(e.message)){delete st.times[dayKey(st.day)];st.slot='';load(st.day)}})};
-    b.appendChild(f);setTimeout(function(){f.scrollIntoView({block:'nearest'})},0)
+      (keepIt&&note.trim()!==saved.trim()?call('saveCareNote',{service:x.service,text:note}):Promise.resolve()).then(function(){return call('requestJob',{topicId:t.topic_id,startsAt:st.slot,details:note,meet:meet?st.kind:''})}).then(function(){if(inline){S.vst=null;S.fw=null}else{close();S.minfo=false}toast('Sent to '+nm+'. You will see here when they confirm.');return refresh()}).catch(function(e){$('.err',f).textContent=e.message;busy($('button[type=submit]',f),false,'Send request');if(/not free/.test(e.message)){delete st.times[dayKey(st.day)];st.slot='';load(st.day)}})};
+    b.appendChild(f);if(!inline)setTimeout(function(){f.scrollIntoView({block:'nearest'})},0)
   }
-  draw();setTimeout(function(){var c=$('.cx',o);if(c)c.focus()},0);
+  if(inline&&st.day)load(st.day);
+  draw();if(!inline)setTimeout(function(){var c=$('.cx',o);if(c)c.focus()},0);
   return o}
 // "Mon, Wed 3–7 PM · Sat 9 AM–12 PM": a vendor's usual hours, days with the same hours together.
 function hoursTxt(h){var N=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],g={},order=[];[1,2,3,4,5,6,0].forEach(function(i){var w=h.week[i];if(!w)return;var k=w.from+'-'+w.to;if(!g[k]){g[k]=[];order.push(k)}g[k].push(N[i])});
