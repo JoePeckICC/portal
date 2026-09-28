@@ -565,6 +565,17 @@ html[data-theme=sage]{--gold:#5E8A6A;--panel:#EEF3EC;--tint:#E4ECE4}html[data-th
 .imcomp.urg .impill{border-color:#B4533E}
 .imsend{width:30px;height:30px;border-radius:15px;border:0;background:var(--gold);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}.imsend svg{width:18px;height:18px;fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
 .imcomp .err{width:100%;margin:0}.imsend[hidden]{display:none}
+.vcal{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}.vch{display:flex;justify-content:space-between;align-items:center;padding:0 4px 8px}.vch b{font-size:17px}
+.vgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.vdow{text-align:center;font-size:11px;font-weight:700;color:var(--faint);padding:4px 0}
+.vdc{aspect-ratio:1;border:0;border-radius:10px;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;font-size:15px;cursor:pointer;color:var(--ink)}.vdc:hover{background:#F6F4EF}.vdc.past span{color:var(--faint)}
+.vdc.today span{font-weight:800;color:var(--gold-ink)}.vdc.on{background:var(--ink)}.vdc.on span{color:#fff}.vdc i{display:flex;gap:2px}.vdc em{width:6px;height:6px;border-radius:3px;background:var(--gold)}.vdc em.dn{background:var(--line2)}
+.vcard.done{opacity:.6}
+
+
+.vj{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:26px}.vj .hsec h2.k{margin:0 0 8px;font-size:12px;font-family:'Manrope',system-ui,sans-serif}
+.vcard{background:#fff;border:1px solid var(--line);border-left:5px solid var(--gold);border-radius:3px;padding:16px 18px;margin-bottom:12px}.vcard.mine{border-left-color:var(--ink)}
+.vwhen{font-size:13px;font-weight:700;color:var(--gold-ink);letter-spacing:.04em}.vwhat{font-family:'Fraunces',Georgia,serif;font-size:22px;margin:2px 0 6px}.vcard p{margin:6px 0 10px;font-size:15px}.vacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
 .imer{display:block;width:100%;border:0;border-top:1px solid #ECE8DF;background:none;padding:12px 16px;font:inherit;font-size:13px;font-weight:600;color:#9B2C2C;text-align:center;cursor:pointer}.imer:hover{background:#FBF3F1}
 .imact b{font-size:22px;color:var(--ink)}.imact.em b{color:#9B2C2C}.imerf .field{margin-bottom:10px}
 
@@ -772,7 +783,7 @@ function render(){
   if(!S.data){app.innerHTML='<div class="gate"><div class="muted">Opening your portal&hellip;</div></div>';return}
   if(S.data.error){app.innerHTML='';app.appendChild(el('<div class="gate"><div class="card"><div class="k">'+esc(BOOT.appName)+'</div><h1 style="margin:12px 0">Something is off.</h1><p class="muted">'+esc(S.data.error)+'</p><p><button class="btn quiet" id="so">Sign out</button></p></div></div>'));$('#so').onclick=signOut;return}
   if(S.data.me.role==='supporter'){app.innerHTML='';app.appendChild(supporterPage());return}
-  app.innerHTML='';app.appendChild(S.data.me.role==='coordinator'?coShell():shell());
+  app.innerHTML='';app.appendChild(S.data.me.role==='coordinator'?coShell():S.data.me.role==='vendor'?vendorShell():shell());
   syncRoute();
 }
 // Each screen has its own address (#plan, #record:docs, #co-library), so refresh and Back keep your place.
@@ -1212,12 +1223,70 @@ function homeView(){
   return v;
 }
 
+// ---------------------------------------------------------------- vendors (2026-09-28)
+// A vendor signs in to two things: the jobs near them (take one; first to take it has it) and the families they
+// are helping, in Messages. They see only what a job needs.
+function vendorShell(){
+  var d=S.data,v=d.vendor||{},un=(d.topics||[]).reduce(function(n,t){return n+topicUnread(t)},0),open=(d.openJobs||[]).length;
+  if(['jobs','calendar','messages'].indexOf(S.view)<0)S.view='jobs';
+  document.body.classList.toggle('imopen',S.view==='messages'&&!!S.mopen&&window.innerWidth<=760);
+  var s=el('<div class="site">'+sitebar(false)+'<section class="hero"><div class="curve"></div><div class="hero-in"><div class="k">'+esc(new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}))+'</div><h1 class="hello">'+esc(v.name||'Welcome')+'</h1><div class="hsub">'+esc([v.service,v.city].filter(Boolean).join(' · '))+'</div></div><nav class="tiles vtiles" aria-label="Portal"></nav></section><div class="main"><div class="wrap" id="view"></div></div></div>');
+  var who=$('.whoami',s);if(who){who.innerHTML='';who.appendChild(chipEl())}
+  var nav=$('.tiles',s);[['jobs','Jobs',open],['calendar','Calendar',0],['messages','Messages',un]].forEach(function(t){var a=el('<a href="#'+t[0]+'" class="tile '+(S.view===t[0]?'on':'')+'">'+(t[2]?'<span class="pill">'+t[2]+'</span>':'')+ICON[t[0]==='jobs'?'tasks':t[0]==='calendar'?'find':'messages']+'<span>'+t[1]+'</span></a>');a.onclick=function(ev){ev.preventDefault();S.view=t[0];S.mopen=false;render()};nav.appendChild(a)});
+  $('#view',s).appendChild(S.view==='messages'?messagesView():S.view==='calendar'?vendorCalendar():vendorJobs());
+  return s}
+function vendorJobs(){
+  var d=S.data,v=d.vendor||{},now=new Date(),mine=(d.myJobs||[]),up=mine.filter(function(j){return j.status==='Taken'}),done=mine.filter(function(j){return j.status==='Done'}).slice(0,10);
+  var w=el('<div class="vj"><section class="hsec"><h2 class="k">Open near you</h2><div class="vopen"></div></section><section class="hsec"><h2 class="k">Your jobs</h2><div class="vmine"></div></section></div>');
+  var o=$('.vopen',w);if(!(d.openJobs||[]).length)o.appendChild(el('<p class="muted hnone">Nothing open right now. When a family near you needs '+esc(String(v.service||'help').toLowerCase())+', you get a text.</p>'));
+  (d.openJobs||[]).forEach(function(j){var c=el('<div class="vcard"><div class="vwhen">'+esc(fmtWhen(j.starts_at))+'</div><div class="vwhat">'+esc(j.service)+' · '+esc(j.city)+'</div>'+(j.details?'<p>'+esc(j.details)+'</p>':'')+'<button type="button" class="btn">Take it</button><p class="err"></p></div>');
+    $('button',c).onclick=function(){var b=this;busy(b,true,'Taking…');call('takeJob',{jobId:j.job_id}).then(function(){toast('It is yours. The family can see you have it.');return refresh()}).catch(function(e){$('.err',c).textContent=e.message;busy(b,false,'Take it');refresh()})};o.appendChild(c)});
+  var m=$('.vmine',w);if(!up.length)m.appendChild(el('<p class="muted hnone">Jobs you take show here, with the address and a way to message the family.</p>'));
+  up.forEach(function(j){var q=encodeURIComponent(j.address||'');var c=el('<div class="vcard mine"><div class="vwhen">'+esc(fmtWhen(j.starts_at))+'</div><div class="vwhat">'+esc(j.service)+' for '+esc(j.family)+'</div>'+(j.address?'<a class="small" href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noopener">'+esc(j.address)+'</a>':'')+(j.details?'<p>'+esc(j.details)+'</p>':'')+'<div class="vacts"><button type="button" class="btn quiet msg">Message the family</button><button type="button" class="btn quiet dn">Mark done</button></div></div>');
+    $('.msg',c).onclick=function(){var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t);else{S.view='messages';render()}};
+    $('.dn',c).onclick=function(){if(!uiOk('Mark this job done?',this,arguments))return;call('finishJob',{jobId:j.job_id}).then(function(){toast('Marked done. Thank you.');return refresh()}).catch(alertErr)};m.appendChild(c)});
+  if(done.length){var dd=el('<details class="vdone"><summary class="small muted">Done ('+done.length+')</summary></details>');done.forEach(function(j){dd.appendChild(el('<div class="small" style="padding:6px 0">'+esc(fmtWhen(j.starts_at))+' — '+esc(j.service)+' for '+esc(j.family)+'</div>'))});m.appendChild(dd)}
+  return w}
+// The vendor's calendar: every job they have taken, by day, and the lot as a file their phone's calendar can take.
+function vendorCalendar(){
+  var d=S.data,jobs=(d.myJobs||[]).slice().sort(function(a,b){return String(a.starts_at).localeCompare(String(b.starts_at))}),t0=new Date();t0.setHours(0,0,0,0);
+  var base=new Date(t0.getFullYear(),t0.getMonth()+(S.vcm||0),1),y=base.getFullYear(),mo=base.getMonth(),byDay={};
+  jobs.forEach(function(j){var w=toDate(j.starts_at);if(w)(byDay[dayKey(w)]=byDay[dayKey(w)]||[]).push(j)});
+  if(!S.vcd){var nx=jobs.filter(function(j){return j.status==='Taken'&&toDate(j.starts_at)>=t0})[0];S.vcd=nx?dayKey(toDate(nx.starts_at)):dayKey(t0)}
+  var w=el('<div class="vj"><div class="vcal"><div class="vch"><button type="button" class="imico pv" aria-label="Previous month"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><b>'+esc(base.toLocaleDateString(undefined,{month:'long',year:'numeric'}))+'</b><button type="button" class="imico nx" aria-label="Next month"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button></div><div class="vgrid"></div></div><section class="hsec"><h2 class="k vdayh"></h2><div class="vday"></div></section><button type="button" class="btn quiet ics" style="align-self:flex-start">Add my jobs to my phone’s calendar</button></div>');
+  $('.pv',w).onclick=function(){S.vcm=(S.vcm||0)-1;render()};$('.nx',w).onclick=function(){S.vcm=(S.vcm||0)+1;render()};
+  var g=$('.vgrid',w);['S','M','T','W','T','F','S'].forEach(function(x){g.appendChild(el('<div class="vdow">'+x+'</div>'))});
+  var first=new Date(y,mo,1).getDay(),n=new Date(y,mo+1,0).getDate();for(var i=0;i<first;i++)g.appendChild(el('<div></div>'));
+  for(var dd=1;dd<=n;dd++){(function(dd){var dt=new Date(y,mo,dd),k=dayKey(dt),js=byDay[k]||[],c=el('<button type="button" class="vdc'+(k===dayKey(t0)?' today':'')+(k===S.vcd?' on':'')+(dt<t0?' past':'')+'" aria-label="'+esc(dt.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}))+(js.length?', '+js.length+' job'+(js.length===1?'':'s'):'')+'"><span>'+dd+'</span>'+(js.length?'<i>'+js.map(function(j){return'<em class="'+(j.status==='Done'?'dn':'')+'"></em>'}).join('')+'</i>':'')+'</button>');c.onclick=function(){S.vcd=k;render()};g.appendChild(c)})(dd)}
+  var sel=S.vcd.split('-'),sd=new Date(+sel[0],+sel[1]-1,+sel[2]),list=byDay[S.vcd]||[];
+  $('.vdayh',w).textContent=sd.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+  var dl=$('.vday',w);if(!list.length)dl.appendChild(el('<p class="muted hnone">Nothing on this day.</p>'));
+  list.forEach(function(j){var q=encodeURIComponent(j.address||'');var c=el('<div class="vcard mine'+(j.status==='Done'?' done':'')+'"><div class="vwhen">'+esc(hasTime(j.starts_at)?fmtTime(toDate(j.starts_at)):'')+(j.status==='Done'?' · done':'')+'</div><div class="vwhat">'+esc(j.service)+' for '+esc(j.family)+'</div>'+(j.address?'<a class="small" href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noopener">'+esc(j.address)+'</a>':'')+(j.details?'<p>'+esc(j.details)+'</p>':'')+(j.status==='Taken'?'<div class="vacts"><button type="button" class="btn quiet msg">Message the family</button></div>':'')+'</div>');var mg=$('.msg',c);if(mg)mg.onclick=function(){var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t)};dl.appendChild(c)});
+  $('.ics',w).onclick=function(){var L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//InCadence Care//Jobs//EN','CALSCALE:GREGORIAN'];function z(v){return new Date(v).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'')}function e(x){return String(x||'').replace(/[\\,;]/g,' ').replace(/[\r\n]+/g,' ')}
+    jobs.filter(function(j){return j.status==='Taken'}).forEach(function(j){L.push('BEGIN:VEVENT','UID:'+j.job_id+'@incadencecare.com','DTSTAMP:'+z(Date.now()),'DTSTART:'+z(j.starts_at),'DURATION:PT1H','SUMMARY:'+e(j.service+' — '+j.family),'LOCATION:'+e(j.address),'DESCRIPTION:'+e(j.details)+' — details and messages in the portal','END:VEVENT')});
+    L.push('END:VCALENDAR');var a=document.createElement('a');a.href='data:text/calendar;charset=utf-8,'+encodeURIComponent(L.join('\r\n'));a.download='incadence-jobs.ics';document.body.appendChild(a);a.click();a.remove()};
+  return w}
+// The family's side: ask for help, and see who has it.
+function helpView(){
+  var d=S.data,co=d.me.role==='coordinator',svc=d.jobServices||['Pet care','Meals','Rides','Childcare','Help at home','Other'],jobs=d.jobs||[];
+  var v=el('<div class="cols"><section class="left"></section><aside class="stack"></aside></div>'),left=$('.left',v);
+  var f=el('<form class="card"><span class="k">What do you need?</span><div class="two" style="margin-top:10px"><div class="field"><label>Kind of help</label><select name="service">'+svc.map(function(x){return'<option'+(x==='Pet care'?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></div><div class="field"><label>When</label><input name="startsAt" type="datetime-local" required></div></div><div class="field"><label>Anything they should know</label><textarea name="details" maxlength="600" style="min-height:70px" placeholder="Biscuit needs two walks. The key is under the mat."></textarea><div class="small muted">Leave out anything medical — this goes to the vendor.</div></div><button class="btn" type="submit">Ask for help</button><p class="small muted" style="margin:10px 0 0">'+(co?'Trusted vendors near the family are told by text; the first to take it has it.':'Trusted people near you are told right away. The first to take it has it, and you will see who.')+'</p><p class="err"></p></form>');
+  f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f);var w=new Date(fd.startsAt);if(isNaN(w)){$('.err',f).textContent='Pick a day and time.';return}busy($('button',f),true,'Sending…');call('requestJob',{service:fd.service,startsAt:w.toISOString(),details:fd.details}).then(function(){toast('Sent. We will show you who takes it.');return refresh()}).catch(function(e){$('.err',f).textContent=e.message;busy($('button',f),false,'Ask for help')})};
+  left.appendChild(f);
+  var l=el('<div class="card" style="margin-top:14px"><span class="k">Your requests</span><div></div></div>'),lb=$('div',l);
+  if(!jobs.length)lb.appendChild(el('<p class="small muted" style="margin:8px 0 0">Nothing asked for yet.</p>'));
+  jobs.forEach(function(j){var st=j.status==='Open'?'Waiting for someone to take it':j.status==='Taken'?'<b>'+esc(j.vendor_name)+'</b> has this covered':j.status==='Done'?'Done':esc(j.status);
+    var r=el('<div class="row"><div class="t"><b>'+esc(j.service)+'</b> · '+esc(fmtWhen(j.starts_at))+'<div class="d">'+st+'</div></div><span style="display:flex;gap:10px;align-items:center">'+(j.topic_id?'<a href="#" class="small msg">Message</a>':'')+((j.status==='Open'||j.status==='Taken')?'<a href="#" class="small cx">Cancel</a>':'')+'</span></div>');
+    var mg=$('.msg',r);if(mg)mg.onclick=function(ev){ev.preventDefault();var t=(d.topics||[]).filter(function(x){return x.topic_id===j.topic_id})[0];if(t)openTopic(t)};
+    var cx=$('.cx',r);if(cx)cx.onclick=function(ev){ev.preventDefault();if(!uiOk('Cancel this request?'+(j.status==='Taken'?' '+j.vendor_name+' is told.':''),this,arguments))return;call('cancelJob',{jobId:j.job_id}).then(refresh).catch(alertErr)};lb.appendChild(r)});
+  left.appendChild(l);
+  return v}
 // ---------------------------------------------------------------- find care: booking, care team, referrals
 function findView(){
   var d=S.data,co=d.me.role==='coordinator';S.fc=S.fc||'book';
   var v=el('<div><div class="head"><div class="k">Find Care</div><h1>'+(co?'Time, people and vendors for '+esc(famLower(d.client.family_name))+'.':'Time with '+esc(first(d.coordinator&&d.coordinator.name)||'your coordinator')+', and the people around you.')+'</h1></div><div class="subnav"></div><div id="fcv"></div></div>');
-  var nav=$('.subnav',v);[['book','Schedule an appointment'],['team','View care team'],['ref','Referrals']].forEach(function(t){var a=el('<a href="#" class="'+(S.fc===t[0]?'on':'')+'">'+t[1]+'</a>');a.onclick=function(ev){ev.preventDefault();S.fc=t[0];render()};nav.appendChild(a)});
-  $('#fcv',v).appendChild({book:bookView,team:teamView,ref:refView}[S.fc]());
+  var nav=$('.subnav',v);[['book','Schedule an appointment'],['help','Get help'],['team','View care team'],['ref','Referrals']].forEach(function(t){var a=el('<a href="#" class="'+(S.fc===t[0]?'on':'')+'">'+t[1]+'</a>');a.onclick=function(ev){ev.preventDefault();S.fc=t[0];render()};nav.appendChild(a)});
+  $('#fcv',v).appendChild(({book:bookView,help:helpView,team:teamView,ref:refView}[S.fc]||bookView)());
   return v;
 }
 function dayKey(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
@@ -1290,7 +1359,7 @@ function drawerEl(){
   var d=S.data,co=d.me.role==='coordinator',fam=d.me.role==='family';
   var groups=[
     ['Home',[['home','Home']]],
-    ['Find Care',[['find:book','Schedule an appointment'],['find:team','View care team'],['find:ref','Referrals']]],
+    ['Find Care',[['find:book','Schedule an appointment'],['find:help','Get help'],['find:team','View care team'],['find:ref','Referrals']]],
     ['Messaging',[['messages','Messages']]],
     ['My Record',[['record:visits','Visits'],['record:summary','Health summary'],['record:timeline','Timeline'],['record:docs','Documents'],['plan','The Cadence Plan'],['tasks','Tasks'],['updates','Updates'],[co?'intake':'settings:answers',co?'Intake':'My answers']]],
     co?['Sharing',[['circle','The Circle'],['settings:inner','Inner circle']]]:null,
@@ -1327,7 +1396,7 @@ function go(target){setView(target);render();window.scrollTo(0,0)}
 function chipEl(){
   var d=S.data,me=d.me,co=me.role==='coordinator';
   var name=me.goes_by||first(me.name)||'You',col=me.avatar||'#1C2A3A';
-  var items=co?[['settings:co','Settings'],['settings:perso','Personalization'],['settings:security','Password & security'],['out','Log out']]:[['settings:hub','Settings'],['settings:info','Personal information'],['settings:answers','My answers'],['settings:inner','Inner circle'],['settings:notify','Notifications'],['settings:perso','Personalization'],['billing:summary','Billing'],['settings:security','Password & security'],['out','Log out']];
+  var items=me.role==='vendor'?[['out','Log out']]:co?[['settings:co','Settings'],['settings:perso','Personalization'],['settings:security','Password & security'],['out','Log out']]:[['settings:hub','Settings'],['settings:info','Personal information'],['settings:answers','My answers'],['settings:inner','Inner circle'],['settings:notify','Notifications'],['settings:perso','Personalization'],['billing:summary','Billing'],['settings:security','Password & security'],['out','Log out']];
   var w=el('<span class="chipwrap"><button type="button" class="chip"><span class="av" style="background:'+esc(col)+';color:#fff">'+esc(initial(name))+'</span><span class="nm">'+esc(name)+'</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button><div class="chipmenu'+(S.chip?' open':'')+'"><div class="cm-h"><b>'+esc(me.name)+'</b><div class="small muted">'+esc(me.email)+'</div></div></div></span>');
   var m=$('.chipmenu',w);
   items.forEach(function(it){var a=el('<a href="#">'+esc(it[1])+'</a>');a.onclick=function(ev){ev.preventDefault();S.chip=false;if(it[0]==='out'){signOut();return}if(co&&/^settings/.test(it[0])){setView(it[0]);S.cv='mine';render();window.scrollTo(0,0);return}go(it[0])};m.appendChild(a)});
@@ -2283,6 +2352,7 @@ function imPeople(){var d=S.data,me=d.me,c=d.client||{},cn=d.coordinator,out=[];
   return out}
 function imWho(t){var d=S.data,co=d.me.role==='coordinator',cn=d.coordinator;
   if(t.kind==='auto')return{name:BOOT.appName,sub:'Reminders and confirmations',sys:true};
+  if(t.kind==='vendor'){var x=t.extra||{};if(d.me.role==='vendor')return{name:x.family_name||'A family',sub:x.service||''};return{name:x.vendor_name||'Vendor',sub:(x.service||'')+' · vendor'+(co?' · '+famName(d.client.family_name):''),fam:true}}
   if(co)return{name:famName(d.client.family_name),sub:t.title};
   if(t.kind==='family'){var ps=imPeople(),to=((t.extra&&t.extra.to)||[]).filter(function(e){return e!==String(d.me.email).toLowerCase()}),ns=to.map(function(e){var p=ps.filter(function(x){return x.key===e})[0];return p||{name:e,sub:''}});return{name:ns.map(function(x){return first(x.name)===x.name?x.name:(ns.length>1?first(x.name):x.name)}).join(', ')||t.title,sub:ns.length===1?ns[0].sub:'Just your circle',fam:true}}
   return{name:cn?cn.name:'Your coordinator',sub:'Care coordinator',co:true}}
@@ -2300,15 +2370,15 @@ function messagesView(){
   function inList(t){return del?imHidden(t):!imHidden(t)}
   var cur=topics.filter(function(t){return t.topic_id===S.topic&&!imHidden(t)})[0];
   if(!cur&&!S.mnew&&!del&&window.innerWidth>760){cur=topics.filter(inList)[0];if(cur)S.topic=cur.topic_id}
-  if(cur&&topicUnread(cur)&&(S.mopen||window.innerWidth>760)){var rcol=co?'read_by_coordinator':'read_by_client';topicMsgs(cur.topic_id).forEach(function(m){m[rcol]=true});call('readTopic',{topicId:cur.topic_id}).catch(function(){})}   // what is on screen counts as read
-  var v=el('<div class="imz'+(S.mopen||S.mnew?' open':'')+'"><aside class="iml"><div class="imbar"><button type="button" class="imlink ed">'+(S.msel?'Done':del?'‹ Messages':'Edit')+'</button>'+(del?'':'<button type="button" class="imico cmp" aria-label="New message"><svg viewBox="0 0 24 24"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></button>')+'</div><h1 class="imt">'+(del?'Archived':'Messages')+'</h1>'+(del?'<p class="imnone" style="padding-top:0">Tap Restore to bring a conversation back.</p>':'<div class="imsr"><input type="search" placeholder="Search" aria-label="Search messages"></div>')+'<div class="imlist" role="list"></div>'+(co||del?'':'<button type="button" class="imer">On your way to the emergency department?</button>')+'</aside><section class="imr"></section></div>');
+  if(cur&&topicUnread(cur)&&(S.mopen||window.innerWidth>760)){if(me.role==='vendor'){cur.extra=cur.extra||{};cur.extra.vendor_read_at=new Date().toISOString()}var rcol=co?'read_by_coordinator':'read_by_client';topicMsgs(cur.topic_id).forEach(function(m){m[rcol]=true});call('readTopic',{topicId:cur.topic_id}).catch(function(){})}   // what is on screen counts as read
+  var v=el('<div class="imz'+(S.mopen||S.mnew?' open':'')+'"><aside class="iml"><div class="imbar"><button type="button" class="imlink ed">'+(S.msel?'Done':del?'‹ Messages':'Edit')+'</button>'+(del||me.role==='vendor'?'':'<button type="button" class="imico cmp" aria-label="New message"><svg viewBox="0 0 24 24"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></button>')+'</div><h1 class="imt">'+(del?'Archived':'Messages')+'</h1>'+(del?'<p class="imnone" style="padding-top:0">Tap Restore to bring a conversation back.</p>':'<div class="imsr"><input type="search" placeholder="Search" aria-label="Search messages"></div>')+'<div class="imlist" role="list"></div>'+(co||del||me.role==='vendor'?'':'<button type="button" class="imer">On your way to the emergency department?</button>')+'</aside><section class="imr"></section></div>');
   $('.ed',v).onclick=function(ev){ev.stopPropagation();if(S.msel){S.msel=null;render();return}if(del){S.mf='active';render();return}var old=$('.immenu');if(old){old.remove();return}var m=el('<div class="immenu" role="menu"><button type="button" data-a="sel">Select conversations<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></button><button type="button" data-a="del">Archived<svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM3 4h18v3H3zM10 12h4"/></svg></button></div>');$('[data-a=sel]',m).onclick=function(){S.msel={};render()};$('[data-a=del]',m).onclick=function(){S.mf='deleted';S.topic=null;S.mopen=false;render()};$('.iml',v).appendChild(m);setTimeout(function(){document.addEventListener('click',function h(){m.remove();document.removeEventListener('click',h)})},0)};
   var erb=$('.imer',v);if(erb)erb.onclick=function(){S.mer=true;render()};
   var cmp=$('.cmp',v);if(cmp)cmp.onclick=function(){S.mnew={to:co?['family']:[]};S.mopen=false;S.msel=null;render()};
   var si=$('.imsr input',v);if(si){si.value=S.mq||'';si.oninput=function(){S.mq=this.value;drawList()}}
   function drawList(){var l=$('.imlist',v);l.innerHTML='';var rows=topics.filter(inList);
     if(S.mq&&!del){var q=S.mq.toLowerCase();rows=rows.filter(function(t){return imWho(t).name.toLowerCase().indexOf(q)>=0||topicMsgs(t.topic_id).some(function(m){return String(m.body).toLowerCase().indexOf(q)>=0})})}
-    if(!rows.length){l.appendChild(el('<p class="imnone">'+(S.mq?'Nothing matches “'+esc(S.mq)+'”.':del?'Nothing archived.':'No messages yet. Tap the pencil to write to '+esc(cf)+'.')+'</p>'));return}
+    if(!rows.length){l.appendChild(el('<p class="imnone">'+(S.mq?'Nothing matches “'+esc(S.mq)+'”.':del?'Nothing archived.':(me.role==='vendor'?'Messages from the families you help show up here.':'No messages yet. Tap the pencil to write to '+esc(cf)+'.'))+'</p>'));return}
     rows.forEach(function(t){var last=imLast(t),un=topicUnread(t),sel=S.msel,w=imWho(t);
       var wrap=el('<div class="imsw'+(S.swiped===t.topic_id?' open':'')+'" role="listitem">'+(del||sel?'':'<button type="button" class="imdel" aria-label="Archive conversation with '+esc(w.name)+'">Archive</button>')+'<a href="#" class="imrow'+(t.topic_id===S.topic&&!S.mnew&&window.innerWidth>760?' on':'')+'">'+(sel?'<span class="imck'+(sel[t.topic_id]?' on':'')+'" aria-hidden="true"></span>':'')+'<span class="imdot'+(un?' un':'')+'" aria-label="'+(un?un+' unread':'')+'"></span>'+imAv(w)+'<span class="imtx"><span class="imr1"><b>'+esc(w.name)+'</b><span class="imwhen">'+esc(imWhen(last?last.sent_at:t.created_at))+(sel||del?'':'<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>')+'</span></span><span class="impv">'+esc(last?(last.attachments&&last.attachments.length&&!String(last.body||'').trim()?'Attachment: '+last.attachments.length+(last.attachments.length===1?' file':' files'):last.body):'No messages yet')+'</span></span>'+(del&&!sel?'<button type="button" class="imlink rec">Restore</button>':'')+'</a></div>');
       var r=$('.imrow',wrap),db_=$('.imdel',wrap),rec=$('.rec',wrap),moved=false;
@@ -2335,7 +2405,7 @@ function messagesView(){
   right.appendChild(hdr);
   if(co){var ps=profileStrip();ps.classList.add('mstrip');right.appendChild(ps)}
   right.appendChild(imThread(ms,co,me));
-  if(!w.sys)right.appendChild(imComposer(function(body,urgent,files){return call('sendMessage',{topicId:cur.topic_id,body:body,urgent:urgent,files:files})},!co&&!w.fam,cf));
+  if(!w.sys)right.appendChild(imComposer(function(body,urgent,files){return call('sendMessage',{topicId:cur.topic_id,body:body,urgent:urgent,files:files})},!co&&!w.fam&&me.role!=='vendor',cf,me.role==='vendor'));
   if(S.minfo)v.appendChild(imInfo(cur,ms,w,co,d,cf));
   setTimeout(function(){var b=$('.imbody',v);if(b)b.scrollTop=b.scrollHeight},0);
   return v;
@@ -2363,13 +2433,14 @@ function imThread(ms,co,me){
   if(lastMine&&ms[ms.length-1]===lastMine)body.appendChild(el('<div class="imrcpt">'+(isTrueV(lastMine[co?'read_by_client':'read_by_coordinator'])?'Read':'Delivered')+'</div>'));
   return body}
 // The typing bar: a round + for a photo, a PDF, or marking it urgent; a pill to write in; the arrow appears once there is something to send.
-function imComposer(send,canUrgent,cf){
+function imComposer(send,canUrgent,cf,noFiles){
   var f=el('<form class="imcomp"><div class="implus"><button type="button" class="imround" aria-label="Add a photo or file'+(canUrgent?', or mark urgent':'')+'"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button><div class="impm" hidden><label class="impi"><input type="file" multiple accept="image/*,application/pdf" hidden>'+ICON.clip+'<span>Photo or PDF</span></label>'+(canUrgent?'<label class="impi"><input type="checkbox" class="urgc"><span>Mark urgent — '+esc(cf)+' is emailed right away</span></label>':'')+'</div></div><div class="impill"><div class="chips"></div><textarea rows="1" placeholder="Message" aria-label="Message"></textarea><button type="submit" class="imsend" aria-label="Send" hidden><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div><p class="err"></p></form>');
   var picked=[],ta=$('textarea',f),sb=$('.imsend',f),chips=$('.chips',f),pm=$('.impm',f),uc=$('.urgc',f);
   function upd(){sb.hidden=!(ta.value.trim()||picked.length)}
   function drawChips(){chips.innerHTML='';picked.forEach(function(x,i){var c=el('<span class="chip2">'+esc(x.name)+' <a href="#" aria-label="Remove">×</a></span>');$('a',c).onclick=function(ev){ev.preventDefault();picked.splice(i,1);drawChips()};chips.appendChild(c)});upd()}
   $('.imround',f).onclick=function(){pm.hidden=!pm.hidden};
   var fin=$('input[type=file]',f);fin.onchange=function(){pm.hidden=true;Array.prototype.slice.call(fin.files).slice(0,4-picked.length).forEach(function(file){if(file.size>10*1024*1024){$('.err',f).textContent='Keep each file under 10 MB.';return}var rdr=new FileReader();rdr.onload=function(){picked.push({name:file.name,type:file.type,b64:String(rdr.result).split(',')[1]});drawChips()};rdr.readAsDataURL(file)});fin.value=''};
+  if(noFiles)$('.implus',f).remove();
   if(uc)uc.onchange=function(){f.classList.toggle('urg',uc.checked);ta.placeholder=uc.checked?'Urgent message':'Message';pm.hidden=true};
   ta.oninput=function(){this.style.height='auto';this.style.height=Math.min(140,this.scrollHeight)+'px';upd()};
   ta.onkeydown=function(ev){if(ev.key==='Enter'&&!ev.shiftKey&&window.innerWidth>760){ev.preventDefault();f.requestSubmit?f.requestSubmit():f.onsubmit(ev)}};
@@ -2435,9 +2506,9 @@ function isTrueV(v){return v===true||String(v).toUpperCase()==='TRUE'}
 function topicMsgs(id){return (S.data.messages||[]).filter(function(m){return String(m.topic_id)===String(id)})}
 // Who wrote a message, for the coordinator: the patient, an inner-circle member by name, or their email.
 function senderName(em){var d=S.data,c=d.client||{},e=String(em||'').toLowerCase();if(e&&e===String(d.patientUser||'').toLowerCase())return [c.patient_first_name,c.patient_last_name].filter(Boolean).join(' ')||'The patient';var u=(d.inner||[]).filter(function(x){return String(x.email||'').toLowerCase()===e})[0];if(u)return (u.name||u.email)+(u.relationship?' ('+u.relationship+')':'');return em||famName(c.family_name)}
-function topicUnread(t){var d=S.data,col=d.me.role!=='coordinator'?'read_by_client':'read_by_coordinator';return topicMsgs(t.topic_id).filter(function(m){return m.sender_email!==d.me.email&&!isTrueV(m[col])}).length}
+function topicUnread(t){var d=S.data;if(d.me.role==='vendor'){var ra=String((t.extra&&t.extra.vendor_read_at)||'');return topicMsgs(t.topic_id).filter(function(m){return m.sender_email!==d.me.email&&m.sender_email!=='system'&&String(m.sent_at)>ra}).length}var col=d.me.role!=='coordinator'?'read_by_client':'read_by_coordinator';return topicMsgs(t.topic_id).filter(function(m){return m.sender_email!==d.me.email&&!isTrueV(m[col])}).length}
 function unreadTotal(){return (S.data.topics||[]).filter(function(t){return !imHidden(t)}).reduce(function(n,t){return n+topicUnread(t)},0)}
-function openTopic(t){S.draftT=null;S.topic=t.topic_id;S.mnew=false;S.mopen=true;S.view='messages';S.touched=true;if(S.data.msgTrimmed&&!S.fullT[t.topic_id]){S.fullT[t.topic_id]=1;call('topicMessages',{topicId:t.topic_id}).then(function(r){if(!S.data||!S.data.messages)return;var col=S.data.me.role!=='coordinator'?'read_by_client':'read_by_coordinator';var rest=S.data.messages.filter(function(m){return String(m.topic_id)!==String(t.topic_id)});(r.messages||[]).forEach(function(m){m[col]=true});S.data.messages=rest.concat(r.messages||[]).sort(function(a,b){return String(a.sent_at).localeCompare(String(b.sent_at))});render()}).catch(function(){})}if(topicUnread(t)){var d=S.data,col=d.me.role!=='coordinator'?'read_by_client':'read_by_coordinator';topicMsgs(t.topic_id).forEach(function(m){m[col]=true});call('readTopic',{topicId:t.topic_id}).catch(function(){})}render()}
+function openTopic(t){S.draftT=null;S.topic=t.topic_id;S.mnew=false;S.mopen=true;S.view='messages';S.touched=true;if(S.data.msgTrimmed&&!S.fullT[t.topic_id]){S.fullT[t.topic_id]=1;call('topicMessages',{topicId:t.topic_id}).then(function(r){if(!S.data||!S.data.messages)return;var col=S.data.me.role!=='coordinator'?'read_by_client':'read_by_coordinator';var rest=S.data.messages.filter(function(m){return String(m.topic_id)!==String(t.topic_id)});(r.messages||[]).forEach(function(m){m[col]=true});S.data.messages=rest.concat(r.messages||[]).sort(function(a,b){return String(a.sent_at).localeCompare(String(b.sent_at))});render()}).catch(function(){})}if(topicUnread(t)){var d=S.data,col=d.me.role!=='coordinator'?'read_by_client':'read_by_coordinator';if(d.me.role==='vendor'){t.extra=t.extra||{};t.extra.vendor_read_at=new Date().toISOString()}topicMsgs(t.topic_id).forEach(function(m){m[col]=true});call('readTopic',{topicId:t.topic_id}).catch(function(){})}render()}
 
 // ---------------------------------------------------------------- updates as a timeline (2026-09-25)
 // Modeled on the live surgery-day page the founder kept for his own surgery: a day label, a time column,
@@ -2850,7 +2921,7 @@ function vendorsEl(){
   if(S.vEdit)l.appendChild(vendorForm(S.vEdit,svc));
   if(!all.length&&!S.vEdit)l.appendChild(el('<div class="wempty" style="padding:12px">No vendors yet. Add the first one you trust.</div>'));
   var byCity={};all.forEach(function(v){var k=(v.city||'')+(v.state?', '+v.state:'');(byCity[k]=byCity[k]||[]).push(v)});
-  Object.keys(byCity).sort().forEach(function(k){l.appendChild(el('<div class="small" style="padding:8px 12px 2px;font-weight:700">'+esc(k)+'</div>'));byCity[k].forEach(function(v){var r=el('<div class="wr" style="grid-template-columns:1fr auto'+(v.active?'':';opacity:.55')+'"><div><b>'+esc(v.name)+'</b> <span class="small muted">'+esc(v.service)+(v.price?' · '+esc(v.price):'')+(v.insured?' · insured':'')+(v.checked?' · background-checked':'')+(v.active?'':' · not in use')+'</span></div><a href="#" class="small ed">Edit</a></div>');$('.ed',r).onclick=function(ev){ev.preventDefault();S.vEdit=v;render()};l.appendChild(r)})});
+  Object.keys(byCity).sort().forEach(function(k){l.appendChild(el('<div class="small" style="padding:8px 12px 2px;font-weight:700">'+esc(k)+'</div>'));byCity[k].forEach(function(v){var r=el('<div class="wr" style="grid-template-columns:1fr auto'+(v.active?'':';opacity:.55')+'"><div><b>'+esc(v.name)+'</b> <span class="small muted">'+esc(v.service)+(v.price?' · '+esc(v.price):'')+(v.insured?' · insured':'')+(v.checked?' · background-checked':'')+(v.active?'':' · not in use')+(v.invited?' · <b>signed up to take jobs</b>':'')+'</span></div><span style="display:flex;gap:12px">'+(v.active&&!v.invited?'<a href="#" class="small inv">'+(v.email?'Invite to take jobs':'Add an email to invite')+'</a>':'')+'<a href="#" class="small ed">Edit</a></span></div>');$('.ed',r).onclick=function(ev){ev.preventDefault();S.vEdit=v;render()};var iv=$('.inv',r);if(iv)iv.onclick=function(ev){ev.preventDefault();if(!v.email){S.vEdit=v;render();return}if(!uiOk('Invite '+v.name+' ('+v.email+') to sign in and take '+v.service.toLowerCase()+' jobs in '+v.city+'? They get an email and a text.',this,arguments))return;call('inviteVendor',{vendorId:v.vendor_id}).then(function(){toast(v.name+' is invited.');return refresh()}).catch(alertErr)};l.appendChild(r)})});
   return w}
 function vendorForm(v,svc){
   var f=el('<form class="card" style="margin:8px 12px"><span class="k">'+(v.vendor_id?'Edit vendor':'New vendor')+'</span><div class="two" style="margin-top:8px"><div class="field"><label>Name</label><input name="name" required maxlength="160" value="'+esc(v.name||'')+'"></div><div class="field"><label>Service</label><select name="service">'+svc.map(function(x){return '<option'+(x===(v.service||'Rides')?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></div></div><div class="two"><div class="field"><label>City</label><input name="city" required maxlength="60" value="'+esc(v.city||'')+'"></div><div class="field"><label>State</label><input name="state" maxlength="4" value="'+esc(v.state||'')+'" style="max-width:80px"></div></div><div class="two"><div class="field"><label>Phone</label><input name="phone" maxlength="40" value="'+esc(v.phone||'')+'"></div><div class="field"><label>Email</label><input name="email" type="email" maxlength="160" value="'+esc(v.email||'')+'"></div></div><div class="field"><label>Website (https://…)</label><input name="website" maxlength="300" value="'+esc(v.website||'')+'"></div><div class="field"><label>Price, in their words</label><input name="price" maxlength="120" value="'+esc(v.price||'')+'" placeholder="$45 each way within 20 miles"></div><div style="display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 10px"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="insured"'+(v.insured?' checked':'')+' style="width:auto"> Insured</label><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="checked"'+(v.checked?' checked':'')+' style="width:auto"> Background-checked</label><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="active"'+(v.vendor_id&&!v.active?'':' checked')+' style="width:auto"> In use</label></div><div class="field"><label>Your notes (never shown to families)</label><textarea name="notes" maxlength="2000">'+esc(v.notes||'')+'</textarea></div><div style="display:flex;gap:8px;align-items:center"><button class="btn sm" type="submit">Save</button><a href="#" class="small cancel">Cancel</a></div><p class="err"></p></form>');
