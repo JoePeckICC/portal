@@ -64,6 +64,7 @@ async function hospitalFromIntake(clientId, name, c) {
 // Consent comes first. Nothing else in the portal opens until the intake is submitted.
 async function signConsent(ctx, p, c) {
   clientOrCo(ctx); needFamily(ctx);
+  must(ctx.role !== 'coordinator', 'The family signs the consent themselves, in their own portal. You can fill in the questions with them.');
   const cs = p.consent || {};
   const initials = (cs.initials || []).map(x => clean(x, 6).trim());
   must(initials.length === CONSENT_ITEMS_.length && initials.every(Boolean), 'Please initial every item');
@@ -103,7 +104,7 @@ async function submitIntake(ctx, p, c) {
   clientOrCo(ctx); needFamily(ctx);
   const client = await core.clientById(ctx.clientId, c);
   const cur = await intake.readIntake(ctx.clientId, c);
-  must(cur.consent, 'Please sign the consent first');
+  must(cur.consent, ctx.role === 'coordinator' ? 'The family signs the consent first, in their own portal. Everything you filled in is saved.' : 'Please sign the consent first');
   const missing = intake.missingRequired(cur.answers);
   must(!missing.length, 'A few required answers are still blank: ' + missing.join(', '));
   if (cur.status === 'Submitted') return { intake: cur, drafts: 0 };

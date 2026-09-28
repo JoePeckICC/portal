@@ -154,7 +154,19 @@ async function inbasket(ctx, p) {
     db.all(`select client_id, count(*)::int n from plan_items where client_id = any($1) and status<>'Done' and coalesce(extra->>'draft','') not in ('true','1') and coalesce(extra->>'coordinated','') not in ('true') group by client_id`, [ids]),
   ]);
   meds.forEach(m => needs.push({ kind: 'Meds', client_id: m.client_id, family: fam(m.client_id), text: m.name + (m.dose ? ' ' + m.dose : '') + ' — pending review', when: m.updated_at || m.added_at || '', go: 'meds', pri: 1 }));
-  unread.forEach(u => { const urg = u.kind === 'urgent' || u.urgent; const medQ = u.kind === 'medical' || require('../intake').medicalQuestions({ m: { a: String(u.body || '') } }).length > 0; needs.push({ kind: urg ? 'Urgent' : medQ ? 'Medical' : 'Message', client_id: u.client_id, family: fam(u.client_id), text: '“' + String(u.body).slice(0, 110) + (String(u.body).length > 110 ? '…' : '') + '” — ' + (u.title || 'Messages') + (u.n > 1 ? ' (' + u.n + ')' : ''), when: u.last_at, go: 'messages:' + u.topic_id, pri: urg ? 0 : 2 }); });
+  unread.forEach(u => { const urg = u.kind === 'urgent' || u.urgent; const IK = require('../intake'), dist = IK.DISTRESS.test(String(u.body || '')), medQ = u.kind === 'medical' || IK.medicalQuestions({ m: { a: String(u.body || '') } }).length > 0; needs.push({ kind: dist ? 'Distress' : urg ? 'Urgent' : medQ ? 'Medical' : 'Message', client_id: u.client_id, family: fam(u.client_id), text: '“' + String(u.body).slice(0, 110) + (String(u.body).length > 110 ? '…' : '') + '” — ' + (u.title || 'Messages') + (u.n > 1 ? ' (' + u.n + ')' : ''), when: u.last_at, go: 'messages:' + u.topic_id, pri: urg || dist ? 0 : medQ ? 1 : 2 }); });
+  // What the family wrote in the intake that needs a person: distress, and medical questions to pass on.
+  // Shown while the plan is being built, and for three weeks after the intake comes in.
+  for (const i of intakes) {
+    const cl = byId[i.client_id]; if (!cl) continue;
+    const fresh = !isTrue(cl.plan_ready) || (i.submitted_at && Date.now() - new Date(i.submitted_at).getTime() < 21 * 864e5);
+    if (!fresh) continue;
+    try {
+      const IK = require('../intake'), ia = (await IK.readIntake(i.client_id)).answers || {};
+      IK.distressMentions(ia).slice(0, 2).forEach(x => needs.push({ kind: 'Distress', client_id: i.client_id, family: fam(i.client_id), text: 'In the intake: “' + x.text + '” — reach out today', when: i.submitted_at || '', go: 'intake', pri: 0 }));
+      const mq = IK.medicalQuestions(ia); if (mq.length) needs.push({ kind: 'Medical', client_id: i.client_id, family: fam(i.client_id), text: mq.length + ' medical question' + (mq.length === 1 ? '' : 's') + ' in the intake to pass to the surgeon’s office — “' + mq[0].text.slice(0, 90) + '”', when: i.submitted_at || '', go: 'intake', pri: 1 });
+    } catch (e) { console.error('inbasket intake scan', e.message); }
+  }
   intakes.forEach(i => {
     const cl = byId[i.client_id];
     if (cl && !isTrue(cl.plan_ready)) needs.push({ kind: 'Plan', client_id: i.client_id, family: fam(i.client_id), text: 'Plan ready to create — the intake is in', when: i.submitted_at || '', go: 'build', pri: 1 });
@@ -168,6 +180,9 @@ async function inbasket(ctx, p) {
     if (cl.stripe_customer_id && !isTrue(cl.paid) && cl.billing_status === 'Active') needs.push({ kind: 'Billing', client_id: cl.client_id, family: fam(cl.client_id), text: 'First invoice not paid yet — portal still locked', when: '', go: 'billing', pri: 4 });
   });
   (await db.all(`select * from escalations where outcome='' and client_id = any($1) and at > now() - interval '3 days' order by at desc`, [ids])).forEach(e => needs.push({ kind: 'ER', client_id: e.client_id, family: fam(e.client_id), text: e.kind + (e.hospital ? ' · ' + e.hospital : '') + ' — ' + String(e.what || '').slice(0, 90) + ' · outcome not written yet', when: e.at, go: 'record:summary', pri: 0 }));
+  // The Circle: comments and photos waiting for approval (the public page and supporters write them).
+  (await db.all(`select client_id, count(*)::int n, max(at) at from update_comments where status='Pending' and client_id = any($1) group by client_id`, [ids])).forEach(r => needs.push({ kind: 'Circle', client_id: r.client_id, family: fam(r.client_id), text: r.n + ' Circle comment' + (r.n === 1 ? '' : 's') + ' to approve', when: r.at, go: 'updates', pri: 3 }));
+  (await db.all(`select client_id, count(*)::int n, max(posted_at) at from updates where client_id = any($1) and extra->>'photo' is not null and coalesce(extra->>'photo_ok','false') <> 'true' group by client_id`, [ids])).forEach(r => needs.push({ kind: 'Circle', client_id: r.client_id, family: fam(r.client_id), text: r.n + ' photo' + (r.n === 1 ? '' : 's') + ' to approve before the Circle sees ' + (r.n === 1 ? 'it' : 'them'), when: r.at, go: 'updates', pri: 3 }));
   assist.forEach(a => needs.push({ kind: 'Assistance', client_id: a.client_id, family: fam(a.client_id), text: a.name + (a.what ? ' — ' + a.what : ''), when: a.updated_at || '', go: 'billing:assist', pri: 4 }));
   papers.forEach(u => needs.push({ kind: 'Papers', client_id: u.client_id, family: fam(u.client_id), text: 'Discharge papers uploaded — build the medication list', when: u.uploaded_at || '', go: 'meds:build', pri: 2 }));
   needs.sort((a, b) => a.pri - b.pri || ms(b.when) - ms(a.when));

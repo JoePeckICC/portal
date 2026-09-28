@@ -14,12 +14,14 @@ async function saveVisitNote(ctx, p, c) {
   must(ctx.role === 'coordinator' || ctx.role === 'client', 'Not allowed');
   const a = await db.one(`select * from appointments where client_id=$1 and appt_id=$2`, [ctx.clientId, String(p.apptId || '')], c); must(a, 'Not found');
   const extra = { ...(a.extra || {}) }, patch = {};
-  if (ctx.role === 'coordinator' && p.note !== undefined) { patch.visit_note = clean(p.note, 4000); extra.note_by = ctx.email; extra.note_at = new Date().toISOString(); }
+  if (ctx.role === 'coordinator' && p.note !== undefined && clean(p.note, 4000).trim()) must(new Date(a.starts_at).getTime() <= Date.now() + 12 * 3600e3, 'Write the note once the visit has happened.');
+  if (ctx.role === 'coordinator' && p.note !== undefined) { must(clean(p.note, 4000).trim() || String(a.visit_note || '').trim(), 'Write the note first.'); patch.visit_note = clean(p.note, 4000); extra.note_by = ctx.email; extra.note_at = new Date().toISOString(); }
   if (p.shared !== undefined) extra.note_shared = p.shared ? 'TRUE' : 'FALSE';
   if (patch.visit_note !== undefined && p.shared === undefined && !String(extra.note_shared || '')) extra.note_shared = 'FALSE';   // private to the patient unless the coordinator shares it
   patch.extra = JSON.stringify(extra);
   await db.update('appointments', { appt_id: a.appt_id }, patch, c);
-  if (ctx.role === 'coordinator' && patch.visit_note && !String(a.visit_note || '').trim()) await core.autoMsg(ctx.clientId, 'A note from your visit “' + a.title + '” is under My Record → Visits.', c);
+  // Only a note the inner circle can see is announced in Messages (the whole inner circle reads Messages).
+  if (ctx.role === 'coordinator' && patch.visit_note && !String(a.visit_note || '').trim() && extra.note_shared === 'TRUE') await core.autoMsg(ctx.clientId, 'A note from your visit “' + a.title + '” is under My Record → Visits.', c);
   return {};
 }
 async function saveAllergies(ctx, p, c) {

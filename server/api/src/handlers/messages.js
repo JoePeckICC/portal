@@ -95,7 +95,7 @@ async function postUpdate(ctx, p, c) {
     extra = { photo: row.upload_id, photo_ok: ctx.role === 'coordinator', sensitive: isTrue(p.sensitive) };
   }
   const u = await db.insert('updates', { update_id: id(), client_id: ctx.clientId, posted_by: ctx.email, stage: pick(p.stage, C.STAGES, client.current_stage || ''), title, body, visible_to_circle: visible,
-    kind: pick(p.kind, C.UPDATE_KINDS, 'Family'), detail: clean(p.detail, 4000), quote: clean(p.quote, 600), quote_ref: clean(p.quote_ref, 120), extra: extra ? JSON.stringify(extra) : null }, c);
+    kind: pick(p.kind, C.UPDATE_KINDS, 'Family'), detail: clean(p.detail, 4000), quote: clean(p.quote, 600), quote_ref: clean(p.quote_ref, 120), extra: JSON.stringify(extra || {}) }, c);
   if (extra && !extra.photo_ok) { const co = await core.coordinatorFor(client); if (co) await core.notifyCo(co, 'upload', 'A photo to approve — ' + famName(client.family_name), (ctx.user.name || ctx.email) + ' put a photo on “' + title + '”. The Circle sees it once you approve it.', '', 'Open Updates'); }
   const after = async () => {
     if (!visible) return;

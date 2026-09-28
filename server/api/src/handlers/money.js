@@ -29,6 +29,8 @@ async function changeAmount(ctx, p, c) {
   coOnly(ctx);
   const cl = await core.clientById(ctx.clientId, c); must(cl && cl.stripe_customer_id, 'Start billing first');
   const amount = Number(p.amount); must(amount >= 0 && amount < 100000, 'Enter a monthly amount');
+  // The same amount again changes nothing: no Stripe call, no message to the family.
+  if (cl.monthly_amount != null && Number(cl.monthly_amount) === amount && (amount === 0 || cl.stripe_subscription_id)) return pub(ctx, c);
   if (cl.stripe_subscription_id) {
     const sub = await B.stripe('GET', '/v1/subscriptions/' + cl.stripe_subscription_id, {});
     const itemId = sub.items && sub.items.data[0] && sub.items.data[0].id;
