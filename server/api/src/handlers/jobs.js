@@ -132,14 +132,59 @@ async function requestJob(ctx, p, c) {
     return { job: j, _after: () => tellVendor(direct, 'New request from ' + famName(client.family_name), C.APP_NAME + ' — a family ' + (meet ? 'would like to ' + meetTxt(meet) : 'you have helped asked for you: ' + svc.toLowerCase()) + ', ' + whenTxt0 + '. Accept or pass: ' + link()) };
   }
   if (loan) return { job: j, _after: async () => { const co = await core.coordinatorFor(client); await core.notifyCo(co, 'message', 'Equipment to borrow — ' + famName(client.family_name), (ctx.user.name || 'The family') + ' would like to borrow: ' + info.map(x => x.l + ': ' + x.v).join('; ') + '.', j.details, 'Open the chart'); } };
-  const after = async () => {
-    const vs = await db.all(`select v.* from vendors v join users u on lower(u.role)='vendor' and u.active and u.extra->>'vendor_id'=v.vendor_id where v.active and lower(v.city)=lower($1) and v.service=$2 and ($3='' or v.state='' or v.state=$3)`, [city, svc, j.state]);
+  // The circle's casting call (Joe): ask the family's own people first — for an hour or two, or only them — and if
+  // no one steps up in time, it goes to the support team like any other request.
+  const CIRCLE_HRS = { '1': 1, '2': 2, '4': 4 };
+  if (p.circle === 'only' || CIRCLE_HRS[p.circle]) {
+    const until = p.circle === 'only' ? '' : new Date(Date.now() + CIRCLE_HRS[p.circle] * 3600e3).toISOString();
+    await db.q(`update jobs set extra = extra || jsonb_build_object('circle', $2::jsonb) where job_id=$1`, [j.job_id, JSON.stringify({ until, fallback: !!until })], c);
     const whenTxt = whenLabel({ starts_at: when, extra: timing });
-    for (const v of vs) await tellVendor(v, 'New job: ' + service + ' in ' + city, C.APP_NAME + ' — new job: ' + service.toLowerCase() + ', ' + whenTxt + ', ' + city + '. First to take it has it: ' + link());
-    const co = await core.coordinatorFor(client);
-    await core.notifyCo(co, 'message', service + ' requested — ' + famName(client.family_name), (ctx.user.name || 'The family') + ' asked for ' + service.toLowerCase() + ', ' + whenTxt + '. ' + (vs.length ? vs.length + ' vendor' + (vs.length === 1 ? ' was' : 's were') + ' told.' : 'No vendor in ' + city + ' offers it yet — it needs you.'), j.details, 'Open the chart');
-  };
-  return { job: j, _after: after };
+    const title = service + ' — ' + whenTxt;
+    const detail = info.map(x => x.l + ': ' + x.v).join('\n') + (j.details ? (info.length ? '\n' : '') + j.details : '');
+    await db.insert('help_items', { item_id: id(), client_id: ctx.clientId, title, detail, when_text: whenTxt, status: 'Open', claimed_by: '', added_by: ctx.email, job_id: j.job_id }, c);
+    const after = async () => {
+      const people = [...new Set([...(await db.all(`select supporter_email e from circle where client_id=$1 and status='Active'`, [ctx.clientId])).map(r => r.e), ...(await db.all(`select email e from users where client_id=$1 and active and lower(role)='family'`, [ctx.clientId])).map(r => r.e)].map(e => String(e).toLowerCase()).filter(e => e && e !== String(ctx.email).toLowerCase()))];
+      const fam = famName(client.family_name);
+      for (const e of people) await mail.notify(e, fam + ' could use a hand: ' + service.toLowerCase(), (first(ctx.user.name) || 'The family') + ' is asking their circle first: ' + service.toLowerCase() + ', ' + whenTxt + '.' + (until ? ' If no one steps up by ' + new Date(until).toLocaleTimeString('en-US', { timeZone: C.TZ, hour: 'numeric', minute: '2-digit' }) + ', InCadence finds someone.' : '') + ' The first to step up has it.', detail, 'I can help', link());
+    };
+    return { job: { ...j, extra: { ...j.extra, circle: { until, fallback: !!until } } }, _after: after };
+  }
+  return { job: j, _after: () => broadcast(j, client, ctx.user.name) };
+}
+// Tell every support-team member in town who offers this kind of help, and the coordinator.
+async function broadcast(j, client, askedBy) {
+  const vs = await db.all(`select v.* from vendors v join users u on lower(u.role)='vendor' and u.active and u.extra->>'vendor_id'=v.vendor_id where v.active and lower(v.city)=lower($1) and v.service=$2 and ($3='' or v.state='' or v.state=$3)`, [j.city, j.service, j.state]);
+  const whenTxt = whenLabel(j);
+  for (const v of vs) await tellVendor(v, 'New job: ' + j.service + ' in ' + j.city, C.APP_NAME + ' — new job: ' + j.service.toLowerCase() + ', ' + whenTxt + ', ' + j.city + '. First to take it has it: ' + link());
+  const co = await core.coordinatorFor(client);
+  await core.notifyCo(co, 'message', j.service + ' requested — ' + famName(client.family_name), (askedBy || 'The family') + ' asked for ' + j.service.toLowerCase() + ', ' + whenTxt + '. ' + (vs.length ? vs.length + ' vendor' + (vs.length === 1 ? ' was' : 's were') + ' told.' : 'No vendor in ' + j.city + ' offers it yet — it needs you.'), j.details, 'Open the chart');
+}
+// The casting call is over: no one stepped up in time (or the family asked us to take it now). It goes to the
+// support team, and the circle's "ways to help" item closes.
+async function releaseCircle(j, c) {
+  const x = j.extra || {}; if (!x.circle || x.circle.released) return null;
+  await db.q(`update jobs set extra = jsonb_set(extra, '{circle,released}', 'true'::jsonb) where job_id=$1`, [j.job_id], c);
+  await db.q(`update help_items set status='Removed' where job_id=$1 and status='Open'`, [j.job_id], c);
+  return async () => broadcast({ ...j, extra: { ...x, circle: { ...x.circle, released: true } } }, await core.clientById(j.client_id), 'The family');
+}
+// The family: "Ask InCadence now" instead of waiting for the circle.
+async function askUsNow(ctx, p, c) {
+  must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
+  const j = await db.one(`select * from jobs where job_id=$1 and client_id=$2 and status='Open'`, [String(p.jobId || ''), ctx.clientId], c); must(j, 'Not found');
+  const after = await releaseCircle(j, c); must(after, 'That one already went to the support team.');
+  return { _after: after };
+}
+// Every 15 minutes (with the dose reminders): casting calls whose time is up go to the support team.
+async function circleSweep() {
+  const due = await db.all(`select * from jobs where status='Open' and extra->'circle' is not null and coalesce(extra->'circle'->>'released','')<>'true' and coalesce(extra->'circle'->>'until','')<>'' and (extra->'circle'->>'until')::timestamptz < now()`);
+  for (const j of due) { const after = await db.tx(c => releaseCircle(j, c)); if (after) await after(); }
+  return due.length;
+}
+// Someone in the circle stepped up (from "ways to help"): the request is theirs.
+async function circleTook(item, who, c) {
+  if (!item.job_id) return null;
+  const r = await db.q(`update jobs set status='Taken', taken_at=now(), extra = extra || jsonb_build_object('circle_by', $2::text) where job_id=$1 and status='Open' returning *`, [item.job_id, who], c);
+  return (r.rows ? r.rows[0] : r[0]) || null;
 }
 // The family's standing note for a kind of help ("Biscuit: two walks, key under the mat, feed at 5"), so they
 // never type it twice. It fills the note on every request for that kind of help; they can change it any time.
@@ -154,6 +199,7 @@ async function cancelJob(ctx, p, c) {
   const j = await db.one(`select * from jobs where job_id=$1 and client_id=$2`, [String(p.jobId || ''), ctx.clientId], c); must(j, 'Not found');
   must(j.status === 'Open' || j.status === 'Taken', 'That one is already ' + j.status.toLowerCase());
   await db.q(`update jobs set status='Cancelled' where job_id=$1`, [j.job_id], c);
+  await db.q(`update help_items set status='Removed' where job_id=$1 and status<>'Removed'`, [j.job_id], c);
   const v = j.vendor_id ? await db.one(`select * from vendors where vendor_id=$1`, [j.vendor_id], c) : null;
   return { _after: v ? () => tellVendor(v, 'Job cancelled', C.APP_NAME + ': the ' + j.service.toLowerCase() + ' job for ' + new Date(j.starts_at).toLocaleString('en-US', { timeZone: C.TZ, weekday: 'short', hour: 'numeric', minute: '2-digit' }) + ' was cancelled by the family.') : null };
 }
@@ -161,7 +207,7 @@ async function cancelJob(ctx, p, c) {
 // ---- the vendor: take it, finish it
 async function takeJob(ctx, p, c) {
   must(ctx.role === 'vendor', 'Not allowed'); const v = await vendorFor(ctx, c);
-  const r = await db.q(`update jobs set status='Taken', vendor_id=$2, taken_at=now() where job_id=$1 and status='Open' and (extra->>'for_vendor'=$2 or (coalesce(extra->>'for_vendor','')='' and coalesce(extra->>'loan','')='' and lower(city)=lower($3) and service=$4)) returning *`, [String(p.jobId || ''), v.vendor_id, v.city, v.service], c);
+  const r = await db.q(`update jobs set status='Taken', vendor_id=$2, taken_at=now() where job_id=$1 and status='Open' and (extra->>'for_vendor'=$2 or (coalesce(extra->>'for_vendor','')='' and coalesce(extra->>'loan','')='' and (extra->'circle' is null or extra->'circle'->>'released'='true') and lower(city)=lower($3) and service=$4)) returning *`, [String(p.jobId || ''), v.vendor_id, v.city, v.service], c);
   const j = r.rows ? r.rows[0] : r[0]; must(j, 'Someone else already took this one.');
   const client = await core.clientById(j.client_id, c);
   const whenTxt = whenLabel(j, true);
@@ -198,7 +244,7 @@ async function finishJob(ctx, p, c) {
 async function vendorBoot(ctx, out) {
   const v = await vendorFor(ctx);
   out.vendor = { name: v.name, service: v.service, city: v.city, state: v.state, phone: v.phone, hours: normHours(v.hours) };
-  const open = await db.all(`select j.*, c.patient_first_name, c.family_name from jobs j join clients c on c.client_id=j.client_id where j.status='Open' and j.starts_at > now() - interval '1 hour' and (j.extra->>'for_vendor'=$3 or (coalesce(j.extra->>'for_vendor','')='' and coalesce(j.extra->>'loan','')='' and lower(j.city)=lower($1) and j.service=$2)) order by j.starts_at`, [v.city, v.service, v.vendor_id]);
+  const open = await db.all(`select j.*, c.patient_first_name, c.family_name from jobs j join clients c on c.client_id=j.client_id where j.status='Open' and j.starts_at > now() - interval '1 hour' and (j.extra->>'for_vendor'=$3 or (coalesce(j.extra->>'for_vendor','')='' and coalesce(j.extra->>'loan','')='' and (j.extra->'circle' is null or j.extra->'circle'->>'released'='true') and lower(j.city)=lower($1) and j.service=$2)) order by j.starts_at`, [v.city, v.service, v.vendor_id]);
   const mine = await db.all(`select j.*, c.patient_first_name, c.family_name from jobs j join clients c on c.client_id=j.client_id where j.vendor_id=$1 and j.status in ('Taken','Done') order by j.starts_at desc limit 60`, [v.vendor_id]);
   out.openJobs = open.map(j => jobPublicOpen(j, j)); out.myJobs = mine.map(j => jobPublicMine(j, j));
   const topics = await db.all(`select * from topics where kind='vendor' and extra->>'vendor_email'=$1 order by created_at`, [ctx.email]);
@@ -212,8 +258,8 @@ async function vendorBoot(ctx, out) {
 // Jobs for a family's own pages (and the coordinator's view of that family).
 async function jobsFor(clientId) {
   const rows = await db.all(`select j.*, v.name as vendor_name, v.phone as vendor_phone from jobs j left join vendors v on v.vendor_id=coalesce(j.vendor_id, j.extra->>'for_vendor') where j.client_id=$1 and j.status <> 'Cancelled' order by j.starts_at desc limit 40`, [clientId]);
-  return rows.map(j => ({ job_id: j.job_id, service: j.service, info: infoOf(j, true), loan: !!(j.extra && j.extra.loan), meet: (j.extra && j.extra.meet) || '', soon: (j.extra && j.extra.soon) || '', until: (j.extra && j.extra.until) || '', from: (j.extra && j.extra.from) || '', address: j.address || '', starts_at: j.starts_at, city: j.city, details: j.details, status: j.status, vendor_name: j.vendor_name || '', direct: !!(j.extra && j.extra.for_vendor), topic_id: (j.extra && j.extra.topic_id) || '', taken_at: j.taken_at, done_at: j.done_at }));
+  return rows.map(j => ({ job_id: j.job_id, service: j.service, circle: (j.extra && j.extra.circle) || null, circle_by: (j.extra && j.extra.circle_by) || '', lent_by: (j.extra && j.extra.lent_by) || '', info: infoOf(j, true), loan: !!(j.extra && j.extra.loan), meet: (j.extra && j.extra.meet) || '', soon: (j.extra && j.extra.soon) || '', until: (j.extra && j.extra.until) || '', from: (j.extra && j.extra.from) || '', address: j.address || '', starts_at: j.starts_at, city: j.city, details: j.details, status: j.status, vendor_name: j.vendor_name || '', direct: !!(j.extra && j.extra.for_vendor), topic_id: (j.extra && j.extra.topic_id) || '', taken_at: j.taken_at, done_at: j.done_at }));
 }
 // Only handlers are enumerable: everything enumerable here becomes a callable action.
-module.exports = { inviteVendor, requestJob, saveCareNote, cancelJob, takeJob, passJob, finishJob, saveHours, vendorTimes };
-Object.defineProperties(module.exports, { vendorBoot: { value: vendorBoot, enumerable: false }, jobsFor: { value: jobsFor, enumerable: false }, normHours: { value: normHours, enumerable: false } });
+module.exports = { inviteVendor, requestJob, saveCareNote, cancelJob, takeJob, passJob, finishJob, saveHours, vendorTimes, askUsNow };
+Object.defineProperties(module.exports, { vendorBoot: { value: vendorBoot, enumerable: false }, jobsFor: { value: jobsFor, enumerable: false }, normHours: { value: normHours, enumerable: false }, circleSweep: { value: circleSweep, enumerable: false }, circleTook: { value: circleTook, enumerable: false } });

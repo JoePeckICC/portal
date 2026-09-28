@@ -71,6 +71,7 @@ async function bootstrap(ctx) {
   out.tasks = tasks; out.topics = topics;
   { const vids = [...new Set(out.topics.filter(t => t.kind === 'vendor').map(t => t.extra && t.extra.vendor_id).filter(Boolean))];   // the vendor's number, for the call button in their conversation
     if (vids.length) { const ph = {}; const hr = {}; (await db.all(`select vendor_id, phone, hours from vendors where vendor_id = any($1)`, [vids])).forEach(v => { ph[v.vendor_id] = v.phone; hr[v.vendor_id] = require('./jobs').normHours(v.hours); }); out.topics = out.topics.map(t => t.kind === 'vendor' ? { ...t, extra: { ...t.extra, vendor_phone: ph[t.extra && t.extra.vendor_id] || '', vendor_hours: hr[t.extra && t.extra.vendor_id] || null } } : t); } }
+  out.borrowed = await require('./loans').borrowedBy(cid); if (ctx.role === 'coordinator') Object.assign(out, await require('./loans').closetFor());
   out.jobs = await require('./jobs').jobsFor(cid); out.careNotes = ce.care_notes || {}; out.jobServices = require('./market').SERVICES;
   out.updates = withPhoto(updates, ctx.role);
   out.tracker = ce.tracker || null; out.trackerSteps = CIRCLE.TRACKER; out.reactions = CIRCLE.REACTIONS; out.what_i_need = ce.what_i_need || '';

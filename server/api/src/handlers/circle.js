@@ -127,9 +127,10 @@ async function addHelp(ctx, p, c) {
 async function claimHelp(ctx, p, c) {
   needFamily(ctx);
   const row = await db.one(`select * from help_items where client_id=$1 and item_id=$2`, [ctx.clientId, String(p.itemId || '')], c); must(row, 'Not found');
-  if (isTrue(p.release)) { must(row.claimed_by === ctx.email || ctx.role === 'coordinator' || core.fam(ctx), 'Not yours'); await db.update('help_items', { item_id: row.item_id }, { status: 'Open', claimed_by: '', claimed_at: null }, c); return { ok: true }; }
+  if (isTrue(p.release)) { must(row.claimed_by === ctx.email || row.claimed_email === ctx.email || ctx.role === 'coordinator' || core.fam(ctx), 'Not yours'); await db.update('help_items', { item_id: row.item_id }, { status: 'Open', claimed_by: '', claimed_at: null }, c); if (row.job_id) await db.q(`update jobs set status='Open', taken_at=null, extra = extra - 'circle_by' where job_id=$1 and status='Taken' and extra ? 'circle_by'`, [row.job_id], c); return { ok: true }; }
   must(row.status === 'Open', 'Someone already has this one');
   await db.update('help_items', { item_id: row.item_id }, { status: 'Claimed', claimed_by: clean(ctx.user.name || ctx.email, 120), claimed_at: new Date(), claimed_email: ctx.email }, c);
+  if (row.job_id) must(await require('./jobs').circleTook(row, clean(ctx.user.name || ctx.email, 120), c), 'That one was already taken care of.');   // a casting call: the request is theirs
   const after = async () => { for (const u of await core.usersFor(ctx.clientId, 'client')) await mail.notify(u.email, (ctx.user.name || 'Someone') + ' is taking care of: ' + row.title, (ctx.user.name || ctx.email) + ' claimed “' + row.title + '”' + (row.when_text ? ' (' + row.when_text + ')' : '') + '.', '', 'Open the Circle'); };
   return { ok: true, _after: after };
 }
