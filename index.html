@@ -565,6 +565,19 @@ html[data-theme=sage]{--gold:#5E8A6A;--panel:#EEF3EC;--tint:#E4ECE4}html[data-th
 .imcomp.urg .impill{border-color:#B4533E}
 .imsend{width:30px;height:30px;border-radius:15px;border:0;background:var(--gold);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}.imsend svg{width:18px;height:18px;fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
 .imcomp .err{width:100%;margin:0}.imsend[hidden]{display:none}
+.imer{display:block;width:100%;border:0;border-top:1px solid #ECE8DF;background:none;padding:12px 16px;font:inherit;font-size:13px;font-weight:600;color:#9B2C2C;text-align:center;cursor:pointer}.imer:hover{background:#FBF3F1}
+.imact b{font-size:22px;color:var(--ink)}.imact.em b{color:#9B2C2C}.imerf .field{margin-bottom:10px}
+
+.imsw{position:relative;overflow:hidden}.imsw .imrow{position:relative;background:#fff;transition:transform .2s ease;touch-action:pan-y}
+.imdel{position:absolute;right:0;top:0;bottom:0;width:88px;border:0;background:#C0392B;color:#fff;font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+.imsw.open .imrow{transform:translateX(-88px)}
+.imrow .rec{margin-left:8px;font-size:15px;flex-shrink:0}.imrow .imtx{min-width:0}
+.imav.fam{background:linear-gradient(160deg,#C9A64A,#9C7B24)}
+.imto{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.imto input{flex:1;min-width:120px;border:0;padding:4px 0;font-size:16px;outline:none;box-shadow:none;background:transparent}.imtoc a{margin-left:4px;text-decoration:none;color:var(--muted)}
+.impeople{display:flex;flex-direction:column;padding:4px 0}.imperson{display:flex;align-items:center;gap:12px;padding:10px 16px;background:none;border:0;border-bottom:1px solid #ECE8DF;font:inherit;text-align:left;cursor:pointer;color:var(--ink)}.imperson:hover{background:#FAF8F3}.imperson span{display:flex;flex-direction:column}.imperson small{color:var(--muted);font-size:13px}.imperson .imav{width:38px;height:38px;font-size:16px}
+.imsp{flex:1}.imnew .imcomp{position:sticky;bottom:0;background:#fff}
+.imdelc{display:block;width:100%;border:0;text-align:center;color:#B03A2E;font:inherit;font-size:16px;font-weight:600;cursor:pointer}
+
 .iminfo{position:fixed;inset:0;z-index:1300;background:rgba(15,22,30,.4);display:flex;align-items:flex-end;justify-content:center}
 .imsheet{background:#F4F2EC;width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:14px 14px 0 0;padding:0 16px calc(24px + env(safe-area-inset-bottom,0px))}
 @media (min-width:761px){.iminfo{align-items:center}.imsheet{border-radius:14px}}
@@ -574,7 +587,7 @@ html[data-theme=sage]{--gold:#5E8A6A;--panel:#EEF3EC;--tint:#E4ECE4}html[data-th
 .imsec{background:#fff;border-radius:12px;padding:14px 16px;margin-top:14px}.imsec h3{margin:0 0 10px;font-size:18px}
 .imgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.imgrid img{width:100%;aspect-ratio:1;object-fit:cover;display:block}.imgrid .imnone{grid-column:1/-1;padding:0}
 .imdoc{display:grid;grid-template-columns:20px 1fr auto;gap:4px 10px;align-items:center;padding:8px 0;border-bottom:1px solid #ECE8DF}.imdoc svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8}.imdoc .small{grid-column:2}.imdoc .keep{grid-row:1/3;grid-column:3;font-size:14px}.imdocs .imnone{padding:0}
-.imnew{display:flex;flex-direction:column;min-height:0;overflow:auto}
+.imnew{display:flex;flex-direction:column;min-height:0;overflow:auto;flex:1}
 .imnh{display:grid;grid-template-columns:70px 1fr 70px;align-items:center;padding:12px 14px;border-bottom:1px solid #ECE8DF;background:#FAF8F3}.imnh b{text-align:center;font-size:17px}.imnh .cx{justify-self:end}
 .imto{padding:12px 16px;border-bottom:1px solid #ECE8DF;font-size:16px}.imtoc{display:inline-block;background:#F3EEDF;color:var(--ink);border-radius:12px;padding:2px 10px;font-weight:600}
 .imabout{padding:14px 16px}.imabout .k{margin-bottom:8px}.imabout .opts{display:flex;flex-direction:column}
@@ -838,7 +851,7 @@ function gate(){
 
 function shell(){
   var d=S.data, me=d.me, co=d.me.role==='coordinator';
-  document.body.classList.toggle('imopen',S.view==='messages'&&!!(S.mopen||S.mnew));   // a phone shows an open conversation full screen
+  document.body.classList.toggle('imopen',S.view==='messages'&&!!(S.mopen||S.mnew)&&window.innerWidth<=760);   // a phone shows an open conversation full screen
   if(S.view!=='home'&&S.sheet){S.sheet=null;document.body.style.overflow=''}if(!S.sheet)$all('body>.sheet').forEach(function(x){x.remove()});
   var unread=d.topics?unreadTotal():0;
   var pending=d.intake&&!isSub(d.intake);
@@ -985,7 +998,7 @@ function erCard(){
   var d=S.data,cf=first(d.coordinator&&d.coordinator.name)||'your coordinator';
   var c=el('<div class="card er"><div class="k">If it goes wrong</div><div class="ern"><b>911</b> life-threatening &nbsp;·&nbsp; <b>988</b> a mental-health crisis</div><p class="small" style="margin:8px 0 10px">Headed to an emergency room? Tell us which one and '+esc(cf)+' calls ahead with the surgery, the medications and the history — so you are not starting from zero at triage.</p><button class="btn block" type="button">We’re headed to the ER</button><form style="display:none;margin-top:10px"><div class="field"><label>Which hospital</label><input name="hospital" required maxlength="160" placeholder="Hospital, or the town" value="'+esc((S.data.walk&&S.data.walk.name)||'')+'"></div><div class="field"><label>What is happening (a line is enough)</label><textarea name="why" maxlength="1000" style="min-height:56px"></textarea></div><div style="display:flex;gap:8px"><button class="btn" type="submit">Page '+esc(cf)+'</button><button class="btn quiet" type="button">Cancel</button></div><p class="err"></p></form></div>');
   var b=$('button.block',c),f=$('form',c);b.onclick=function(){b.style.display='none';f.style.display='';$('input',f).focus()};$('button.quiet',f).onclick=function(){f.style.display='none';b.style.display=''};
-  f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f);busy($('button[type=submit]',f),true,'Paging…');call('erAlert',fd).then(function(){c.innerHTML='<div class="k">Paged</div><p style="margin:8px 0 0">'+esc(cf)+' has been paged and will call '+esc(fd.hospital)+' ahead of you. If it is life-threatening, call <b>911</b> first — do not drive.</p><p class="small muted" style="margin:8px 0 0">Your Health summary (under My Record) is the one page to hand triage.</p>'}).catch(function(e){$('.err',f).textContent=e.message;busy($('button[type=submit]',f),false,'Page '+cf)})};
+  f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f);busy($('button[type=submit]',f),true,'Sending…');call('erAlert',fd).then(function(){c.innerHTML='<div class="k">Paged</div><p style="margin:8px 0 0">'+esc(cf)+' has been paged and will call '+esc(fd.hospital)+' ahead of you. If it is life-threatening, call <b>911</b> first — do not drive.</p><p class="small muted" style="margin:8px 0 0">Your Health summary (under My Record) is the one page to hand triage.</p>'}).catch(function(e){$('.err',f).textContent=e.message;busy($('button[type=submit]',f),false,'Page '+cf)})};
   return c}
 // Home for the family (2026-09-28, Joe): one clean column, built for today and for the phase they are in.
 // Top: a dose that is due and not ticked. Hospital day: the tracker and the walk with the map. Before surgery: today,
@@ -2258,105 +2271,148 @@ function tasksView(){
   v.appendChild(cols);return v;
 }
 
-// Messages, laid out like the phone's own Messages app (2026-09-28, Joe): one list of conversations with a big title,
-// Edit on the left and a compose button on the right; tap one and it opens full screen with bubbles and a pill to type in.
-// Automated notices are just another conversation in the list. Archived ones sit behind Edit, like Recently Deleted.
-function imAv(t,co,cn,d,big){var sys=t&&t.kind==='auto';return '<span class="imav'+(sys?' sys':'')+(big?' big':'')+'" aria-hidden="true">'+(sys?'<svg viewBox="0 0 24 24"><path d="M15.5 6.5A7 7 0 1 0 15.5 17.5"/><path d="M11.5 9l3 3-3 3"/></svg>':esc(initial(co?d.client.family_name:(cn&&cn.name)||'?')))+'</span>'}
+// Messages, laid out like the phone's own Messages app (2026-09-28, Joe). One conversation per person: tap the pencil,
+// pick who it is to — the coordinator, or someone in the inner circle — and write. No sorting it into topics first;
+// sorting is our job. Slide a conversation left to archive it. Nothing in a healthcare record is ever deleted.
+function imMine(){var d=S.data;return d.me.role==='coordinator'?'coordinator':d.me.email}
+function imHidden(t){return ((t.extra&&t.extra.hidden)||[]).indexOf(imMine())>=0}
+function imPeople(){var d=S.data,me=d.me,c=d.client||{},cn=d.coordinator,out=[];
+  if(cn)out.push({key:'coordinator',name:cn.name||'Your coordinator',sub:'Care coordinator'});
+  if(d.patientUser&&String(d.patientUser).toLowerCase()!==String(me.email).toLowerCase())out.push({key:String(d.patientUser).toLowerCase(),name:[c.patient_first_name,c.patient_last_name].filter(Boolean).join(' ')||d.patientUser,sub:'Patient'});
+  (d.inner||[]).forEach(function(u){if(String(u.email).toLowerCase()!==String(me.email).toLowerCase())out.push({key:String(u.email).toLowerCase(),name:u.name||u.email,sub:u.relationship||'Inner circle'})});
+  return out}
+function imWho(t){var d=S.data,co=d.me.role==='coordinator',cn=d.coordinator;
+  if(t.kind==='auto')return{name:BOOT.appName,sub:'Reminders and confirmations',sys:true};
+  if(co)return{name:famName(d.client.family_name),sub:t.title};
+  if(t.kind==='family'){var ps=imPeople(),to=((t.extra&&t.extra.to)||[]).filter(function(e){return e!==String(d.me.email).toLowerCase()}),ns=to.map(function(e){var p=ps.filter(function(x){return x.key===e})[0];return p||{name:e,sub:''}});return{name:ns.map(function(x){return first(x.name)===x.name?x.name:(ns.length>1?first(x.name):x.name)}).join(', ')||t.title,sub:ns.length===1?ns[0].sub:'Just your circle',fam:true}}
+  return{name:cn?cn.name:'Your coordinator',sub:'Care coordinator',co:true}}
+function imAv(w,big){return '<span class="imav'+(w.sys?' sys':'')+(w.fam?' fam':'')+(big?' big':'')+'" aria-hidden="true">'+(w.sys?'<svg viewBox="0 0 24 24"><path d="M15.5 6.5A7 7 0 1 0 15.5 17.5"/><path d="M11.5 9l3 3-3 3"/></svg>':esc(initial(w.name)))+'</span>'}
 function imWhen(v){var w=toDate(v);if(!w)return'';var t0=new Date();t0.setHours(0,0,0,0);var dd=Math.round((new Date(w.getFullYear(),w.getMonth(),w.getDate())-t0)/864e5);if(dd===0)return fmtTime(w);if(dd===-1)return'Yesterday';if(dd>-7)return w.toLocaleDateString(undefined,{weekday:'long'});return w.toLocaleDateString(undefined,{month:'numeric',day:'numeric',year:'2-digit'})}
 function imStamp(v){var w=toDate(v);if(!w)return'';var t0=new Date();t0.setHours(0,0,0,0);var dd=Math.round((new Date(w.getFullYear(),w.getMonth(),w.getDate())-t0)/864e5);return (dd===0?'Today':dd===-1?'Yesterday':dd>-7?w.toLocaleDateString(undefined,{weekday:'long'}):w.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}))+' '+fmtTime(w)}
+function imLast(t){var ms=topicMsgs(t.topic_id);return ms[ms.length-1]}
+function imHide(ids,hidden){var d=S.data;(d.topics||[]).forEach(function(t){if(ids.indexOf(String(t.topic_id))<0)return;var e=t.extra=t.extra||{},h=(e.hidden||[]).filter(function(x){return x!==imMine()});if(hidden)h.push(imMine());e.hidden=h});S.msel=null;S.swiped=null;if(hidden&&ids.indexOf(String(S.topic))>=0){S.topic=null;S.mopen=false}render();return Promise.all(ids.map(function(id){return call('hideTopic',{topicId:id,hidden:hidden})})).then(function(){if(hidden)toast(ids.length===1?'Conversation archived.':ids.length+' conversations archived.',function(){imHide(ids,false)})}).catch(alertErr)}
 function messagesView(){
   var d=S.data,me=d.me,co=me.role==='coordinator',cn=d.coordinator,cf=co?first(d.client.family_name):(first(cn&&cn.name)||'your coordinator');
-  var topics=(d.topics||[]).slice().sort(function(a,b){var la=topicMsgs(a.topic_id),lb=topicMsgs(b.topic_id);var x=String((la[la.length-1]||{}).sent_at||a.last_at||a.created_at||''),y=String((lb[lb.length-1]||{}).sent_at||b.last_at||b.created_at||'');return y.localeCompare(x)});
-  var arch=S.mf==='archived';
+  var topics=(d.topics||[]).slice().sort(function(a,b){var x=String((imLast(a)||{}).sent_at||a.last_at||a.created_at||''),y=String((imLast(b)||{}).sent_at||b.last_at||b.created_at||'');return y.localeCompare(x)});
+  var del=S.mf==='deleted';
   // Opening Messages lands on the conversation with something unread, so the number always leads somewhere.
-  if(!S.mf){S.mf='active';var unT=topics.filter(function(t){return t.status!=='Archived'&&topicUnread(t)})[0];if(unT){S.topic=unT.topic_id;S.mopen=true}}
-  function inList(t){return arch?t.status==='Archived':t.status!=='Archived'}
-  var cur=topics.filter(function(t){return t.topic_id===S.topic})[0];
-  if(!cur&&!S.mnew&&!S.draftT&&window.innerWidth>760){cur=topics.filter(inList)[0];if(cur)S.topic=cur.topic_id}
-  if(S.draftT&&!cur)cur={topic_id:'',title:S.draftT.title,kind:S.draftT.kind,status:'Active',draft:true};
-  if(cur&&!cur.draft&&topicUnread(cur)&&(S.mopen||window.innerWidth>760)){var rcol=co?'read_by_coordinator':'read_by_client';topicMsgs(cur.topic_id).forEach(function(m){m[rcol]=true});call('readTopic',{topicId:cur.topic_id}).catch(function(){})}   // what is on screen counts as read
-  var v=el('<div class="imz'+(S.mopen?' open':'')+'"><aside class="iml"><div class="imbar"><button type="button" class="imlink ed">'+(S.msel?'Done':'Edit')+'</button><button type="button" class="imico cmp" aria-label="New message"><svg viewBox="0 0 24 24"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></button></div><h1 class="imt">'+(arch?'Archived':'Messages')+'</h1><div class="imsr"><input type="search" placeholder="Search" aria-label="Search messages"></div><div class="imlist" role="list"></div><p class="imfoot">Medical emergency: call 911. Crisis: call or text 988.</p></aside><section class="imr"></section></div>');
-  // Edit: a small menu, as on the phone
-  $('.ed',v).onclick=function(ev){ev.stopPropagation();if(S.msel){S.msel=null;render();return}var old=$('.immenu');if(old){old.remove();return}var m=el('<div class="immenu" role="menu"><button type="button" data-a="sel">Select conversations<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></button><button type="button" data-a="arch">'+(arch?'Back to Messages':'Show archived')+'<svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM3 4h18v3H3zM10 12h4"/></svg></button></div>');$('[data-a=sel]',m).onclick=function(){S.msel={};render()};$('[data-a=arch]',m).onclick=function(){S.mf=arch?'active':'archived';S.topic=null;S.mopen=false;render()};$('.iml',v).appendChild(m);setTimeout(function(){document.addEventListener('click',function h(){m.remove();document.removeEventListener('click',h)})},0)};
-  $('.cmp',v).onclick=function(){S.mnew=true;S.mopen=true;S.msel=null;render()};
-  var si=$('.imsr input',v);si.value=S.mq||'';si.oninput=function(){S.mq=this.value;drawList()};
+  if(!S.mf){S.mf='active';var unT=topics.filter(function(t){return !imHidden(t)&&topicUnread(t)})[0];if(unT){S.topic=unT.topic_id;S.mopen=true}}
+  function inList(t){return del?imHidden(t):!imHidden(t)}
+  var cur=topics.filter(function(t){return t.topic_id===S.topic&&!imHidden(t)})[0];
+  if(!cur&&!S.mnew&&!del&&window.innerWidth>760){cur=topics.filter(inList)[0];if(cur)S.topic=cur.topic_id}
+  if(cur&&topicUnread(cur)&&(S.mopen||window.innerWidth>760)){var rcol=co?'read_by_coordinator':'read_by_client';topicMsgs(cur.topic_id).forEach(function(m){m[rcol]=true});call('readTopic',{topicId:cur.topic_id}).catch(function(){})}   // what is on screen counts as read
+  var v=el('<div class="imz'+(S.mopen||S.mnew?' open':'')+'"><aside class="iml"><div class="imbar"><button type="button" class="imlink ed">'+(S.msel?'Done':del?'‹ Messages':'Edit')+'</button>'+(del?'':'<button type="button" class="imico cmp" aria-label="New message"><svg viewBox="0 0 24 24"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></button>')+'</div><h1 class="imt">'+(del?'Archived':'Messages')+'</h1>'+(del?'<p class="imnone" style="padding-top:0">Tap Restore to bring a conversation back.</p>':'<div class="imsr"><input type="search" placeholder="Search" aria-label="Search messages"></div>')+'<div class="imlist" role="list"></div>'+(co||del?'':'<button type="button" class="imer">On your way to the emergency department?</button>')+'</aside><section class="imr"></section></div>');
+  $('.ed',v).onclick=function(ev){ev.stopPropagation();if(S.msel){S.msel=null;render();return}if(del){S.mf='active';render();return}var old=$('.immenu');if(old){old.remove();return}var m=el('<div class="immenu" role="menu"><button type="button" data-a="sel">Select conversations<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></button><button type="button" data-a="del">Archived<svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM3 4h18v3H3zM10 12h4"/></svg></button></div>');$('[data-a=sel]',m).onclick=function(){S.msel={};render()};$('[data-a=del]',m).onclick=function(){S.mf='deleted';S.topic=null;S.mopen=false;render()};$('.iml',v).appendChild(m);setTimeout(function(){document.addEventListener('click',function h(){m.remove();document.removeEventListener('click',h)})},0)};
+  var erb=$('.imer',v);if(erb)erb.onclick=function(){S.mer=true;render()};
+  var cmp=$('.cmp',v);if(cmp)cmp.onclick=function(){S.mnew={to:co?['family']:[]};S.mopen=false;S.msel=null;render()};
+  var si=$('.imsr input',v);if(si){si.value=S.mq||'';si.oninput=function(){S.mq=this.value;drawList()}}
   function drawList(){var l=$('.imlist',v);l.innerHTML='';var rows=topics.filter(inList);
-    if(S.mq){var q=S.mq.toLowerCase();rows=rows.filter(function(t){return t.title.toLowerCase().indexOf(q)>=0||topicMsgs(t.topic_id).some(function(m){return String(m.body).toLowerCase().indexOf(q)>=0})})}
-    if(!rows.length){l.appendChild(el('<p class="imnone">'+(S.mq?'Nothing matches “'+esc(S.mq)+'”.':arch?'Nothing archived.':'No messages yet. Tap the pencil to write to '+esc(cf)+'.')+'</p>'));return}
-    rows.forEach(function(t){var ms=topicMsgs(t.topic_id),last=ms[ms.length-1],un=topicUnread(t),sel=S.msel;
-      var r=el('<a href="#" role="listitem" class="imrow'+(t.topic_id===S.topic&&!S.mnew&&window.innerWidth>760?' on':'')+'">'+(sel?'<span class="imck'+(sel[t.topic_id]?' on':'')+'" aria-hidden="true"></span>':'')+'<span class="imdot'+(un?' un':'')+'" aria-label="'+(un?un+' unread':'')+'"></span>'+imAv(t,co,cn,d)+'<span class="imtx"><span class="imr1"><b>'+esc(t.kind==='auto'?BOOT.appName:t.title)+'</b><span class="imwhen">'+esc(imWhen(last?last.sent_at:t.created_at))+(sel?'':'<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>')+'</span></span><span class="impv">'+esc(last?(last.attachments&&last.attachments.length&&!String(last.body||'').trim()?'Attachment: '+last.attachments.length+(last.attachments.length===1?' file':' files'):last.body):'No messages yet')+'</span></span></a>');
-      r.onclick=function(ev){ev.preventDefault();if(S.msel){if(S.msel[t.topic_id])delete S.msel[t.topic_id];else S.msel[t.topic_id]=1;render();return}openTopic(t)};l.appendChild(r)})}
+    if(S.mq&&!del){var q=S.mq.toLowerCase();rows=rows.filter(function(t){return imWho(t).name.toLowerCase().indexOf(q)>=0||topicMsgs(t.topic_id).some(function(m){return String(m.body).toLowerCase().indexOf(q)>=0})})}
+    if(!rows.length){l.appendChild(el('<p class="imnone">'+(S.mq?'Nothing matches “'+esc(S.mq)+'”.':del?'Nothing archived.':'No messages yet. Tap the pencil to write to '+esc(cf)+'.')+'</p>'));return}
+    rows.forEach(function(t){var last=imLast(t),un=topicUnread(t),sel=S.msel,w=imWho(t);
+      var wrap=el('<div class="imsw'+(S.swiped===t.topic_id?' open':'')+'" role="listitem">'+(del||sel?'':'<button type="button" class="imdel" aria-label="Archive conversation with '+esc(w.name)+'">Archive</button>')+'<a href="#" class="imrow'+(t.topic_id===S.topic&&!S.mnew&&window.innerWidth>760?' on':'')+'">'+(sel?'<span class="imck'+(sel[t.topic_id]?' on':'')+'" aria-hidden="true"></span>':'')+'<span class="imdot'+(un?' un':'')+'" aria-label="'+(un?un+' unread':'')+'"></span>'+imAv(w)+'<span class="imtx"><span class="imr1"><b>'+esc(w.name)+'</b><span class="imwhen">'+esc(imWhen(last?last.sent_at:t.created_at))+(sel||del?'':'<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>')+'</span></span><span class="impv">'+esc(last?(last.attachments&&last.attachments.length&&!String(last.body||'').trim()?'Attachment: '+last.attachments.length+(last.attachments.length===1?' file':' files'):last.body):'No messages yet')+'</span></span>'+(del&&!sel?'<button type="button" class="imlink rec">Restore</button>':'')+'</a></div>');
+      var r=$('.imrow',wrap),db_=$('.imdel',wrap),rec=$('.rec',wrap),moved=false;
+      if(rec)rec.onclick=function(ev){ev.preventDefault();ev.stopPropagation();imHide([String(t.topic_id)],false)};
+      if(db_)db_.onclick=function(){imHide([String(t.topic_id)],true)};
+      r.onclick=function(ev){ev.preventDefault();if(moved){moved=false;return}if(S.swiped){S.swiped=null;$all('.imsw.open',v).forEach(function(x){x.classList.remove('open');$('.imrow',x).style.transform=''});if(S.swiped!==t.topic_id)return}if(S.msel){if(S.msel[t.topic_id])delete S.msel[t.topic_id];else S.msel[t.topic_id]=1;render();return}if(del)return;openTopic(t)};
+      // Slide left to reveal Delete, as on a phone.
+      if(db_){var x0=null,dx=0;r.addEventListener('pointerdown',function(e){if(e.pointerType==='mouse')return;x0=e.clientX;dx=0;r.style.transition='none'});r.addEventListener('pointermove',function(e){if(x0===null)return;dx=Math.min(0,Math.max(-96,e.clientX-x0+(wrap.classList.contains('open')?-88:0)));if(Math.abs(e.clientX-x0)>8){moved=true;r.style.transform='translateX('+dx+'px)'}});
+        function up(){if(x0===null)return;x0=null;r.style.transition='';var open=dx<-44;wrap.classList.toggle('open',open);r.style.transform=open?'translateX(-88px)':'';S.swiped=open?t.topic_id:null;setTimeout(function(){moved=false},50)}r.addEventListener('pointerup',up);r.addEventListener('pointercancel',up)}
+      l.appendChild(wrap)})}
   drawList();
-  if(S.msel){var n=Object.keys(S.msel).length,bb=el('<div class="imsel"><button type="button" class="imlink ra">Read all</button><button type="button" class="imlink ar"'+(n?'':' disabled')+'>'+(arch?'Move back':'Archive')+(n?' ('+n+')':'')+'</button></div>');
-    $('.ra',bb).onclick=function(){var ts=topics.filter(function(t){return inList(t)&&topicUnread(t)});var col=co?'read_by_coordinator':'read_by_client';ts.forEach(function(t){topicMsgs(t.topic_id).forEach(function(m){m[col]=true})});Promise.all(ts.map(function(t){return call('readTopic',{topicId:t.topic_id}).catch(function(){})})).then(function(){S.msel=null;render()})};
-    $('.ar',bb).onclick=function(){var ids=Object.keys(S.msel).filter(function(id){var t=topics.filter(function(x){return String(x.topic_id)===id})[0];return t&&t.kind!=='auto'});Promise.all(ids.map(function(id){return call('setTopicStatus',{topicId:id,status:arch?'Active':'Archived'})})).then(function(){S.msel=null;return refresh()}).catch(alertErr)};
+  if(S.msel){var n=Object.keys(S.msel).length,bb=el('<div class="imsel">'+(del?'<span></span>':'<button type="button" class="imlink ra">Read all</button>')+'<button type="button" class="imlink ar"'+(n?'':' disabled')+'>'+(del?'Restore':'Archive')+(n?' ('+n+')':'')+'</button></div>');
+    var ra=$('.ra',bb);if(ra)ra.onclick=function(){var ts=topics.filter(function(t){return inList(t)&&topicUnread(t)});var col=co?'read_by_coordinator':'read_by_client';ts.forEach(function(t){topicMsgs(t.topic_id).forEach(function(m){m[col]=true})});Promise.all(ts.map(function(t){return call('readTopic',{topicId:t.topic_id}).catch(function(){})})).then(function(){S.msel=null;render()})};
+    $('.ar',bb).onclick=function(){imHide(Object.keys(S.msel),!del)};
     $('.iml',v).appendChild(bb)}
   var right=$('.imr',v);
-  if(S.mnew){right.appendChild(newTopicPane());return v}
+  if(S.mer)v.appendChild(imEr());
+  if(S.mnew){right.appendChild(imCompose());return v}
   if(!cur){right.appendChild(el('<div class="imempty">'+(topics.length?'Pick a conversation.':'Tap the pencil to write to '+esc(cf)+'.')+'</div>'));return v}
-  var ms=topicMsgs(cur.topic_id),sys=cur.kind==='auto',unOther=unreadTotal()-topicUnread(cur);
-  var hdr=el('<header class="imh"><button type="button" class="imback" aria-label="Back to all messages"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>'+(unOther>0?'<span class="imbadge">'+unOther+'</span>':'')+'</button><button type="button" class="imwho" aria-label="Details for '+esc(sys?BOOT.appName:cur.title)+'">'+imAv(cur,co,cn,d)+'<span class="imwn">'+esc(sys?BOOT.appName:cur.title)+'<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span><span class="imws">'+esc(sys?'Reminders and confirmations':co?famName(d.client.family_name):(cn?cn.name:'Your coordinator')+', your coordinator')+'</span></button><span class="imhr"></span></header>');
-  $('.imback',hdr).onclick=function(){S.mopen=false;S.draftT=null;render()};
+  var ms=topicMsgs(cur.topic_id),w=imWho(cur),unOther=unreadTotal()-topicUnread(cur);
+  var hdr=el('<header class="imh"><button type="button" class="imback" aria-label="Back to all messages"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>'+(unOther>0?'<span class="imbadge">'+unOther+'</span>':'')+'</button><button type="button" class="imwho" aria-label="Details and scheduling for '+esc(w.name)+'">'+imAv(w)+'<span class="imwn">'+esc(w.name)+'<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span><span class="imws">'+esc(w.sub)+'</span></button><span></span></header>');
+  $('.imback',hdr).onclick=function(){S.mopen=false;render()};
   $('.imwho',hdr).onclick=function(){S.minfo=true;render()};
-  if(!sys&&!co){var bk=el('<button type="button" class="imico" aria-label="Book time with '+esc(cf)+'"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></button>');bk.onclick=function(){S.view='find';S.fc='book';S.touched=true;S.mopen=false;render()};$('.imhr',hdr).appendChild(bk)}
   right.appendChild(hdr);
   if(co){var ps=profileStrip();ps.classList.add('mstrip');right.appendChild(ps)}
-  if(cur.kind==='medical')right.appendChild(el('<div class="imwarn"><b>911</b> if it is life-threatening · <b>988</b> for a crisis · your surgeon’s office for anything about the body. We help you ask; we do not answer medical questions.</div>'));
-  var body=el('<div class="imbody"></div>'),lastT=0,lastMine=null;
-  if(!ms.length)body.appendChild(el('<p class="imnone" style="text-align:center">Nothing here yet. Say what is on your mind.</p>'));
-  ms.forEach(function(m,i){var w=toDate(m.sent_at),mine=m.sender_email===me.email,sysm=m.sender_email==='system',prev=ms[i-1];
-    if(!w||w-lastT>60*60000)body.appendChild(el('<div class="imstamp">'+esc(imStamp(m.sent_at))+'</div>'));lastT=w||lastT;
-    var who=(!mine&&co&&!sysm&&(!prev||prev.sender_email!==m.sender_email))?'<div class="imfrom">'+esc(senderName(m.sender_email))+'</div>':'';
-    var att=(m.attachments||[]).map(function(a){var img=String(a.type||'').indexOf('image/')===0;return img?'<a href="'+esc(a.url)+'" target="_blank" rel="noopener" class="imimg" data-id="'+esc(a.id)+'"><img src="'+esc(a.url)+'" alt="'+esc(a.name)+'" loading="lazy"></a>':'<a href="'+esc(a.url)+'" target="_blank" rel="noopener" class="imfile" data-id="'+esc(a.id)+'">'+ICON.file+'<span>'+esc(a.name)+'</span></a>'}).join('');
-    var b=el('<div class="imb'+(mine?' me':'')+(isTrueV(m.urgent)?' urg':'')+'">'+who+(isTrueV(m.urgent)?'<div class="imut">Urgent</div>':'')+att+(String(m.body||'').trim()?'<div class="imtxt">'+esc(m.body)+'</div>':'')+'</div>');
-    body.appendChild(b);if(mine)lastMine={el:b,m:m}});
-  if(lastMine&&ms[ms.length-1]===lastMine.m){var rd=isTrueV(lastMine.m[co?'read_by_client':'read_by_coordinator']);body.appendChild(el('<div class="imrcpt">'+(rd?'Read':'Delivered')+'</div>'))}
-  right.appendChild(body);
-  if(!sys&&cur.status==='Archived'){var ab=el('<div class="imarch">This conversation is archived. <button type="button" class="imlink">Move it back</button></div>');$('button',ab).onclick=function(){call('setTopicStatus',{topicId:cur.topic_id,status:'Active'}).then(function(){S.mf='active';return refresh()}).catch(alertErr)};right.appendChild(ab)}
-  else if(!sys){
-    var f=el('<form class="imcomp"><div class="implus"><button type="button" class="imround" aria-label="Add a photo, a file, or mark urgent"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button><div class="impm" hidden><label class="impi"><input type="file" multiple accept="image/*,application/pdf" hidden>'+ICON.clip+'<span>Photo or PDF</span></label>'+(co?'':'<label class="impi"><input type="checkbox" class="urgc"><span>Mark urgent — emails '+esc(cf)+' now</span></label>')+'</div></div><div class="impill"><div class="chips"></div><textarea rows="1" placeholder="Message" aria-label="Message '+esc(cf)+'"></textarea><button type="submit" class="imsend" aria-label="Send" hidden><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div><p class="err"></p></form>');
-    var picked=[],ta=$('textarea',f),sb=$('.imsend',f),chips=$('.chips',f),pm=$('.impm',f);
-    function upd(){sb.hidden=!(ta.value.trim()||picked.length)}
-    function drawChips(){chips.innerHTML='';picked.forEach(function(x,i){var c=el('<span class="chip2">'+esc(x.name)+' <a href="#" aria-label="Remove">×</a></span>');$('a',c).onclick=function(ev){ev.preventDefault();picked.splice(i,1);drawChips();upd()};chips.appendChild(c)});upd()}
-    $('.imround',f).onclick=function(){pm.hidden=!pm.hidden};
-    var fin=$('input[type=file]',f);fin.onchange=function(){pm.hidden=true;Array.prototype.slice.call(fin.files).slice(0,4-picked.length).forEach(function(file){if(file.size>10*1024*1024){$('.err',f).textContent='Keep each file under 10 MB.';return}var rdr=new FileReader();rdr.onload=function(){picked.push({name:file.name,type:file.type,b64:String(rdr.result).split(',')[1]});drawChips()};rdr.readAsDataURL(file)});fin.value=''};
-    var uc=$('.urgc',f);if(uc)uc.onchange=function(){f.classList.toggle('urg',uc.checked);ta.placeholder=uc.checked?'Urgent message':'Message';pm.hidden=true};
-    ta.oninput=function(){this.style.height='auto';this.style.height=Math.min(140,this.scrollHeight)+'px';upd()};
-    ta.onkeydown=function(ev){if(ev.key==='Enter'&&!ev.shiftKey&&window.innerWidth>760){ev.preventDefault();f.requestSubmit?f.requestSubmit():f.onsubmit(ev)}};
-    f.onsubmit=function(ev){ev.preventDefault();if(!ta.value.trim()&&!picked.length)return;sb.disabled=true;(cur.draft?call('newTopic',{kind:cur.kind,title:cur.title}).then(function(r){S.draftT=null;S.topic=r.topic.topic_id;return r.topic.topic_id}):Promise.resolve(cur.topic_id)).then(function(tid){return (S.ib=null,call)('sendMessage',{topicId:tid,body:ta.value,urgent:!!(uc&&uc.checked),files:picked})}).then(function(){ta.value='';picked=[];return refresh()}).catch(function(e){$('.err',f).textContent=e.message;sb.disabled=false})};
-    right.appendChild(f);
-  }
-  if(S.minfo)v.appendChild(imInfo(cur,ms,sys,co,cn,d,cf));
-  setTimeout(function(){body.scrollTop=body.scrollHeight},0);
+  right.appendChild(imThread(ms,co,me));
+  if(!w.sys)right.appendChild(imComposer(function(body,urgent,files){return call('sendMessage',{topicId:cur.topic_id,body:body,urgent:urgent,files:files})},!co&&!w.fam,cf));
+  if(S.minfo)v.appendChild(imInfo(cur,ms,w,co,d,cf));
+  setTimeout(function(){var b=$('.imbody',v);if(b)b.scrollTop=b.scrollHeight},0);
   return v;
 }
-// Details for one conversation: who it is with, a call and a booking button, and what has been shared in it.
-function imInfo(cur,ms,sys,co,cn,d,cf){
+// "On your way to the emergency department?" — 911 and 988 one tap away, and one line that tells the coordinator,
+// as an urgent message. No promises about what happens next: every hospital answers differently (Joe, 2026-09-28).
+function imEr(){
+  var d=S.data,cf=first(d.coordinator&&d.coordinator.name)||'your coordinator';
+  var o=el('<div class="iminfo" role="dialog" aria-modal="true" aria-label="On your way to the emergency department"><div class="imsheet"><div class="imsh"><button type="button" class="imlink dn">Close</button></div><div class="imcenter"><h2>On your way to the ED?</h2><p class="muted">In an emergency, call first.</p></div><div class="imacts"><a class="imact em" href="tel:911"><b>911</b><span>emergency</span></a><a class="imact" href="tel:988"><b>988</b><span>crisis line</span></a></div><form class="imsec imerf"><h3>Let your care coordinator know</h3><p class="small muted" style="margin:-4px 0 10px">It is sent as urgent, right away.</p><div class="field"><label>Which emergency department</label><input name="hospital" required maxlength="160" placeholder="Hospital, or the town" value="'+esc((d.walk&&d.walk.name)||'')+'"></div><div class="field"><label>What is happening (a line is enough)</label><textarea name="why" maxlength="1000" style="min-height:56px"></textarea></div><button class="btn block" type="submit">Notify your care coordinator</button><p class="err"></p></form></div></div>');
+  function close(){S.mer=false;S.merDone=null;render()}
+  $('.dn',o).onclick=close;o.onclick=function(ev){if(ev.target===o)close()};o.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
+  var f=$('form',o);f.onsubmit=function(ev){ev.preventDefault();var fd=formData(f);busy($('button[type=submit]',f),true,'Paging…');call('erAlert',fd).then(function(){S.merDone=fd.hospital;return refresh()}).catch(function(e){$('.err',f).textContent=e.message;busy($('button[type=submit]',f),false,'Notify your care coordinator')})};
+  if(S.merDone)f.innerHTML='<h3>Your care coordinator has been notified</h3><p style="margin:6px 0 0">If it is life-threatening, call <b>911</b>.</p>';
+  setTimeout(function(){var b=$('.dn',o);if(b)b.focus()},0);
+  return o}
+function imThread(ms,co,me){
+  var body=el('<div class="imbody"></div>'),lastT=0,lastMine=null;
+  if(!ms.length)body.appendChild(el('<p class="imnone" style="text-align:center">Nothing here yet.</p>'));
+  ms.forEach(function(m,i){var w=toDate(m.sent_at),mine=m.sender_email===me.email,sysm=m.sender_email==='system',prev=ms[i-1];
+    if(!w||w-lastT>60*60000)body.appendChild(el('<div class="imstamp">'+esc(imStamp(m.sent_at))+'</div>'));lastT=w||lastT;
+    var who=(!mine&&!sysm&&(!prev||prev.sender_email!==m.sender_email)&&(co||(S.data.coordinator&&m.sender_email!==String(S.data.coordinator.email||'').toLowerCase())))?'<div class="imfrom">'+esc(co?senderName(m.sender_email):(imPeople().filter(function(p){return p.key===String(m.sender_email).toLowerCase()})[0]||{name:m.sender_email}).name)+'</div>':'';
+    var att=(m.attachments||[]).map(function(a){var img=String(a.type||'').indexOf('image/')===0;return img?'<a href="'+esc(a.url)+'" target="_blank" rel="noopener" class="imimg"><img src="'+esc(a.url)+'" alt="'+esc(a.name)+'" loading="lazy"></a>':'<a href="'+esc(a.url)+'" target="_blank" rel="noopener" class="imfile">'+ICON.file+'<span>'+esc(a.name)+'</span></a>'}).join('');
+    var b=el('<div class="imb'+(mine?' me':'')+(isTrueV(m.urgent)?' urg':'')+'">'+who+(isTrueV(m.urgent)?'<div class="imut">Urgent</div>':'')+att+(String(m.body||'').trim()?'<div class="imtxt">'+esc(m.body)+'</div>':'')+'</div>');
+    body.appendChild(b);if(mine)lastMine=m});
+  if(lastMine&&ms[ms.length-1]===lastMine)body.appendChild(el('<div class="imrcpt">'+(isTrueV(lastMine[co?'read_by_client':'read_by_coordinator'])?'Read':'Delivered')+'</div>'));
+  return body}
+// The typing bar: a round + for a photo, a PDF, or marking it urgent; a pill to write in; the arrow appears once there is something to send.
+function imComposer(send,canUrgent,cf){
+  var f=el('<form class="imcomp"><div class="implus"><button type="button" class="imround" aria-label="Add a photo or file'+(canUrgent?', or mark urgent':'')+'"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button><div class="impm" hidden><label class="impi"><input type="file" multiple accept="image/*,application/pdf" hidden>'+ICON.clip+'<span>Photo or PDF</span></label>'+(canUrgent?'<label class="impi"><input type="checkbox" class="urgc"><span>Mark urgent — '+esc(cf)+' is emailed right away</span></label>':'')+'</div></div><div class="impill"><div class="chips"></div><textarea rows="1" placeholder="Message" aria-label="Message"></textarea><button type="submit" class="imsend" aria-label="Send" hidden><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div><p class="err"></p></form>');
+  var picked=[],ta=$('textarea',f),sb=$('.imsend',f),chips=$('.chips',f),pm=$('.impm',f),uc=$('.urgc',f);
+  function upd(){sb.hidden=!(ta.value.trim()||picked.length)}
+  function drawChips(){chips.innerHTML='';picked.forEach(function(x,i){var c=el('<span class="chip2">'+esc(x.name)+' <a href="#" aria-label="Remove">×</a></span>');$('a',c).onclick=function(ev){ev.preventDefault();picked.splice(i,1);drawChips()};chips.appendChild(c)});upd()}
+  $('.imround',f).onclick=function(){pm.hidden=!pm.hidden};
+  var fin=$('input[type=file]',f);fin.onchange=function(){pm.hidden=true;Array.prototype.slice.call(fin.files).slice(0,4-picked.length).forEach(function(file){if(file.size>10*1024*1024){$('.err',f).textContent='Keep each file under 10 MB.';return}var rdr=new FileReader();rdr.onload=function(){picked.push({name:file.name,type:file.type,b64:String(rdr.result).split(',')[1]});drawChips()};rdr.readAsDataURL(file)});fin.value=''};
+  if(uc)uc.onchange=function(){f.classList.toggle('urg',uc.checked);ta.placeholder=uc.checked?'Urgent message':'Message';pm.hidden=true};
+  ta.oninput=function(){this.style.height='auto';this.style.height=Math.min(140,this.scrollHeight)+'px';upd()};
+  ta.onkeydown=function(ev){if(ev.key==='Enter'&&!ev.shiftKey&&window.innerWidth>760){ev.preventDefault();f.requestSubmit?f.requestSubmit():f.onsubmit(ev)}};
+  f.onsubmit=function(ev){ev.preventDefault();if(!ta.value.trim()&&!picked.length)return;sb.disabled=true;Promise.resolve(send(ta.value,!!(uc&&uc.checked),picked)).then(function(){ta.value='';picked=[];return refresh()}).catch(function(e){$('.err',f).textContent=e.message;sb.disabled=false})};
+  return f}
+// New Message: To: who it is for, then write. One conversation per person — writing to someone you already talk with continues that thread.
+function imCompose(){
+  var d=S.data,co=d.me.role==='coordinator',N=S.mnew,people=co?[{key:'family',name:famName(d.client.family_name),sub:'The family'}]:imPeople();
+  var v=el('<div class="imnew"><header class="imnh"><span></span><b>New Message</b><button type="button" class="imlink cx">Cancel</button></header><div class="imto"><span class="muted">To:</span><span class="imtos"></span><input aria-label="To" placeholder="'+(co?'':'Name')+'"></div><div class="impeople"></div><div class="imsp"></div></div>');
+  $('.cx',v).onclick=function(){S.mnew=null;render()};
+  var inp=$('.imto input',v);if(co)inp.hidden=true;
+  function draw(){var tos=$('.imtos',v),pl=$('.impeople',v);tos.innerHTML='';pl.innerHTML='';
+    N.to.forEach(function(k){var p=people.filter(function(x){return x.key===k})[0];if(!p)return;var c=el('<span class="imtoc">'+esc(p.name)+(co?'':' <a href="#" aria-label="Remove '+esc(p.name)+'">×</a>')+'</span>');var a=$('a',c);if(a)a.onclick=function(ev){ev.preventDefault();N.to=N.to.filter(function(x){return x!==k});draw()};tos.appendChild(c)});
+    if(co)return;var q=inp.value.trim().toLowerCase();
+    people.filter(function(p){return N.to.indexOf(p.key)<0&&(!q||p.name.toLowerCase().indexOf(q)>=0)}).forEach(function(p){var r=el('<button type="button" class="imperson">'+imAv({name:p.name,fam:p.key!=='coordinator'})+'<span><b>'+esc(p.name)+'</b><small>'+esc(p.sub)+'</small></span></button>');r.onclick=function(){N.to.push(p.key);inp.value='';draw();var t=$('.imcomp textarea',v);if(t)t.focus()};pl.appendChild(r)});
+    if(!people.length)pl.appendChild(el('<p class="imnone">Nobody to write to yet.</p>'))}
+  inp.oninput=draw;draw();
+  v.appendChild(imComposer(function(body,urgent,files){
+    if(!N.to.length)return Promise.reject(new Error('Pick who it is to.'));
+    var withCo=co||N.to.indexOf('coordinator')>=0,me=String(d.me.email).toLowerCase(),want=N.to.filter(function(k){return k!=='coordinator'}).concat([me]).sort().join(',');
+    var ts=(d.topics||[]).slice().sort(function(a,b){return String(b.last_at||b.created_at).localeCompare(String(a.last_at||a.created_at))});
+    var hit=withCo?ts.filter(function(t){return t.kind!=='auto'&&t.kind!=='family'})[0]:ts.filter(function(t){return t.kind==='family'&&((t.extra&&t.extra.to)||[]).slice().sort().join(',')===want})[0];
+    return (hit?Promise.resolve(hit.topic_id):call('newTopic',withCo?{kind:'question'}:{to:N.to}).then(function(r){return r.topic.topic_id})).then(function(tid){return call('sendMessage',{topicId:tid,body:body,urgent:urgent,files:files}).then(function(){S.mnew=null;S.topic=tid;S.mopen=true;S.mf='active'})})
+  },!co,first(d.coordinator&&d.coordinator.name)||'your coordinator'));
+  setTimeout(function(){if(!co)inp.focus()},0);
+  return v}
+// Details for one conversation: the person, a call and a scheduling button, what has been shared, and Archive.
+function imInfo(cur,ms,w,co,d,cf){
   var files=[];ms.forEach(function(m){(m.attachments||[]).forEach(function(a){files.push({a:a,m:m})})});
   var imgs=files.filter(function(x){return String(x.a.type||'').indexOf('image/')===0}),docs=files.filter(function(x){return String(x.a.type||'').indexOf('image/')!==0});
-  var ph=co?(d.client&&d.client.phone):BOOT.phone;
-  var o=el('<div class="iminfo" role="dialog" aria-modal="true" aria-label="Conversation details"><div class="imsheet"><div class="imsh"><button type="button" class="imlink dn">Done</button></div><div class="imcenter">'+imAv(cur,co,cn,d,true)+'<h2>'+esc(sys?BOOT.appName:(co?famName(d.client.family_name):(cn?cn.name:'Your coordinator')))+'</h2><p class="muted">'+esc(sys?'Reminders and confirmations':cur.title)+'</p></div>'+(sys?'':'<div class="imacts">'+(ph?'<a class="imact" href="tel:'+esc(String(ph).replace(/[^\d+]/g,''))+'"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><span>call</span><small>'+esc(ph)+'</small></a>':'')+(co?'':'<button type="button" class="imact bk"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>book time</span></button>')+'<button type="button" class="imact ar"><svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM3 4h18v3H3zM10 12h4"/></svg><span>'+(cur.status==='Archived'?'move back':'archive')+'</span></button></div>')+'<div class="imsec"><h3>Photos</h3><div class="imgrid"></div></div><div class="imsec"><h3>Documents</h3><div class="imdocs"></div></div></div></div>');
+  var ph=co?(d.client&&d.client.phone):(w.co?BOOT.phone:'');
+  var o=el('<div class="iminfo" role="dialog" aria-modal="true" aria-label="Conversation details"><div class="imsheet"><div class="imsh"><button type="button" class="imlink dn">Done</button></div><div class="imcenter">'+imAv(w,true)+'<h2>'+esc(w.name)+'</h2><p class="muted">'+esc(w.sub)+'</p></div><div class="imacts">'+(ph?'<a class="imact" href="tel:'+esc(String(ph).replace(/[^\d+]/g,''))+'"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><span>call</span><small>'+esc(ph)+'</small></a>':'')+(w.co&&!co?'<button type="button" class="imact bk"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>schedule</span><small>a time with '+esc(cf)+'</small></button>':'')+'</div><div class="imsec"><h3>Photos</h3><div class="imgrid"></div></div><div class="imsec"><h3>Documents</h3><div class="imdocs"></div></div><button type="button" class="imsec imdelc">Archive conversation</button></div></div>');
+  if(!$('.imact',o))$('.imacts',o).remove();
   function close(){S.minfo=false;render()}
   $('.dn',o).onclick=close;o.onclick=function(ev){if(ev.target===o)close()};o.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
   var bk=$('.bk',o);if(bk)bk.onclick=function(){S.minfo=false;S.mopen=false;S.view='find';S.fc='book';S.touched=true;render()};
-  var ar=$('.ar',o);if(ar)ar.onclick=function(){if(cur.draft){close();return}call('setTopicStatus',{topicId:cur.topic_id,status:cur.status==='Archived'?'Active':'Archived'}).then(function(){S.minfo=false;S.mopen=false;S.topic=null;return refresh()}).catch(alertErr)};
+  $('.imdelc',o).onclick=function(){S.minfo=false;imHide([String(cur.topic_id)],true)};
   var g=$('.imgrid',o);if(!imgs.length)g.appendChild(el('<p class="imnone">No photos shared here yet.</p>'));imgs.forEach(function(x){g.appendChild(el('<a href="'+esc(x.a.url)+'" target="_blank" rel="noopener"><img src="'+esc(x.a.url)+'" alt="'+esc(x.a.name)+'" loading="lazy"></a>'))});
   var dl=$('.imdocs',o);if(!docs.length)dl.appendChild(el('<p class="imnone">No documents shared here yet.</p>'));
   docs.forEach(function(x){var r=el('<div class="imdoc">'+ICON.file+'<a href="'+esc(x.a.url)+'" target="_blank" rel="noopener">'+esc(x.a.name)+'</a><span class="small muted">'+esc(imWhen(x.m.sent_at))+'</span><button type="button" class="imlink keep">Save to Documents</button></div>');
     $('.keep',r).onclick=function(){var b=this,kind=uiAsk('File it under: Discharge, Insurance, Forms, Letters, Living will, or Other','Other',this,arguments);if(kind===null)return;call('keepAttachment',{messageId:x.m.message_id,fileId:x.a.id,kind:kind}).then(function(){b.textContent='Saved';refresh()}).catch(alertErr)};dl.appendChild(r)});
   setTimeout(function(){var b=$('.dn',o);if(b)b.focus()},0);
   return o}
-function newTopicPane(){
-  var d=S.data,co=d.me.role==='coordinator',cn=d.coordinator,cf=co?famName(d.client.family_name):(first(cn&&cn.name)||'your coordinator');
-  var TK=BOOT.topicKinds||{question:'Question for {CO}',plan:'About the plan',billing:'Billing',urgent:'Something urgent today',other:'Something else'};
-  var kinds=[['question',(TK.question||'Question for {CO}').replace('{CO}',co?'the family':first(cn&&cn.name)||'your coordinator'),'Anything on your mind that is not urgent.'],['plan',TK.plan,'An item, a date, a change on the plan.'],['medical',TK.medical||'A medical question',co?'You pass it to the care team; you do not answer it.':'We get you to the right person fast — we do not answer it ourselves.'],['billing',TK.billing,'An invoice or a payment.'],['urgent',TK.urgent,co?'Marked urgent in their inbox.':cf+' is flagged right away. Not for emergencies.'],['other',TK.other,'Give it a name of your own.']];
-  var v=el('<div class="imnew"><header class="imnh"><span></span><b>New Message</b><button type="button" class="imlink cx">Cancel</button></header><div class="imto"><span class="muted">To:</span> <span class="imtoc">'+esc(co?famName(d.client.family_name):(cn?cn.name:'Your coordinator'))+'</span></div><div class="imabout"><div class="k">What is it about?</div><div class="opts"></div><form class="oth" hidden><input placeholder="Name it" maxlength="120" aria-label="Name the conversation"><button class="btn sm" type="submit">Start</button></form><p class="err"></p><p class="small muted" style="margin-top:14px">Medical emergency: call 911. Crisis: call or text 988.</p></div></div>');
-  $('.cx',v).onclick=function(){S.mnew=false;S.mopen=false;render()};
-  function start(kind,title){if(kind==='other'&&!String(title||'').trim()){$('.err',v).textContent='Give it a name.';return}var k=kinds.filter(function(x){return x[0]===kind})[0];S.draftT={kind:kind,title:kind==='other'?String(title).trim():(k?k[1]:'New message')};S.topic=null;S.mnew=false;S.mf='active';S.mq='';S.mopen=true;render()}
-  kinds.forEach(function(k){var a=el('<button type="button" class="imopt"><span><b>'+esc(k[1])+'</b><small>'+esc(k[2])+'</small></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>');a.onclick=function(){if(k[0]==='other'){var f=$('.oth',v);f.hidden=false;$('input',f).focus()}else start(k[0])};$('.opts',v).appendChild(a)});
-  $('.oth',v).onsubmit=function(ev){ev.preventDefault();start('other',$('input',this).value)};
-  return v;
-}
 // ---- in-page confirm and ask (2026-09-28): no browser pop-ups. A handler asks once; on Yes it runs again and
 // uiOk (or uiAsk, with the answer) lets it through. Esc or Cancel leaves everything as it was.
 function uiDialog(msg,def,onOk){var ask=def!==undefined&&def!==null&&def!==false;var prev=document.activeElement;
@@ -2380,7 +2436,7 @@ function topicMsgs(id){return (S.data.messages||[]).filter(function(m){return St
 // Who wrote a message, for the coordinator: the patient, an inner-circle member by name, or their email.
 function senderName(em){var d=S.data,c=d.client||{},e=String(em||'').toLowerCase();if(e&&e===String(d.patientUser||'').toLowerCase())return [c.patient_first_name,c.patient_last_name].filter(Boolean).join(' ')||'The patient';var u=(d.inner||[]).filter(function(x){return String(x.email||'').toLowerCase()===e})[0];if(u)return (u.name||u.email)+(u.relationship?' ('+u.relationship+')':'');return em||famName(c.family_name)}
 function topicUnread(t){var d=S.data,col=d.me.role!=='coordinator'?'read_by_client':'read_by_coordinator';return topicMsgs(t.topic_id).filter(function(m){return m.sender_email!==d.me.email&&!isTrueV(m[col])}).length}
-function unreadTotal(){return (S.data.topics||[]).filter(function(t){return t.status!=='Archived'}).reduce(function(n,t){return n+topicUnread(t)},0)}
+function unreadTotal(){return (S.data.topics||[]).filter(function(t){return !imHidden(t)}).reduce(function(n,t){return n+topicUnread(t)},0)}
 function openTopic(t){S.draftT=null;S.topic=t.topic_id;S.mnew=false;S.mopen=true;S.view='messages';S.touched=true;if(S.data.msgTrimmed&&!S.fullT[t.topic_id]){S.fullT[t.topic_id]=1;call('topicMessages',{topicId:t.topic_id}).then(function(r){if(!S.data||!S.data.messages)return;var col=S.data.me.role!=='coordinator'?'read_by_client':'read_by_coordinator';var rest=S.data.messages.filter(function(m){return String(m.topic_id)!==String(t.topic_id)});(r.messages||[]).forEach(function(m){m[col]=true});S.data.messages=rest.concat(r.messages||[]).sort(function(a,b){return String(a.sent_at).localeCompare(String(b.sent_at))});render()}).catch(function(){})}if(topicUnread(t)){var d=S.data,col=d.me.role!=='coordinator'?'read_by_client':'read_by_coordinator';topicMsgs(t.topic_id).forEach(function(m){m[col]=true});call('readTopic',{topicId:t.topic_id}).catch(function(){})}render()}
 
 // ---------------------------------------------------------------- updates as a timeline (2026-09-25)
@@ -2558,7 +2614,7 @@ function restrictionsEl(){
   var l=$('.rsl',w),any=false;
   keys.forEach(function(k){var r=rs[k.key];if(!r||r.status==='ask'&&!r.note)return;any=true;var word=r.status==='from'&&r.from?'From '+fmtShort(r.from):RS_WORD[r.status];l.appendChild(el('<div class="rsr '+esc(r.status)+'"><i></i><div><b>'+esc(k.label)+'</b> <span>'+esc(word)+'</span>'+(r.note?'<div class="small muted">'+esc(r.note)+'</div>':'')+'</div></div>'))});
   if(!any)l.appendChild(el('<p class="small muted" style="margin:0">Nothing written down yet. '+(co?'Click Change and go through the list with the team’s instructions in hand.':'Send '+esc(cf)+' what the team told you, and it goes here.')+'</p>'));
-  var g=$('.rsg',w);if(g)g.onclick=function(ev){ev.preventDefault();S.draftT={kind:'plan',title:'A change to what I can do right now'};S.topic=null;S.mnew=false;S.view='messages';S.mf='active';S.touched=true;render();window.scrollTo(0,0)};
+  var g=$('.rsg',w);if(g)g.onclick=function(ev){ev.preventDefault();S.draftT=null;S.topic=null;S.mnew={to:['coordinator']};S.view='messages';S.mf='active';S.touched=true;render();window.scrollTo(0,0)};
   var e=$('.rse',w);if(e)e.onclick=function(ev){ev.preventDefault();var f=el('<form class="rsf"></form>');keys.forEach(function(k){var r=rs[k.key]||{status:'ask',from:'',note:''};f.appendChild(el('<div class="rsq"><b>'+esc(k.label)+'</b><div class="rso">'+['ask','no','from','ok'].map(function(s){return'<label><input type="radio" name="'+k.key+'" value="'+s+'"'+(r.status===s?' checked':'')+'>'+esc({ask:'Not said',no:'Not yet',from:'From a date',ok:'Yes'}[s])+'</label>'}).join('')+'</div><div class="rsd"><input type="date" name="'+k.key+'_from" value="'+esc(r.from||'')+'"><input name="'+k.key+'_note" placeholder="The team’s words (optional)" maxlength="300" value="'+esc(r.note||'')+'"></div></div>'))});f.appendChild(el('<div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button class="btn sm" type="submit">Save</button><button class="btn sm quiet" type="button">Cancel</button><span class="small muted">A “not yet” adds the matching home check to the task list, once.</span></div><p class="err"></p>'));
     $('button.quiet',f).onclick=function(){render()};
     f.onsubmit=function(ev){ev.preventDefault();var out={};keys.forEach(function(k){var s=$('input[name="'+k.key+'"]:checked',f);out[k.key]={status:s?s.value:'ask',from:$('input[name="'+k.key+'_from"]',f).value,note:$('input[name="'+k.key+'_note"]',f).value}});call('setRestrictions',{restrictions:out}).then(function(r){if(r.made&&r.made.length)S.thanks=(r.made.length===1?'One home check':r.made.length+' home checks')+' added to the task list.';return refresh()}).catch(function(x){$('.err',f).textContent=x.message})};
