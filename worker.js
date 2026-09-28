@@ -15,7 +15,7 @@ const SECURITY = {
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https:",
     "connect-src 'self' https://api.incadencecare.com",
-    "frame-src https://api.incadencecare.com https://player.vimeo.com https://www.youtube-nocookie.com https://docs.google.com https://drive.google.com",
+    "frame-src https://api.incadencecare.com https://player.vimeo.com https://www.youtube-nocookie.com https://docs.google.com https://drive.google.com https://www.google.com",   // www.google.com: the map of where an appointment is (Find Care)
     "frame-ancestors 'none'",
     "base-uri 'none'",
     "form-action 'self'",
