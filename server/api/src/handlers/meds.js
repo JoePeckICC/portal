@@ -116,7 +116,7 @@ async function missedDose(ctx, p, c) {
   const med = await db.one(`select * from medications where client_id=$1 and med_id=$2`, [ctx.clientId, String(p.medId || '')], c); must(med, 'Not found');
   const client = await core.clientById(ctx.clientId, c), co = await core.coordinatorFor(client, c);
   const when = require('../util').niceWhen(p.dueAt);
-  await core.autoMsg(ctx.clientId, 'Missed dose: ' + med.name + ' (' + when + '). ' + (co ? first(co.name) : 'Your coordinator') + ' has been asked to check in.', c);
+  await core.autoMsg(ctx.clientId, 'Missed dose: ' + med.name + ' (' + when + '). ' + (co ? first(co.name) : 'Your coordinator') + ' knows, and will be in touch about what to do next.', c);
   const after = () => core.notifyCo(co, 'missed', 'Check-in asked — ' + famName(client.family_name), ctx.user.name + ' missed ' + med.name + (med.dose ? ' ' + med.dose : '') + ' due ' + when + ' and asked you to check in.', med.instructions, 'Open the portal');
   return { _after: after };
 }
