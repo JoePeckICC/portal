@@ -774,7 +774,7 @@ function shell(){
     who.innerHTML=sel;who.appendChild(chipEl());
     $('#fam',who).onchange=function(){S.clientId=this.value;store('ic_client',S.clientId);S.data=null;S.bk=null;S.topic=null;render();refresh()};
   } else {
-    who.innerHTML='';var vm=voiceEl();if(vm)who.appendChild(vm);who.appendChild(chipEl());
+    who.innerHTML='';who.appendChild(chipEl());   // the voice button is off the top bar until it is ready
   }
   var mb=$('#menub',s);if(mb){mb.onclick=function(ev){ev.preventDefault();S.drawer=true;render()};s.appendChild(drawerEl())}
   var hb=$('#homeb',s);if(hb)hb.onclick=function(ev){ev.preventDefault();S.touched=true;S.view='home';render()};
@@ -1019,7 +1019,13 @@ function homeSimple(){
   // 7. one goal for the day, theirs to set
   v.appendChild(dayGoalEl());
   // 8. one question a day, gone once answered
-  var ck=(d.checkins||[]).filter(function(x){var k=toDate(x.at);return k&&ymdLocal(k)===ymdLocal(new Date())&&x.by===d.me.email})[0];if(!ck)v.appendChild(checkinEl());
+  var ck=(d.checkins||[]).filter(function(x){var k=toDate(x.at);return k&&ymdLocal(k)===ymdLocal(new Date())&&x.by===d.me.email})[0];
+  if(!ck)v.appendChild(checkinEl());
+  else{ // checked in: its place goes to the next step on the plan for this phase — theirs first, then what the coordinator is doing
+    var open=plan.filter(function(p){return p.stage===P.stage&&p.status!=='Done'}).sort(function(a,b){var x=toDate(a.target_date),y=toDate(b.target_date);return (x?x.getTime():9e15)-(y?y.getTime():9e15)});
+    var nxp=open.filter(famPlan)[0]||open[0];
+    if(nxp){var mine=famPlan(nxp),na=el('<a href="#plan" class="hck"><span><span class="small muted">'+(mine?'Next on your plan':esc(cf)+' is working on')+'</span><br><b>'+esc(nxp.item)+'</b>'+(nxp.target_date?'<span class="small muted"> · by '+esc(fmtDate(nxp.target_date))+'</span>':'')+'</span><span aria-hidden="true">›</span></a>');na.onclick=function(ev){ev.preventDefault();go('plan')};v.appendChild(na)}
+  }
   // 8. something the coordinator picked, until it is opened
   var hr=d.recommended;if(hr&&!hr.opened_at){var hc=el('<a href="#resources" class="hck"><span><span class="small muted">'+esc(first(userName(hr.by)))+' picked this for you</span><br><b>'+esc(hr.title)+'</b></span><span aria-hidden="true">›</span></a>');hc.onclick=function(ev){ev.preventDefault();S.touched=true;S.view='resources';S.ro=null;if(S.res&&S.res.cid===S.clientId){openRes(hr.resource_id)}else{S.resLoading=true;loadRes().then(function(){S.resLoading=false;openRes(hr.resource_id)}).catch(function(){S.resLoading=false;render()})}};v.appendChild(hc)}
   $all('body>.sheet').forEach(function(x){x.remove()});
@@ -1191,7 +1197,7 @@ function drawerEl(){
   var groups=[
     ['Home',[['home','Home']]],
     ['Find Care',[['find:book','Schedule an appointment'],['find:team','View care team'],['find:ref','Referrals']]],
-    ['Messaging',[['messages','Message Center']]],
+    ['Messaging',[['messages','Messages']]],
     ['My Record',[['record:visits','Visits'],['record:summary','Health summary'],['record:timeline','Timeline'],['record:docs','Documents'],['plan','The Cadence Plan'],['tasks','Tasks'],['updates','Updates'],[co?'intake':'settings:answers',co?'Intake':'My answers']]],
     co?['Sharing',[['circle','The Circle'],['settings:inner','Inner circle']]]:null,
     ['Pharmacy',[['meds:list','Medications'],['meds:refills','Refills & pharmacy'],['meds:papers','Discharge papers']]],
@@ -2176,7 +2182,7 @@ function messagesView(){
   var topics=(d.topics||[]).slice().sort(function(a,b){return String(b.last_at)>String(a.last_at)?1:-1});
   function inFilter(t){return S.mf==='auto'?t.kind==='auto':S.mf==='archived'?t.status==='Archived':(t.status!=='Archived'&&t.kind!=='auto')}
   // Opening Messages lands where the unread messages are, so the number on the tile always leads somewhere.
-  if(!S.mf){S.mf='active';var unT=topics.filter(function(t){return t.status!=='Archived'&&topicUnread(t)})[0];if(unT){S.mf=unT.kind==='auto'?'auto':'active';S.topic=unT.topic_id}}
+  if(!S.mf){S.mf='active';var unT=topics.filter(function(t){return t.status!=='Archived'&&topicUnread(t)})[0];if(unT){S.mf=unT.kind==='auto'?'auto':'active';S.topic=unT.topic_id;S.mopen=true}}
   function inFilter0(t){return S.mf==='auto'?t.kind==='auto':S.mf==='archived'?t.status==='Archived':(t.status!=='Archived'&&t.kind!=='auto')}
   var list=topics.filter(inFilter);
   if(S.mq){var q=S.mq.toLowerCase();list=list.filter(function(t){return t.title.toLowerCase().indexOf(q)>=0||topicMsgs(t.topic_id).some(function(m){return String(m.body).toLowerCase().indexOf(q)>=0})})}
