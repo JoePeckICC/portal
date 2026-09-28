@@ -18,16 +18,17 @@ async function erAlert(ctx, p, c) {
   const client = await core.clientById(ctx.clientId, c);
   const row = await db.insert('escalations', { esc_id: id(), client_id: ctx.clientId, by: ctx.email, kind: 'ER', hospital, what: why, outcome: '' }, c);
   // it lands in Messages too, under the urgent topic, so the thread is where the family already looks
-  let t = await db.one(`select * from topics where client_id=$1 and kind='urgent' and status='Active' order by last_at desc nulls last limit 1`, [ctx.clientId], c);
+  // One conversation per person (2026-09-28): it goes into the family's thread with the coordinator, not a new one.
+  let t = await db.one(`select * from topics where client_id=$1 and kind not in ('auto','family') order by last_at desc nulls last, created_at desc limit 1`, [ctx.clientId], c);
   if (!t) t = await db.insert('topics', { topic_id: id(), client_id: ctx.clientId, title: C.TOPIC_KINDS.urgent, kind: 'urgent', status: 'Active', created_by: ctx.email }, c);
-  const body = 'Headed to the ER: ' + hospital + (why ? '\n' + why : '') + '\n\nIf this is life-threatening, call 911 first. Your coordinator has been paged and will call the ER ahead of you.';
+  const body = 'Headed to the ER: ' + hospital + (why ? '\n' + why : '') + '\n\nIf this is life-threatening, call 911. Your care coordinator has been notified.';
   await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: t.topic_id, sender_email: ctx.email, body, read_by_client: ctx.role === 'client', read_by_coordinator: false, urgent: true }, c);
-  await db.q(`update topics set last_at=now() where topic_id=$1`, [t.topic_id], c);
+  await db.q(`update topics set last_at=now(), status='Active', extra=coalesce(extra,'{}'::jsonb)-'hidden' where topic_id=$1`, [t.topic_id], c);
   const after = async () => {
     const co = await core.coordinatorFor(client);
     const name = (ctx.user && ctx.user.name) || ctx.email;
     await core.notifyCo(co, 'er', 'ER — ' + famName(client.family_name) + ' · ' + hospital, name + ' says they are headed to ' + hospital + ' now. Call the ED charge nurse before they arrive; the Health summary has what to read them.', why, 'Open the chart');
-    await core.notifyFamily(ctx.clientId, 'urgent', 'Headed to the ER — ' + hospital, name + ' let us know the family is headed to ' + hospital + '. Your coordinator is calling ahead.', why, 'Open the portal', ctx.email);
+    await core.notifyFamily(ctx.clientId, 'urgent', 'Headed to the ER — ' + hospital, name + ' let us know the family is headed to ' + hospital + '. Your care coordinator has been notified.', why, 'Open the portal', ctx.email);
   };
   return { escalation: row, _after: after };
 }

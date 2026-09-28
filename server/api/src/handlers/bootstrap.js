@@ -88,6 +88,9 @@ async function bootstrap(ctx) {
   out.checklists = require('../checklists').CHECKLISTS;
   out.ticks = await db.all(`select list_id, item_id, done_at, done_by from checklist_ticks where client_id=$1`, [cid]);
   const rm = await core.recentMessages(ctx); out.messages = rm.messages; if (rm.trimmed) out.msgTrimmed = true;
+  // Threads a family started among themselves are theirs; the coordinator's view leaves them out entirely.
+  if (ctx.role === 'coordinator') { const fo = {}; out.topics = out.topics.filter(t => { if (t.kind === 'family') { fo[t.topic_id] = 1; return false; } return true; }); out.messages = out.messages.filter(m => !fo[m.topic_id]); }
+  else out.topics = out.topics.filter(t => t.kind !== 'family' || ((t.extra && t.extra.to) || []).includes(ctx.email));
    out.circle = circle;
   const co = await core.coordinatorFor(client); out.coordinator = pubCo(co);
   const { apptPublic, localStamp } = require('../time');
@@ -117,6 +120,8 @@ async function latestRec(clientId) {
 // The rest of a conversation, fetched when someone opens a topic that the first load trimmed.
 async function topicMessages(ctx, p) {
   must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
+  const t = await core.topicById(ctx.clientId, p.topicId);
+  must(!(t && t.kind === 'family' && (ctx.role === 'coordinator' || !((t.extra && t.extra.to) || []).includes(ctx.email))), 'Not found');
   return { messages: (await db.all(`select * from messages where client_id=$1 and topic_id=$2 order by sent_at, message_id`, [ctx.clientId, String(p.topicId || '')])).map(m => core.msgPublic(m, ctx)) };
 }
 

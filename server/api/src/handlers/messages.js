@@ -7,7 +7,7 @@ const { id, must, clean, pick, famName, normEmail, EMAIL_RE, isTrue, first } = r
 
 // Topics: every conversation has one. Either side can open a topic; presets or a name of their own.
 // What the family reads the moment they open a medical question. We are not the doctors; we get them to the right one.
-const MEDICAL_LANE = cf => 'Before you type: we are not your doctors, and we will not guess at a medical answer. What we will do is help you get it from the right person, fast.\n\n' +
+const MEDICAL_LANE_UNUSED = cf => 'Before you type: we are not your doctors, and we will not guess at a medical answer. What we will do is help you get it from the right person, fast.\n\n' +
   'If you think it is an emergency, call 911 or go to the ER now — do not wait on a message. Then use “We’re headed to the ER” on your Home page and ' + cf + ' will call ahead.\n\n' +
   'If your discharge papers or your team told you to call them about something, call the number they gave you now.\n\n' +
   'If you are having thoughts of hurting yourself, call or text 988. If anyone in the house is in danger, call 911.\n\n' +
@@ -15,12 +15,20 @@ const MEDICAL_LANE = cf => 'Before you type: we are not your doctors, and we wil
 async function newTopic(ctx, p, c) {
   must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
   must(ctx.clientId, 'Pick a family first');
-  const kind = C.TOPIC_KINDS[p.kind] && p.kind !== 'auto' ? p.kind : 'other';
   const co = await core.coordinatorFor(await core.clientById(ctx.clientId, c), c);
-  const title = kind === 'other' ? clean(p.title, 120).trim() : C.TOPIC_KINDS[kind].replace('{CO}', first(co && co.name) || 'your coordinator');
-  must(title, 'Give the topic a name');
+  // A family member can write to people in their own circle without the coordinator (2026-09-28, Joe).
+  // Those threads are theirs: the coordinator never sees them.
+  const to = Array.isArray(p.to) ? p.to.map(normEmail).filter(Boolean) : [];
+  if (core.fam(ctx) && to.length && !to.includes('coordinator')) {
+    const fam = await db.all(`select email, name from users where client_id=$1 and active and lower(role) in ('client','family')`, [ctx.clientId], c);
+    const people = fam.filter(u => to.includes(normEmail(u.email)) && normEmail(u.email) !== ctx.email);
+    must(people.length, 'Pick who it is to');
+    const t = await db.insert('topics', { topic_id: id(), client_id: ctx.clientId, title: people.map(u => u.name || u.email).join(', '), kind: 'family', status: 'Active', created_by: ctx.email, extra: JSON.stringify({ to: people.map(u => normEmail(u.email)).concat([ctx.email]) }) }, c);
+    return { topic: t };
+  }
+  const kind = C.TOPIC_KINDS[p.kind] && p.kind !== 'auto' && p.kind !== 'family' ? p.kind : (p.kind ? 'other' : 'question');
+  const title = kind === 'other' ? (clean(p.title, 120).trim() || (first(co && co.name) || 'Your coordinator')) : C.TOPIC_KINDS[kind].replace('{CO}', first(co && co.name) || 'your coordinator');
   const t = await db.insert('topics', { topic_id: id(), client_id: ctx.clientId, title, kind, status: 'Active', created_by: ctx.email }, c);
-  if (kind === 'medical') await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: t.topic_id, sender_email: 'system', body: MEDICAL_LANE(first(co && co.name) || 'Your coordinator'), read_by_client: true, read_by_coordinator: true }, c);
   return { topic: t };
 }
 
@@ -43,14 +51,22 @@ async function sendMessage(ctx, p, c) {
     }
   }
   const urgent = topic.kind === 'urgent' || !!p.urgent;
-  const msg = await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: topic.topic_id, sender_email: ctx.email, body, read_by_client: ctx.role === 'client', read_by_coordinator: ctx.role === 'coordinator', urgent: !!p.urgent, attachments: JSON.stringify(atts) }, c);
+  const famOnly = topic.kind === 'family';
+  must(!(famOnly && ctx.role === 'coordinator'), 'Not found');
+  const msg = await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: topic.topic_id, sender_email: ctx.email, body, read_by_client: ctx.role === 'client', read_by_coordinator: ctx.role === 'coordinator' || famOnly, urgent: !!p.urgent, attachments: JSON.stringify(atts) }, c);
   if (atts.length) body = (body.trim() ? body + '\n\n' : '') + 'Attached: ' + atts.map(a => a.name).join(', ');
-  await db.q(`update topics set last_at=now(), status='Active' where topic_id=$1`, [topic.topic_id], c);
+  await db.q(`update topics set last_at=now(), status='Active', extra=coalesce(extra,'{}'::jsonb)-'hidden' where topic_id=$1`, [topic.topic_id], c);   // a new line brings a deleted conversation back, as on a phone
   // Replying is reading: everything before it in this topic is read by whoever replied.
   if (ctx.role === 'coordinator') await db.q(`update messages set read_by_coordinator=true where topic_id=$1 and client_id=$2`, [topic.topic_id, ctx.clientId], c);
   else if (ctx.role === 'client') await db.q(`update messages set read_by_client=true where topic_id=$1 and client_id=$2`, [topic.topic_id, ctx.clientId], c);
   const client = await core.clientById(ctx.clientId, c);
   const after = async () => {
+    if (famOnly) {   // only the people in the thread hear about it
+      const to = ((topic.extra && topic.extra.to) || []).filter(e => normEmail(e) !== ctx.email);
+      const users = await db.all(`select * from users where client_id=$1 and active and lower(email) = any($2)`, [ctx.clientId, to.map(normEmail)]);
+      for (const u of users) if (core.prefs(u).message) await mail.notify(u.email, ctx.user.name + ' wrote to you', ctx.user.name + ' wrote:', body, 'Open the portal');
+      return;
+    }
     if (core.fam(ctx)) {
       const co = await core.coordinatorFor(client);
       await core.notifyCo(co, urgent ? 'urgent' : topic.kind === 'medical' ? 'medical' : 'message', (urgent ? 'URGENT — ' : topic.kind === 'medical' ? 'Medical question — ' : '') + topic.title + ' — ' + famName(client.family_name).toLowerCase(), ctx.user.name + ' wrote in "' + topic.title + '":', body, 'Open the portal');
@@ -74,6 +90,18 @@ async function setTopicStatus(ctx, p, c) {
   const topic = await core.topicById(ctx.clientId, p.topicId, c);
   must(topic, 'Not found');
   await db.q(`update topics set status=$2 where topic_id=$1`, [topic.topic_id, p.status === 'Archived' ? 'Archived' : 'Active'], c);
+  return {};
+}
+
+// Deleting a conversation hides it for whoever deleted it; the record stays (we archive, we do not destroy).
+async function hideTopic(ctx, p, c) {
+  must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
+  const topic = await core.topicById(ctx.clientId, p.topicId, c);
+  must(topic, 'Not found');
+  const who = ctx.role === 'coordinator' ? 'coordinator' : ctx.email;
+  const h = new Set(((topic.extra && topic.extra.hidden) || []).map(String));
+  if (isTrue(p.hidden)) h.add(who); else h.delete(who);
+  await db.q(`update topics set extra=coalesce(extra,'{}'::jsonb) || jsonb_build_object('hidden', $2::jsonb) where topic_id=$1`, [topic.topic_id, JSON.stringify([...h])], c);
   return {};
 }
 
@@ -135,4 +163,4 @@ async function removeCircle(ctx, p, c) {
   return {};
 }
 
-module.exports = { newTopic, sendMessage, readTopic, setTopicStatus, postUpdate, addCircle, removeCircle };
+module.exports = { newTopic, sendMessage, readTopic, setTopicStatus, hideTopic, postUpdate, addCircle, removeCircle };
