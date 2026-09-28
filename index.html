@@ -1599,7 +1599,7 @@ function chartHome(){
   return v;
 }
 function userName(email){var d=S.data;if(!email)return'';if(d.coordinator&&d.coordinator.email===email)return d.coordinator.name;if(d.me.email===email)return d.me.name;if(d.patientUser===email)return [d.client.patient_first_name,d.client.patient_last_name].join(' ');var u=(d.inner||[]).filter(function(x){return x.email===email})[0];return u?u.name:email==='system'?'Portal':email}
-function docColor(k){return {Discharge:'#2F6B3A',Insurance:'#3B5B8C',Forms:'#7A2E2E',Letters:'#C09B36','Living will':'#6B3FA0',Other:'#5B6470'}[k]||'#5B6470'}
+function docColor(k){return {Discharge:'#2F6B3A',Insurance:'#3B5B8C',Forms:'#7A2E2E',Letters:'#C09B36','Living will':'#6B3FA0',Recording:'#0E6E6E',Other:'#5B6470'}[k]||'#5B6470'}
 function notePane(){
   var d=S.data,co=d.me.role==='coordinator',appts=(d.appointments||[]).slice().sort(function(a,b){return String(b.starts_at).localeCompare(String(a.starts_at))});
   var a=appts.filter(function(x){return x.appt_id===S.noteFor})[0]||appts.filter(function(x){return toDate(x.starts_at)<new Date()})[0]||appts[0];
@@ -1692,8 +1692,50 @@ function timelinePage(){
   ev.slice(0,60).forEach(function(e){box.appendChild(el('<div class="tle"><div class="small muted" style="width:96px;flex-shrink:0">'+esc(fmtShort(e.at).replace(/, \d{4}$/,''))+'</div><span class="dot" style="background:'+e.col+'"></span><div'+(e.col==='#CDD7E0'?' class="muted"':'')+'>'+esc(e.what)+'</div></div>'))});
   return v;
 }
+// ---- appointment recordings into text (2026-09-27). The coordinator adds a recording, confirms the clinician agreed
+// to it, and asks for a transcript. It comes back to the coordinator only; they check it and choose to share it.
+function isAudio(u){return /^(audio|video)\//.test(u.mime||'')||/\.(m4a|mp3|wav|webm|ogg|aac|mp4|mov|caf|flac|amr|3gp)$/i.test(u.name||'')}
+function recordingEl(){
+  var d=S.data,auds=(d.uploads||[]).filter(isAudio),pick=S.txFor&&auds.some(function(u){return u.upload_id===S.txFor})?S.txFor:'';
+  var f=el('<form class="card" id="txf"><span class="k">Transcribe a recording</span><p class="small muted" style="margin:8px 0 10px">A voice memo from the appointment, or one the family recorded in the portal. The transcript comes back to you first — usually within the hour, at most a day — and the family only sees it if you share it.</p>'+
+    '<div class="field"><label>Recording</label><select name="src"><option value="">A new file from this device…</option>'+auds.map(function(u){return '<option value="'+esc(u.upload_id)+'"'+(u.upload_id===pick?' selected':'')+'>'+esc(u.note&&u.kind==='Recording'?u.note:u.name)+' · '+esc(fmtShort(u.uploaded_at))+'</option>'}).join('')+'</select></div>'+
+    '<div class="field nf"><label>File</label><input type="file" name="file" accept="audio/*,video/*,.m4a,.mp3,.wav,.webm,.ogg,.aac,.caf,.amr,.3gp"></div>'+
+    '<div class="two"><div class="field"><label>What it was</label><input name="title" placeholder="Pre-op with Dr. Smith"></div><div class="field"><label>Date</label><input name="date" type="date"></div></div>'+
+    '<label class="small" style="display:flex;gap:8px;align-items:flex-start;margin:4px 0 12px"><input type="checkbox" name="consent" style="width:auto;margin-top:3px"> The clinician agreed to this recording in the room, and the family asked for it.</label>'+
+    '<button class="btn" type="submit">Transcribe</button> <span class="small muted prog" role="status"></span><p class="err"></p></form>');
+  var src=$('select[name=src]',f),nf=$('.nf',f);function sync(){nf.hidden=!!src.value}src.onchange=sync;sync();
+  f.onsubmit=function(ev){ev.preventDefault();var b=$('button',f),pr=$('.prog',f),er=$('.err',f);er.textContent='';
+    if(!$('input[name=consent]',f).checked){er.textContent='Confirm the clinician agreed to the recording first.';return}
+    var title=$('input[name=title]',f).value,date=$('input[name=date]',f).value,file=$('input[type=file]',f).files[0];
+    if(!src.value&&!file){er.textContent='Choose a recording.';return}
+    b.disabled=true;
+    var up=src.value?Promise.resolve(src.value):sendRecording(file,title,function(t){pr.textContent=t});
+    up.then(function(uid){pr.textContent='Starting the transcript… (a long recording takes a minute to prepare)';return call('transcribe',{uploadId:uid,title:title,apptDate:date,consent:true})})
+      .then(function(){S.txFor='';pr.textContent='';return refresh()}).catch(function(e){er.textContent=e.message;pr.textContent='';b.disabled=false})};
+  return f}
+// A recording goes up in 5 MB pieces; the last piece joins them. Resolves to the new upload's id.
+function sendRecording(file,title,say){var PART=5*1024*1024,n=Math.max(1,Math.ceil(file.size/PART)),sid=(Date.now().toString(36)+Math.random().toString(36).slice(2,10)).slice(0,20),i=0;
+  if(n>30)return Promise.reject(new Error('That recording is too long for one upload (the limit is about five hours).'));
+  function next(){var blob=file.slice(i*PART,(i+1)*PART);say('Uploading… '+Math.round(i/n*100)+'%');return new Promise(function(res,rej){var rd=new FileReader();rd.onload=function(){res(String(rd.result).split(',')[1]||'')};rd.onerror=rej;rd.readAsDataURL(blob)})
+    .then(function(b64){return call('addRecording',{sessionId:sid,part:i,parts:n,b64:b64,name:file.name,type:file.type,size:file.size,title:title})})
+    .then(function(r){i++;if(i<n)return next();return r.upload.upload_id})}
+  return next()}
+function transcriptsEl(){
+  var d=S.data,co=d.me.role==='coordinator',ts=d.transcripts||[];if(!ts.length)return null;
+  var w=el('<div class="card" style="margin-top:14px"><span class="k">'+(co?'Transcripts':'Appointment transcripts')+'</span>'+(co?'':'<p class="small muted" style="margin:6px 0 0">A written record of what was said, checked by your coordinator. It is not medical advice — your care team is the one to ask about what it means.</p>')+'</div>');
+  ts.forEach(function(t){var open=S.txOpen===t.transcript_id;
+    var st=t.status==='Working'?'<span class="small muted">Working on it — usually within the hour</span>':t.status==='Failed'?'<span class="small" style="color:#9B2C2C">Did not work: '+esc(t.error||'')+'</span>':co?'<span class="small" style="color:var(--gold-ink);font-weight:700">'+(t.shared?'Shared with the family':'Only you can see this')+'</span>':'';
+    var r=el('<div class="drow" style="display:block"><div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><b style="flex-grow:1">'+esc(t.title)+'</b><span class="small muted">'+esc(t.appt_date?fmtShort(t.appt_date):fmtShort(t.created_at))+(t.seconds?' · '+Math.max(1,Math.round(t.seconds/60))+' min':'')+'</span></div><div>'+st+'</div></div>');
+    if(t.status==='Ready'){var tg=el('<a href="#" class="small" aria-expanded="'+open+'">'+(open?'Close':'Read')+'</a>');tg.onclick=function(ev){ev.preventDefault();S.txOpen=open?'':t.transcript_id;render()};r.appendChild(tg)}
+    if(open&&t.status==='Ready'){
+      if(co){var ed=el('<div style="margin-top:10px"><textarea aria-label="Transcript of '+esc(t.title)+'" style="min-height:260px;font-size:14px;line-height:1.55">'+esc(t.text)+'</textarea><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><button class="btn sm" type="button">Save</button><label class="tgl small"><span class="swt'+(t.shared?' on':'')+'"></span>Share with the family</label><span class="small muted ok" role="status"></span></div></div>');
+        var sw=$('.swt',ed);$('button',ed).onclick=function(){call('saveTranscript',{transcriptId:t.transcript_id,text:$('textarea',ed).value}).then(function(){$('.ok',ed).textContent='Saved.';t.text=$('textarea',ed).value}).catch(alertErr)};
+        $('.tgl',ed).onclick=function(){var on=!sw.classList.contains('on');call('saveTranscript',{transcriptId:t.transcript_id,text:$('textarea',ed).value,shared:on}).then(refresh).catch(alertErr)};r.appendChild(ed)}
+      else r.appendChild(el('<div style="margin-top:10px;white-space:pre-wrap;line-height:1.6;font-size:15px">'+esc(t.text)+'</div>'))}
+    w.appendChild(r)});
+  return w}
 function docsPage(){
-  var d=S.data,co=d.me.role==='coordinator',fam=d.me.role==='family',cf=first(d.coordinator&&d.coordinator.name)||'your coordinator',K=['Discharge','Insurance','Forms','Letters','Living will','Other'];S.dk=S.dk||'';
+  var d=S.data,co=d.me.role==='coordinator',fam=d.me.role==='family',cf=first(d.coordinator&&d.coordinator.name)||'your coordinator',K=['Discharge','Insurance','Forms','Letters','Living will','Recording','Other'];S.dk=S.dk||'';
   var docs=(d.uploads||[]).slice().sort(function(a,b){return String(b.uploaded_at).localeCompare(String(a.uploaded_at))}).filter(function(u){return !S.dk||u.kind===S.dk});
   var v=el('<div class="cols"><section class="left"><div class="card"><div class="dfil"></div><div class="dl"></div></div>'+(co?'':'<div class="note" style="margin-top:12px">Waiting on a scan or a lab result is its own kind of hard. Results reach your surgeon first, sometimes days before anyone calls. If the portal you have with the hospital shows a result you do not understand, do not read it alone at midnight — write to '+esc(cf)+' and we will help you get the right person on the phone.</div>')+'<p class="small muted" style="margin:12px 0 0">Photos or PDFs, from a phone or a computer. Stored in '+esc(BOOT.appName)+'’s Drive. '+(co?'You can add a note to any of them.':'<b>Ask for help</b> on any row starts a Messages topic about that one thing — insurance, FMLA, the living will.')+'</p></section><aside class="stack"></aside></div>');
   var fil=$('.dfil',v);[''].concat(K).forEach(function(k){var a=el('<a href="#" class="dk'+(S.dk===k?' on':'')+'">'+(k||'All')+'</a>');a.onclick=function(ev){ev.preventDefault();S.dk=k;render()};fil.appendChild(a)});
@@ -1704,6 +1746,7 @@ function docsPage(){
   var lw=$('.lw',list);if(lw)lw.onclick=function(){askHelp('a living will','I would like help getting a living will done.')};
   docs.forEach(function(u){var row=el('<div class="drow"><span class="k dk" style="color:'+docColor(u.kind)+'">'+esc(u.kind)+'</span><div style="flex-grow:1;min-width:0"><a href="'+esc(u.url)+'" target="_blank" rel="noopener" style="font-weight:700">'+esc(u.name)+'</a><div class="small muted">'+esc(first(userName(u.uploaded_by)))+' · '+esc(fmtShort(u.uploaded_at))+'</div>'+(u.note?'<div class="small nt">'+esc(u.note)+'</div>':'')+'</div><div class="da"></div></div>');var da=$('.da',row);
     if(!fam){var tg=el('<label class="tgl small"><span class="swt'+(u.shared?' on':'')+'"></span>Inner circle</label>');var sw=$('.swt',tg);tg.onclick=function(){var on=!sw.classList.contains('on');sw.classList.toggle('on',on);call('setDoc',{uploadId:u.upload_id,shared:on}).catch(alertErr)};da.appendChild(tg)}
+    if(co&&isAudio(u)&&!(d.transcripts||[]).some(function(t){return t.upload_id===u.upload_id&&t.status!=='Failed'})){var tb=el('<a href="#" class="small">Transcribe</a>');tb.onclick=function(ev){ev.preventDefault();S.txFor=u.upload_id;render();var x=$('#txf');if(x)x.scrollIntoView({block:'center'})};da.appendChild(tb)}
     if(co){var nb=el('<a href="#" class="small">Note</a>');nb.onclick=function(ev){ev.preventDefault();var t=prompt('Note the family sees on this document',u.note||'');if(t===null)return;call('setDoc',{uploadId:u.upload_id,note:t}).then(refresh).catch(alertErr)};da.appendChild(nb);var kb=el('<select style="width:auto;padding:4px 6px;font-size:12px">'+K.map(function(k){return'<option'+(k===u.kind?' selected':'')+'>'+k+'</option>'}).join('')+'</select>');kb.onchange=function(){call('setDoc',{uploadId:u.upload_id,kind:this.value}).then(refresh).catch(alertErr)};da.appendChild(kb)}
     else{var hb=el('<a href="#" class="small">Ask for help</a>');hb.onclick=function(ev){ev.preventDefault();askHelp(u.kind==='Other'?u.name:u.kind.toLowerCase(),'About “'+u.name+'”: ')};da.appendChild(hb)}
     list.appendChild(row)});
@@ -1711,6 +1754,8 @@ function docsPage(){
   var f=el('<form class="card"><span class="k">Add a document</span><div class="field" style="margin-top:10px"><label>File (photo or PDF)</label><input type="file" name="file" accept="image/*,application/pdf" required></div><div class="field"><label>What is it</label><select name="kind">'+K.map(function(k){return'<option'+(k===(S.dk||'Other')?' selected':'')+'>'+k+'</option>'}).join('')+'</select></div><div class="field"><label>Note</label><input name="note" placeholder="Optional"></div>'+(fam?'':'<label class="tgl" style="margin:0 0 12px"><input type="checkbox" name="shared" checked style="width:auto"> Inner circle can see it</label>')+'<button class="btn block" type="submit">Upload</button><p class="err"></p></form>');
   f.onsubmit=function(ev){ev.preventDefault();var file=$('input[type=file]',f).files[0];if(!file)return;var b=$('button',f);b.disabled=true;b.textContent='Uploading…';var rd=new FileReader();rd.onload=function(){var b64=String(rd.result).split(',')[1];var sh=$('input[name=shared]',f);call('uploadDoc',{name:file.name,type:file.type,b64:b64,kind:$('select',f).value,note:$('input[name=note]',f).value,shared:sh?sh.checked:true}).then(refresh).catch(function(e){$('.err',f).textContent=e.message;b.disabled=false;b.textContent='Upload'})};rd.readAsDataURL(file)};
   side.appendChild(f);
+  if(co)side.appendChild(recordingEl());
+  var tl=transcriptsEl();if(tl)$('.left',v).appendChild(tl);
   if(!co)side.appendChild(el('<div class="card"><span class="k">Help with any of it</span><p class="small muted" style="margin:8px 0 0">Insurance cards, FMLA forms, letters from the surgeon’s office, the living will. If one of them is a knot, say so — '+esc(cf)+' will help you untangle it.</p></div>'));
   if(!co)side.appendChild(directiveEl());
   return v;
