@@ -8,9 +8,10 @@ const { id, must, clean, pick, famName, normEmail, EMAIL_RE, isTrue, first } = r
 // Topics: every conversation has one. Either side can open a topic; presets or a name of their own.
 // What the family reads the moment they open a medical question. We are not the doctors; we get them to the right one.
 const MEDICAL_LANE = cf => 'Before you type: we are not your doctors, and we will not guess at a medical answer. What we will do is help you get it from the right person, fast.\n\n' +
-  'Chest pain, trouble breathing, heavy bleeding, a new weakness on one side, confusion, a fever the discharge papers said to call about — call 911 or go to the ER now. Use “We’re headed to the ER” on your Home page and ' + cf + ' will call ahead.\n\n' +
-  'Thoughts of hurting yourself, or someone in the house is not safe — call or text 988.\n\n' +
-  'Everything else about the body — a symptom, a medication question, “is this normal?” — belongs to the surgeon’s office or the after-hours line. Write it here and ' + cf + ' will help you ask it well, and follow up if nobody calls back.';
+  'If you think it is an emergency, call 911 or go to the ER now — do not wait on a message. Then use “We’re headed to the ER” on your Home page and ' + cf + ' will call ahead.\n\n' +
+  'If your discharge papers or your team told you to call them about something, call the number they gave you now.\n\n' +
+  'If you are having thoughts of hurting yourself, call or text 988. If anyone in the house is in danger, call 911.\n\n' +
+  'Everything else — a question about a symptom, a medication, “is this normal?” — belongs to the surgeon’s office or their after-hours line. Write it here and ' + cf + ' will help you ask it well, and follow up if nobody calls back.';
 async function newTopic(ctx, p, c) {
   must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
   must(ctx.clientId, 'Pick a family first');

@@ -13,12 +13,16 @@ async function saveProfile(ctx, p, c) {
   const fields = ['patient_first_name', 'patient_last_name', 'dob', 'phone', 'address', 'emergency_name', 'emergency_relationship', 'emergency_phone'];
   const patch = {};
   fields.forEach(f => { if (p[f] !== undefined) patch[f] = clean(p[f], 240); });
-  if (patch.dob !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(patch.dob)) patch.dob = null;
+  if (patch.dob !== undefined) { if (!String(patch.dob).trim()) patch.dob = null; else { const t = new Date().toISOString().slice(0, 10); must(/^\d{4}-\d{2}-\d{2}$/.test(patch.dob) && patch.dob >= '1900-01-01' && patch.dob <= t, 'Please check the date of birth.'); } }
+  ['phone', 'emergency_phone'].forEach(f => { if (patch[f] !== undefined && patch[f].trim()) { const ok = intake.phoneOk(patch[f]); must(ok, 'That phone number does not look right. Please enter a 10-digit US number, like (615) 555-0100.'); patch[f] = ok; } });
   if (ctx.role === 'coordinator' && p.family_name !== undefined && clean(p.family_name, 80).trim()) patch.family_name = clean(p.family_name, 80).trim();   // the setup screen: the intake may be signed under a different name
   if (ctx.role === 'coordinator' && p.surgery_date !== undefined) patch.surgery_date = /^\d{4}-\d{2}-\d{2}$/.test(String(p.surgery_date)) ? p.surgery_date : null;   // the setup screen (2026-09-25)
   if (p.goes_by !== undefined) patch.extra = JSON.stringify({ ...(cl.extra || {}), goes_by: clean(p.goes_by, 240) });
   must(String(patch.patient_first_name === undefined ? cl.patient_first_name : patch.patient_first_name).trim(), 'First name is needed');
   if (Object.keys(patch).length) await db.update('clients', { client_id: cl.client_id }, patch, c);
+  // The same basics in the intake, so the two never disagree.
+  const back = {}; if (patch.dob) back['A.dob'] = { a: patch.dob, n: '' }; if (patch.phone) back['A.phone'] = { a: patch.phone, n: '' };
+  if (Object.keys(back).length && ctx.role === 'client') await intake.writeIntake(cl.client_id, back, ctx.email, c);
   // The date moved and the coordinator chose "hold everything and shift": every dated plan item and task moves by the
   // same number of days (added 2026-09-27). Appointments are real bookings and never move on their own.
   if (patch.surgery_date && cl.surgery_date && isTrue(p.shiftPlan)) {

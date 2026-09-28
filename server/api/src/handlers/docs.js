@@ -53,8 +53,8 @@ async function letterHtml(c, user, to, subject, body) {
     '<div class="fine">' + esc(C.APP_NAME) + ' provides non-medical care coordination. This letter confirms the timeline and support arrangements known to us; it is not a physician’s statement, diagnosis, or medical excuse. Medical documentation comes from the treating clinician.</div></body></html>';
 }
 async function summaryHtml(c, clientId) {
-  const it = await intake.readIntake(clientId), a = qid => (it.answers[qid] || {}).a || '';
-  const meds = await db.all(`select * from medications where client_id=$1 and status<>'Stopped' order by added_at`, [clientId]);
+  const it = await intake.readIntake(clientId), a = qid => String((it.answers[qid] || {}).a || '').replace(/([^.!?;:,\s])[ \t]*\n+\s*/g, '$1. ').replace(/\s*\n+\s*/g, ' ').trim();
+  const meds = await db.all(`select * from medications where client_id=$1 and status='Accepted' order by added_at`, [clientId]);
   const team = await db.all(`select * from care_team where client_id=$1 and status<>'Removed' order by updated_at`, [clientId]);
   const inner = await core.usersFor(clientId, 'family'), co = await core.coordinatorFor(c);
   const name = [c.patient_first_name, c.patient_last_name].join(' ').trim() || c.family_name;
@@ -62,7 +62,7 @@ async function summaryHtml(c, clientId) {
   const sec = (t, rows) => (rows ? '<h2>' + t + '</h2><table>' + rows + '</table>' : '');
   return '<html><head><meta charset="utf-8"><style>body{font-family:Helvetica,Arial,sans-serif;color:#1C2A3A;font-size:10.5pt;line-height:1.45;margin:44px 56px}h1{font-family:Georgia,serif;font-weight:normal;font-size:22pt;margin:0}h2{font-family:Georgia,serif;font-weight:normal;font-size:13pt;margin:18px 0 4px;border-top:1px solid #E3DED3;padding-top:8px}table{border-collapse:collapse;width:100%}td{padding:3px 0;vertical-align:top}td.k{width:150px;color:#5B6470}.top{display:flex;justify-content:space-between;border-bottom:2px solid #C09B36;padding-bottom:8px}.top span{font-size:9pt;color:#5B6470;text-align:right}</style></head><body>' +
     '<div class="top"><div><h1>' + esc(name) + '</h1><div>Health summary · ' + esc(longDate()) + '</div></div><span>' + esc(C.APP_NAME) + '<br>' + esc(C.INCADENCE_PHONE) + '</span></div>' +
-    sec('The situation', row('Patient', esc(name) + (c.dob ? ' · born ' + esc(String(c.dob).slice(0, 10)) : '')) + row('Phone', esc(c.phone || a('A.phone'))) + row('Diagnosis', esc(a('G.1'))) + row('Surgery', esc(a('G.4')) + (c.surgery_date ? ' · ' + esc(String(c.surgery_date).slice(0, 10)) : '')) + row('Expected stay', esc(a('G.9'))) + row('After the hospital', esc(a('G.10'))) + row('Stage', esc(c.current_stage || ''))) +
+    sec('The situation', row('Patient', esc(name) + (c.dob ? ' · born ' + esc(String(c.dob).slice(0, 10)) : '')) + row('Phone', esc(c.phone || a('A.phone'))) + row('Diagnosis', esc(a('G.1'))) + row('Surgery', esc(a('G.4')) + (c.surgery_date ? ' · ' + esc(String(c.surgery_date).slice(0, 10)) : '')) + row('Expected stay (what the family told us)', esc(a('G.9'))) + row('After the hospital', esc(a('G.10'))) + row('Stage', esc(c.current_stage || ''))) +
     sec('Medications', meds.map(m => row(m.name, esc([m.dose, m.frequency, m.instructions].filter(Boolean).join(' · ')) + (m.status === 'Pending review' ? ' <i>(pending review)</i>' : ''))).join('') + row('Allergies', esc(c.allergies || 'None listed')) + row('Pharmacy', esc([c.pharmacy_name, c.pharmacy_phone].filter(Boolean).join(' · ')))) +
     sec('Care team', team.map(m => row(m.role || m.kind, esc([m.name, m.org, m.phone].filter(Boolean).join(' · ')))).join('') + (co ? row('Coordinator', esc(co.name) + ' · ' + esc(C.APP_NAME) + ' · ' + esc(C.INCADENCE_PHONE)) : '')) +
     sec('People & home', row('Emergency contact', esc([c.emergency_name, c.emergency_relationship ? '(' + c.emergency_relationship + ')' : '', c.emergency_phone].filter(Boolean).join(' '))) + row('Lives', esc(a('A.2'))) + row('Ride home', esc(a('L.1') + (intake.det(it.answers, 'L.1') ? ' · ' + intake.det(it.answers, 'L.1') : ''))) + row('Children at home', esc(a('M.1') === 'Yes' ? 'Yes' + (intake.det(it.answers, 'M.1') ? ' · ' + intake.det(it.answers, 'M.1') : '') : a('M.1'))) + row('Pets', esc(a('M.4'))) + row('Inner circle', esc(inner.map(u => u.name + (u.relationship ? ' (' + u.relationship + ')' : '')).join(', ')))) +
@@ -118,7 +118,7 @@ async function book(ctx, p, cx) {
   must((await calendar.freeSlots(day, kind.minutes)).some(d => d.getTime() === start.getTime()), 'That time was just taken. Pick another.');
   const end = new Date(start.getTime() + kind.minutes * 60000);
   const client = await core.clientById(ctx.clientId, cx), co = await core.coordinatorFor(client, cx);
-  const phone = clean(p.phone, 40).trim();
+  const phone = (v => { const s = clean(v, 40).trim(); if (!s) return ''; const ok = require('../intake').phoneOk(s); must(ok, 'That phone number does not look right. Use 10 digits, like (615) 555-0100.'); return ok; })(p.phone);
   if (mode === 'phone') { must(phone, 'Add the best number to reach you'); await db.q(`update clients set phone=$2 where client_id=$1`, [client.client_id, phone], cx); }
   const about = clean(p.about, 500).trim(), fam = famName(client.family_name);
   const title = kind.label + ' — ' + fam;
@@ -128,8 +128,8 @@ async function book(ctx, p, cx) {
   const ev = await calendar.createEvent({ title, start, end, guests, description: desc, location: mode === 'phone' ? 'Phone' : 'Video', video: mode === 'video' });
   const row = await db.insert('appointments', { appt_id: id(), client_id: ctx.clientId, title: kind.label + ' with ' + (co ? first(co.name) : C.APP_NAME), starts_at: start.toISOString(), location: mode === 'phone' ? 'Phone' : 'Video', note: mode === 'phone' ? 'They call ' + phone : (ev.link ? 'Video link in your invite' : 'Video'), status: 'Scheduled', kind: p.kind, mode, minutes: kind.minutes, event_id: ev.id, booked_by: ctx.email, about, link: ev.link }, cx);
   const out = { ...row, starts_at: localStamp(row.starts_at) };
-  await core.autoMsg(ctx.clientId, 'Booked: ' + out.title + ', ' + out.starts_at.replace('T', ' at ') + ' (' + out.location + '). An invite went to your email.', cx);
-  const after = ctx.role === 'client' ? () => core.notifyCo(co, (start.getTime() - Date.now() < 2 * 864e5) ? 'bookingSoon' : 'booking', 'New booking — ' + fam, ctx.user.name + ' booked a ' + kind.label.toLowerCase() + ' for ' + out.starts_at.replace('T', ' at ') + ' (' + out.location + ').', about, 'Open the portal') : null;
+  await core.autoMsg(ctx.clientId, 'Booked: ' + out.title + ', ' + require('../util').niceWhen(out.starts_at) + ' (' + out.location + '). An invite went to your email.', cx);
+  const after = ctx.role === 'client' ? () => core.notifyCo(co, (start.getTime() - Date.now() < 2 * 864e5) ? 'bookingSoon' : 'booking', 'New booking — ' + fam, ctx.user.name + ' booked a ' + kind.label.toLowerCase() + ' for ' + require('../util').niceWhen(out.starts_at) + ' (' + out.location + ').', about, 'Open the portal') : null;
   return { appointment: out, _after: after };
 }
 async function flushCache(ctx) { coOnly(ctx); return { flushed: true }; }   // nothing to flush any more; kept so the button still works

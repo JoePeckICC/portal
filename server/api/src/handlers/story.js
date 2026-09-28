@@ -50,9 +50,12 @@ async function dischargePlan(ctx, p, c) {
   const ans = p.answers && typeof p.answers === 'object' ? p.answers : {};
   const out = {}, made = [];
   for (const q of DISCHARGE) {
+    if (ans[q.id] === undefined) continue;
     const v = ['yes', 'no', 'dk'].indexOf(ans[q.id]) >= 0 ? ans[q.id] : '';
-    if (!v) continue; out[q.id] = v;
-    if (v !== 'yes') {
+    out[q.id] = v;
+    // A yes, or a cleared answer, takes back a task nobody has started.
+    if (v === 'yes' || !v) { await db.q(`delete from tasks where client_id=$1 and extra->>'auto'=$2 and status='Not started'`, [ctx.clientId, 'discharge:' + q.id], c); continue; }
+    {
       const exists = await db.one(`select 1 from tasks where client_id=$1 and extra->>'auto'=$2 and status<>'Done'`, [ctx.clientId, 'discharge:' + q.id], c);
       if (!exists) { await db.insert('tasks', { task_id: id(), client_id: ctx.clientId, title: q.task, category: C.CATEGORIES[q.cat], status: 'Not started', owner: first(client.patient_first_name) || 'Family', due_date: null, notes: 'From the discharge planner' + (v === 'dk' ? ' — nobody knew yet' : '') + '.', extra: JSON.stringify({ auto: 'discharge:' + q.id }) }, c); made.push(q.task); }
     }

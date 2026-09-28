@@ -22,7 +22,7 @@ async function saveVendor(ctx, p, c) {
   const city = clean(p.city, 60).trim(); must(city, 'Which city do they serve?');
   const row = {
     name, city, state: clean(p.state, 4).toUpperCase(), service: SERVICES.includes(p.service) ? p.service : 'Other',
-    phone: clean(p.phone, 40), email: clean(p.email, 160), website: web(p.website), price: clean(p.price, 120),
+    phone: (v => { const s = clean(v, 40).trim(); if (!s) return ''; const ok = require('../intake').phoneOk(s); must(ok, 'That phone number does not look right. Use 10 digits, like (615) 555-0100.'); return ok; })(p.phone), email: clean(p.email, 160), website: web(p.website), price: clean(p.price, 120),
     insured: isTrue(p.insured), checked: isTrue(p.checked), notes: clean(p.notes, 2000), active: p.active === undefined ? true : isTrue(p.active),
     updated_by: ctx.email, updated_at: new Date(),
   };

@@ -22,6 +22,12 @@ async function saveMed(ctx, p, c) {
   must(freq === 'As needed' || times.length, 'Pick at least one time of day');
   const client = await core.clientById(ctx.clientId, c), co = await core.coordinatorFor(client, c);
   const refills = parseInt(p.refills_left, 10);
+  must(String(p.refills_left ?? '').trim() === '' || (Number.isFinite(refills) && refills >= 0 && refills <= 99 && /^\d+$/.test(String(p.refills_left).trim())), 'Refills left should be a whole number from 0 to 99.');
+  if (p.next_refill) {
+    must(/^\d{4}-\d{2}-\d{2}$/.test(p.next_refill), 'Check the refill date.');
+    const t = Date.parse(p.next_refill), now = Date.now();
+    must(t > now - 366 * 864e5 && t < now + 731 * 864e5, 'The refill date should be within the past year or the next two years.');
+  }
   const row = { name, dose: clean(p.dose, 120), instructions: clean(p.instructions, 500), prescriber: clean(p.prescriber, 120), frequency: freq, times: times.join(','), refills_left: Number.isFinite(refills) ? refills : null,
     next_refill: /^\d{4}-\d{2}-\d{2}$/.test(p.next_refill || '') ? p.next_refill : null, notes: clean(p.notes, 500), status: ctx.role === 'coordinator' ? 'Accepted' : 'Pending review', updated_by: ctx.email };
   const existing = p.medId ? await db.one(`select * from medications where client_id=$1 and med_id=$2`, [ctx.clientId, String(p.medId)], c) : null;
@@ -54,6 +60,15 @@ async function addMeds(ctx, p, c) {
   const after = () => core.notifyFamily(ctx.clientId, 'meds', 'Your medication list is ready', cf + ' added ' + added.length + ' medication' + (added.length === 1 ? '' : 's') + ' from your discharge papers.', added.map(m => '• ' + m.name + (m.dose ? ' ' + m.dose : '') + (m.times ? ' at ' + m.times.split(',').join(', ') : ' as needed')).join('\n'), 'Open Pharmacy');
   return { added: added.length, _after: after };
 }
+// A medication the family added and nobody has reviewed yet can be taken back by the family.
+async function withdrawMed(ctx, p, c) {
+  famOrCo(ctx);
+  const m = await db.one(`select * from medications where client_id=$1 and med_id=$2`, [ctx.clientId, String(p.medId || '')], c); must(m, 'Not found');
+  must(ctx.role === 'coordinator' || m.status === 'Pending review', 'Once it has been reviewed, ask your coordinator to change it.');
+  await db.update('medications', { med_id: m.med_id }, { status: 'Stopped', notes: ((m.notes || '') + ' [Taken back before review]').trim(), updated_by: ctx.email }, c);
+  await core.autoMsg(ctx.clientId, 'Taken off the list before review: ' + m.name + '.', c);
+  return {};
+}
 async function setMedStatus(ctx, p, c) {
   coOnly(ctx);
   const m = await db.one(`select * from medications where client_id=$1 and med_id=$2`, [ctx.clientId, String(p.medId || '')], c); must(m, 'Not found');
@@ -82,7 +97,7 @@ async function doseNote(ctx, p, c) {
   const due = localToIso(p.dueAt);
   await db.q(`insert into doses (dose_id,client_id,med_id,due_at,status,taken_at,by) values ($1,$2,$3,$4,$5,now(),$6)
     on conflict (med_id,due_at) do update set status=excluded.status, taken_at=now(), by=excluded.by`, [id(), ctx.clientId, med.med_id, due, status, ctx.email], c);
-  if (status === 'Vomited') await core.autoMsg(ctx.clientId, 'Vomited after ' + med.name + (med.dose ? ' ' + med.dose : '') + ' (' + String(p.dueAt).replace('T', ' at ') + '). Do not take it again unless the team says to — call the post-op line and ask.', c);
+  if (status === 'Vomited') await core.autoMsg(ctx.clientId, 'Vomited after ' + med.name + (med.dose ? ' ' + med.dose : '') + ' (' + require('../util').niceWhen(p.dueAt) + '). Do not take it again unless the team says to — call the post-op line and ask.', c);
   return {};
 }
 // A dose taken hours late: the rest of today's doses of that medication slide by the same amount, today only.
@@ -100,7 +115,7 @@ async function missedDose(ctx, p, c) {
   must(core.fam(ctx), 'Not allowed');
   const med = await db.one(`select * from medications where client_id=$1 and med_id=$2`, [ctx.clientId, String(p.medId || '')], c); must(med, 'Not found');
   const client = await core.clientById(ctx.clientId, c), co = await core.coordinatorFor(client, c);
-  const when = String(p.dueAt || '').replace('T', ' at ');
+  const when = require('../util').niceWhen(p.dueAt);
   await core.autoMsg(ctx.clientId, 'Missed dose: ' + med.name + ' (' + when + '). ' + (co ? first(co.name) : 'Your coordinator') + ' has been asked to check in.', c);
   const after = () => core.notifyCo(co, 'missed', 'Check-in asked — ' + famName(client.family_name), ctx.user.name + ' missed ' + med.name + (med.dose ? ' ' + med.dose : '') + ' due ' + when + ' and asked you to check in.', med.instructions, 'Open the portal');
   return { _after: after };
@@ -145,6 +160,6 @@ function parseMeds(text) {
   return out;
 }
 
-module.exports = { saveMed, addMeds, setMedStatus, takeDose, missedDose, readDischarge, doseNote, shiftDoses };
+module.exports = { withdrawMed, saveMed, addMeds, setMedStatus, takeDose, missedDose, readDischarge, doseNote, shiftDoses };
 Object.defineProperty(module.exports, 'medPublic', { value: medPublic, enumerable: false });
 Object.defineProperty(module.exports, 'parseMeds', { value: parseMeds, enumerable: false });   // helper, not an action

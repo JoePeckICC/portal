@@ -31,6 +31,7 @@ async function savePharmacy(ctx, p, c) {
   famOrCo(ctx);
   const patch = {};
   ['pharmacy_name', 'pharmacy_phone', 'pharmacy_address', 'pharmacy_hours'].forEach(f => { if (p[f] !== undefined) patch[f] = clean(p[f], 240); });
+  if (patch.pharmacy_phone) patch.pharmacy_phone = (v => { const s = clean(v, 40).trim(); if (!s) return ''; const ok = require('../intake').phoneOk(s); must(ok, 'That phone number does not look right. Use 10 digits, like (615) 555-0100.'); return ok; })(patch.pharmacy_phone);
   if (Object.keys(patch).length) { const r = await db.update('clients', { client_id: ctx.clientId }, patch, c); must(r.length, 'Not found'); }
   return { client: core.publicClient(await core.clientById(ctx.clientId, c)) };
 }

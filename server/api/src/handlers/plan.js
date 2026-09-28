@@ -27,6 +27,8 @@ async function saveIntake(ctx, p, c) {
   // After submitting, keep a running list of what changed (first value -> latest value), so the
   // coordinator gets one email listing it all when they press "Save my changes" (submitIntake).
   if (cur.status === 'Submitted' || cur.status === 'Updated after submitting') {
+    // The answers the plan is built on are the coordinator's to change once the intake is in.
+    if (ctx.role !== 'coordinator') C.FIXED_ANSWERS.forEach(k => { delete ok[k]; });
     const ch = Object.assign({}, cur.changed);
     Object.keys(ok).forEach(qid => {
       const was = cur.answers[qid] || { a: '', n: '' }, now = ok[qid] || {};
@@ -38,7 +40,14 @@ async function saveIntake(ctx, p, c) {
   } else if (cur.status === 'Not started') ok._status = { a: 'In progress' };
   await intake.writeIntake(ctx.clientId, ok, ctx.email, c);
   if (ok['G.7']) await hospitalFromIntake(ctx.clientId, String(ok['G.7'].a || ''), c);
-  return { intake: await intake.readIntake(ctx.clientId, c) };
+  const now = await intake.readIntake(ctx.clientId, c);
+  // One copy of the basics: birth date, phone and address from the intake also fill Personal information.
+  const A = k => String((now.answers[k] || {}).a || '').trim(), sync = {};
+  if (ok['A.dob'] && /^\d{4}-\d{2}-\d{2}$/.test(A('A.dob'))) sync.dob = A('A.dob');
+  if (ok['A.phone'] && intake.phoneOk(A('A.phone'))) sync.phone = intake.phoneOk(A('A.phone'));
+  if ((ok['A.addr'] || ok['A.city']) && A('A.addr') && !/^Rather/.test(A('A.addr'))) sync.address = [A('A.addr'), A('A.city')].filter(Boolean).join(', ');
+  if (Object.keys(sync).length) await db.update('clients', { client_id: ctx.clientId }, sync, c);
+  return { intake: now };
 }
 // The hospital question (G.7) picks the family's hospital: its facts, walk and campus map land on their plan.
 // A hospital the coordinator assigned by hand is never overridden; one the intake picked follows the answer.
@@ -194,7 +203,7 @@ async function addAppointment(ctx, p, c) {
   must(title.trim(), 'Write what the appointment is');
   must(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/.test(when), 'Pick a date and time');
   const row = await db.insert('appointments', { appt_id: id(), client_id: ctx.clientId, title, starts_at: localToIso(when), location: clean(p.location, 200), note: clean(p.note, 500), status: 'Scheduled' }, c);
-  await core.autoMsg(ctx.clientId, 'Appointment added: ' + title + ' — ' + when.replace('T', ' at ') + (row.location ? ', ' + row.location : '') + '.', c);
+  await core.autoMsg(ctx.clientId, 'Appointment added: ' + title + ' — ' + require('../util').niceWhen(when) + (row.location ? ', ' + row.location : '') + '.', c);
   return { appointment: apptPublic(row) };
 }
 async function cancelAppointment(ctx, p, c) {
@@ -202,14 +211,14 @@ async function cancelAppointment(ctx, p, c) {
   must(ctx.role === 'coordinator' || String(a.event_id || ''), 'Only appointments you booked can be cancelled here');
   if (a.event_id) { try { await require('../calendar').deleteEvent(a.event_id); } catch (e) { console.error('calendar delete', e.message); } }
   await db.q(`update appointments set status='Cancelled' where appt_id=$1`, [a.appt_id], c);
-  await core.autoMsg(ctx.clientId, 'Cancelled: ' + a.title + ' on ' + localStamp(a.starts_at).replace('T', ' at ') + '.', c);
+  await core.autoMsg(ctx.clientId, 'Cancelled: ' + a.title + ' on ' + require('../util').niceWhen(localStamp(a.starts_at)) + '.', c);
   return {};
 }
 // ---- care team + referrals (Find Care)
 async function addCareTeam(ctx, p, c) {
   famOrCo(ctx); needFamily(ctx);
   const name = clean(p.name, 120).trim(); must(name, 'Add their name');
-  const row = await db.insert('care_team', { member_id: id(), client_id: ctx.clientId, name, role: clean(p.role, 120), org: clean(p.org, 160), phone: clean(p.phone, 40), address: clean(p.address, 240), notes: clean(p.notes, 500), kind: p.kind === 'vendor' ? 'vendor' : 'provider', added_by: ctx.email, status: 'Active' }, c);
+  const row = await db.insert('care_team', { member_id: id(), client_id: ctx.clientId, name, role: clean(p.role, 120), org: clean(p.org, 160), phone: (v => { const s = clean(v, 40).trim(); if (!s) return ''; const ok = require('../intake').phoneOk(s); must(ok, 'That phone number does not look right. Use 10 digits, like (615) 555-0100.'); return ok; })(p.phone), address: clean(p.address, 240), notes: clean(p.notes, 500), kind: p.kind === 'vendor' ? 'vendor' : 'provider', added_by: ctx.email, status: 'Active' }, c);
   return { member: row };
 }
 // Records per provider: one release each, then the records themselves. Coordinator only. Kept in extra.

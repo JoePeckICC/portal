@@ -33,7 +33,7 @@ const RESTRICTIONS = [
 const STATUSES = ['ask', 'no', 'from', 'ok'];
 
 async function setRestrictions(ctx, p, c) {
-  must(ctx.role === 'coordinator' || ctx.role === 'client', 'Only the patient or the coordinator can change this'); needFamily(ctx);
+  coOnly(ctx); needFamily(ctx);   // the team's instructions, as the coordinator wrote them down; the family suggests changes in Messages
   const client = await core.clientById(ctx.clientId, c);
   const cur = extraOf(client).restrictions || {};
   const inp = p.restrictions && typeof p.restrictions === 'object' ? p.restrictions : {};
@@ -42,12 +42,16 @@ async function setRestrictions(ctx, p, c) {
     const v = inp[r.key]; if (!v) continue;
     const status = STATUSES.indexOf(v.status) >= 0 ? v.status : 'ask';
     const from = status === 'from' && /^\d{4}-\d{2}-\d{2}$/.test(String(v.from || '')) ? String(v.from) : '';
+    must(status !== 'from' || from, r.label + ': pick the date it lifts, or choose another answer.');
+    if (from) { const t = Date.parse(from); must(t > Date.now() - 366 * 864e5 && t < Date.now() + 731 * 864e5, r.label + ': the date should be within the next two years.'); }
     out[r.key] = { status, from, note: clean(v.note, 300), by: ctx.email, at: new Date().toISOString() };
     if ((status === 'no' || status === 'from') && r.check) {
       const exists = await db.one(`select 1 from tasks where client_id=$1 and extra->>'auto'=$2`, [ctx.clientId, 'restriction:' + r.key], c);
-      if (!exists) { await db.insert('tasks', { task_id: id(), client_id: ctx.clientId, title: r.check, category: r.cat, status: 'Not started', owner: first(client.patient_first_name) || 'Family', due_date: null, notes: 'From the “' + r.label + '” restriction' + (from ? ' (until ' + from + ')' : '') + '.', extra: JSON.stringify({ auto: 'restriction:' + r.key }) }, c); made.push(r.check); }
+      if (!exists) { await db.insert('tasks', { task_id: id(), client_id: ctx.clientId, title: r.check, category: r.cat, status: 'Not started', owner: first(client.patient_first_name) || 'Family', due_date: null, notes: 'From the “' + r.label + '” restriction' + (from ? ' (until ' + new Date(from + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ')' : '') + '.', extra: JSON.stringify({ auto: 'restriction:' + r.key }) }, c); made.push(r.check); }
     }
   }
+  // Taken back: a home check nobody has started goes away again.
+  for (const r of RESTRICTIONS) { const v = out[r.key]; if (v && (v.status === 'ok' || v.status === 'ask')) await db.q(`delete from tasks where client_id=$1 and extra->>'auto'=$2 and status='Not started'`, [ctx.clientId, 'restriction:' + r.key], c); }
   await patchExtra(client, { restrictions: out }, c);
   return { restrictions: out, made };
 }
@@ -93,6 +97,7 @@ async function addSymptom(ctx, p, c) {
   famOrCo(ctx); needFamily(ctx);
   const name = clean(p.name, 120).trim(); must(name, 'What is it?');
   const severity = p.severity === undefined || p.severity === '' ? null : Math.max(0, Math.min(10, Number(p.severity)));
+  if (p.at) { must(/^\d{4}-\d{2}-\d{2}$/.test(String(p.at)), 'Check the date.'); const t = Date.parse(String(p.at)); must(t <= Date.now() + 864e5 && t > Date.now() - 366 * 864e5, 'The date should be today or earlier.'); }
   const row = await db.insert('symptoms', { symptom_id: id(), client_id: ctx.clientId, by: ctx.email, name, severity, note: clean(p.note, 600), at: p.at && /^\d{4}-\d{2}-\d{2}$/.test(String(p.at)) ? new Date(require('../time').localToIso(String(p.at) + 'T12:00')) : new Date() }, c);   // a bare date means noon that day, family time
   return { symptom: row };
 }
@@ -140,6 +145,7 @@ async function setDisaster(ctx, p, c) {
     const exists = await db.one(`select 1 from tasks where client_id=$1 and extra->>'auto'='disaster:utility' and status<>'Done'`, [ctx.clientId], c);
     if (!exists) { await db.insert('tasks', { task_id: id(), client_id: ctx.clientId, title: 'Register with the power company’s medical priority list', category: 'Care coordination', status: 'Not started', owner: first(client.patient_first_name) || 'Family', due_date: null, notes: 'Call the utility; ask for the medical baseline / priority restoration program. A doctor’s letter is usually needed — the coordinator can request it.', extra: JSON.stringify({ auto: 'disaster:utility' }) }, c); made = true; }
   }
+  else await db.q(`delete from tasks where client_id=$1 and extra->>'auto'='disaster:utility' and status='Not started'`, [ctx.clientId], c);
   return { made };
 }
 module.exports = { setRestrictions, setRedFlags, setReason, checkin, addSymptom, removeSymptom, setIcant, postIcant, setDisaster };
