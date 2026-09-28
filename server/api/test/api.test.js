@@ -279,6 +279,32 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   { const r = await api(pat, 'saveCareNote', { service: 'Pet care', text: 'Biscuit: two walks, key under the mat' }); assert.equal(r.ok, true, r.error); }
   assert.equal((await api(pat, 'bootstrap', {})).careNotes['Pet care'], 'Biscuit: two walks, key under the mat', 'the usual note is kept');
   assert.equal((await api(sarah, 'saveCareNote', { service: 'Pet care', text: 'x' })).error, 'Not allowed');
+  // her hours: the family sees only the times she is free, and can ask to meet first
+  const { localStamp, localToIso } = require('../src/time');
+  const day = localStamp(new Date(Date.now() + 5 * 86400e3)).slice(0, 10), dow = new Date(day + 'T12:00:00Z').getUTCDay();
+  { const r = await api(pat, 'vendorTimes', { topicId: vt.topic_id, date: day }); assert.equal(r.ok, true, r.error); assert.equal(r.any, true, 'no hours set: any time'); }
+  const week = [null, null, null, null, null, null, null]; week[dow] = { from: '15:00', to: '17:00' };
+  { const r = await api(sarah, 'saveHours', { hours: { week, off: [] } }); assert.equal(r.ok, true, r.error); }
+  assert.equal((await api(pat, 'saveHours', { hours: { week } })).error, 'Not allowed');
+  const tv = await api(pat, 'vendorTimes', { topicId: vt.topic_id, date: day });
+  assert.equal(tv.any, false); assert.deepEqual(tv.times, ['15:00', '15:30', '16:00', '16:30'].map(t => localToIso(day + 'T' + t)));
+  assert.match((await api(pat, 'requestJob', { topicId: vt.topic_id, startsAt: localToIso(day + 'T09:00') })).error, /not free then/);
+  const meet = await api(pat, 'requestJob', { topicId: vt.topic_id, startsAt: localToIso(day + 'T15:30'), meet: 'phone' });
+  assert.equal(meet.ok, true, meet.error);
+  const sb3 = await api(sarah, 'bootstrap', {}); assert.equal(sb3.openJobs.find(x => x.job_id === meet.job.job_id).meet, 'phone');
+  assert.deepEqual((await api(pat, 'vendorTimes', { topicId: vt.topic_id, date: day })).times, [localToIso(day + 'T16:30')], 'an hour either side of a request is held');
+  { const r = await api(sarah, 'takeJob', { jobId: meet.job.job_id }); assert.equal(r.ok, true, r.error); }
+  assert.ok((await api(pat, 'bootstrap', {})).messages.some(m => m.topic_id === vt.topic_id && /confirmed: meet first \(phone call\)/.test(m.body)));
+  { const r = await api(sarah, 'saveHours', { hours: { week, off: [day] } }); assert.equal(r.ok, true, r.error); }
+  assert.deepEqual((await api(pat, 'vendorTimes', { topicId: vt.topic_id, date: day })).times, [], 'a day off');
+  assert.equal((await api(pat, 'bootstrap', {})).topics.find(t => t.topic_id === vt.topic_id).extra.vendor_hours.week[dow].from, '15:00');
+  // "I'm open": any time, except time off
+  { const r = await api(sarah, 'saveHours', { hours: { open: true, off: [day] } }); assert.equal(r.ok, true, r.error); }
+  assert.deepEqual((await api(pat, 'vendorTimes', { topicId: vt.topic_id, date: day })).times, [], 'time off holds when open');
+  const day2 = localStamp(new Date(Date.now() + 6 * 86400e3)).slice(0, 10);
+  assert.equal((await api(pat, 'vendorTimes', { topicId: vt.topic_id, date: day2 })).any, true);
+  assert.match((await api(sarah, 'saveHours', { hours: { week: [] } })).error, /at least one day/);
+  assert.equal((await api(sarah, 'bootstrap', {})).vendor.hours.set, true, 'onboarding is done once hours are saved');
 });
 
 test('supporters only get updates', async () => {
