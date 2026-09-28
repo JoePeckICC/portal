@@ -7,7 +7,7 @@ const { isTrue, must, ymd } = require('../util');
 
 // Everything the page needs to draw itself.
 async function bootstrap(ctx) {
-  const out = { me: { email: ctx.email, name: ctx.user.name, role: ctx.role, goes_by: ctx.user.goes_by || '', avatar: ctx.user.avatar || '', prefs: core.prefs(ctx.user) }, fixedAnswers: C.FIXED_ANSWERS, notifyKinds: C.NOTIFY_KINDS, avatars: C.AVATARS };
+  const out = { me: { email: ctx.email, name: ctx.user.name, role: ctx.role, goes_by: ctx.user.goes_by || '', avatar: ctx.user.avatar || '', prefs: core.prefs(ctx.user), zip: (ctx.user.extra && ctx.user.extra.zip) || '' }, fixedAnswers: C.FIXED_ANSWERS, notifyKinds: C.NOTIFY_KINDS, avatars: C.AVATARS };
   if (ctx.role === 'coordinator') {
     out.families = (await db.all(`select client_id, family_name, patient_first_name, patient_last_name, current_stage, status from clients where status <> 'Archived' order by family_name`)).map(c =>
       ({ client_id: c.client_id, family_name: c.family_name, patient: [c.patient_first_name, c.patient_last_name].join(' ').trim(), current_stage: c.current_stage, status: c.status }));
@@ -72,6 +72,7 @@ async function bootstrap(ctx) {
   { const vids = [...new Set(out.topics.filter(t => t.kind === 'vendor').map(t => t.extra && t.extra.vendor_id).filter(Boolean))];   // the vendor's number, for the call button in their conversation
     if (vids.length) { const ph = {}; const hr = {}; (await db.all(`select vendor_id, phone, hours from vendors where vendor_id = any($1)`, [vids])).forEach(v => { ph[v.vendor_id] = v.phone; hr[v.vendor_id] = require('./jobs').normHours(v.hours); }); out.topics = out.topics.map(t => t.kind === 'vendor' ? { ...t, extra: { ...t.extra, vendor_phone: ph[t.extra && t.extra.vendor_id] || '', vendor_hours: hr[t.extra && t.extra.vendor_id] || null } } : t); } }
   out.borrowed = await require('./loans').borrowedBy(cid); if (ctx.role === 'coordinator') Object.assign(out, await require('./loans').closetFor());
+  out.circleNear = core.fam(ctx) ? (await require('./jobs').circleNear(cid, ctx.email)).length : 0;
   out.jobs = await require('./jobs').jobsFor(cid); out.careNotes = ce.care_notes || {}; out.jobServices = require('./market').SERVICES;
   out.updates = withPhoto(updates, ctx.role);
   out.tracker = ce.tracker || null; out.trackerSteps = CIRCLE.TRACKER; out.reactions = CIRCLE.REACTIONS; out.what_i_need = ce.what_i_need || '';

@@ -136,6 +136,8 @@ async function requestJob(ctx, p, c) {
   // no one steps up in time, it goes to the support team like any other request.
   const CIRCLE_HRS = { '1': 1, '2': 2, '4': 4 };
   if (p.circle === 'only' || CIRCLE_HRS[p.circle]) {
+    const near = await circleNear(ctx.clientId, ctx.email, c);
+    must(near.length, 'No one in your circle lives near you yet. Ask our support team instead.');
     const until = p.circle === 'only' ? '' : new Date(Date.now() + CIRCLE_HRS[p.circle] * 3600e3).toISOString();
     await db.q(`update jobs set extra = extra || jsonb_build_object('circle', $2::jsonb) where job_id=$1`, [j.job_id, JSON.stringify({ until, fallback: !!until })], c);
     const whenTxt = whenLabel({ starts_at: when, extra: timing });
@@ -143,13 +145,23 @@ async function requestJob(ctx, p, c) {
     const detail = info.map(x => x.l + ': ' + x.v).join('\n') + (j.details ? (info.length ? '\n' : '') + j.details : '');
     await db.insert('help_items', { item_id: id(), client_id: ctx.clientId, title, detail, when_text: whenTxt, status: 'Open', claimed_by: '', added_by: ctx.email, job_id: j.job_id }, c);
     const after = async () => {
-      const people = [...new Set([...(await db.all(`select supporter_email e from circle where client_id=$1 and status='Active'`, [ctx.clientId])).map(r => r.e), ...(await db.all(`select email e from users where client_id=$1 and active and lower(role)='family'`, [ctx.clientId])).map(r => r.e)].map(e => String(e).toLowerCase()).filter(e => e && e !== String(ctx.email).toLowerCase()))];
+      const people = near;
       const fam = famName(client.family_name);
       for (const e of people) await mail.notify(e, fam + ' could use a hand: ' + service.toLowerCase(), (first(ctx.user.name) || 'The family') + ' is asking their circle first: ' + service.toLowerCase() + ', ' + whenTxt + '.' + (until ? ' If no one steps up by ' + new Date(until).toLocaleTimeString('en-US', { timeZone: C.TZ, hour: 'numeric', minute: '2-digit' }) + ', InCadence finds someone.' : '') + ' The first to step up has it.', detail, 'I can help', link());
     };
     return { job: { ...j, extra: { ...j.extra, circle: { until, fallback: !!until } } }, _after: after };
   }
   return { job: j, _after: () => broadcast(j, client, ctx.user.name) };
+}
+// The people in a family's circle who live near them: the same first three ZIP digits (roughly the same area).
+// Everyone in the circle gives a ZIP code when they first sign in; people far away are never asked to drive over.
+const zipOf = s => { const m = String(s || '').match(/\b(\d{5})(?:-\d{4})?\b(?!.*\b\d{5}\b)/); return m ? m[1] : ''; };
+async function circleNear(clientId, exceptEmail, c) {
+  const client = await core.clientById(clientId, c); const home = zipOf(client && client.address); if (!home) return [];
+  const emails = [...new Set([...(await db.all(`select lower(supporter_email) e from circle where client_id=$1 and status='Active'`, [clientId], c)).map(r => r.e), ...(await db.all(`select lower(email) e from users where client_id=$1 and active and lower(role)='family'`, [clientId], c)).map(r => r.e)].filter(e => e && e !== String(exceptEmail || '').toLowerCase()))];
+  if (!emails.length) return [];
+  const rows = await db.all(`select lower(email) e, extra->>'zip' z from users where lower(email) = any($1) and active`, [emails], c);
+  return rows.filter(r => r.z && r.z.slice(0, 3) === home.slice(0, 3)).map(r => r.e);
 }
 // Tell every support-team member in town who offers this kind of help, and the coordinator.
 async function broadcast(j, client, askedBy) {
@@ -262,4 +274,4 @@ async function jobsFor(clientId) {
 }
 // Only handlers are enumerable: everything enumerable here becomes a callable action.
 module.exports = { inviteVendor, requestJob, saveCareNote, cancelJob, takeJob, passJob, finishJob, saveHours, vendorTimes, askUsNow };
-Object.defineProperties(module.exports, { vendorBoot: { value: vendorBoot, enumerable: false }, jobsFor: { value: jobsFor, enumerable: false }, normHours: { value: normHours, enumerable: false }, circleSweep: { value: circleSweep, enumerable: false }, circleTook: { value: circleTook, enumerable: false } });
+Object.defineProperties(module.exports, { vendorBoot: { value: vendorBoot, enumerable: false }, jobsFor: { value: jobsFor, enumerable: false }, normHours: { value: normHours, enumerable: false }, circleSweep: { value: circleSweep, enumerable: false }, circleNear: { value: circleNear, enumerable: false }, circleTook: { value: circleTook, enumerable: false } });

@@ -116,6 +116,8 @@ async function savePrefs(ctx, p, c) {
   if (p.prefs) { const cur = core.prefs(ctx.user); Object.keys(C.NOTIFY_KINDS).forEach(k => { if (p.prefs[k] !== undefined) cur[k] = !!p.prefs[k]; }); patch.prefs = JSON.stringify(cur); }
   if (p.goes_by !== undefined) patch.goes_by = clean(p.goes_by, 24).trim();
   if (p.avatar !== undefined) patch.avatar = C.AVATARS.indexOf(p.avatar) >= 0 ? p.avatar : '';
+  // Where someone in a family's circle lives (a ZIP code), so the family can ask the people nearby for a hand.
+  if (p.zip !== undefined) { const z = String(p.zip || '').trim(); must(/^\d{5}$/.test(z), 'Use a 5-digit ZIP code'); await db.q(`update users set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object('zip', $2::text) where email=$1`, [ctx.email, z], c); }
   if (Object.keys(patch).length) await db.update('users', { email: ctx.email }, patch, c);
   return {};
 }
