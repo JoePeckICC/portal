@@ -47,7 +47,7 @@ create unique index clients_stripe_customer_idx on clients(stripe_customer_id) w
 create table users (
   email          text primary key,                    -- always lower-cased
   name           text not null default '',
-  role           text not null,                       -- client | family | supporter | coordinator
+  role           text not null,                       -- client | family | supporter | coordinator | vendor
   client_id      text references clients(client_id) on delete restrict,
   active         boolean not null default true,
   relationship   text not null default '',
@@ -58,7 +58,7 @@ create table users (
   session_ver    integer not null default 1,
   created_at     timestamptz not null default now(),
   extra          jsonb not null default '{}',
-  constraint users_role_chk check (role in ('client','family','supporter','coordinator'))
+  constraint users_role_chk check (role in ('client','family','supporter','coordinator','vendor'))
 );
 create index users_client_idx on users(client_id);
 
