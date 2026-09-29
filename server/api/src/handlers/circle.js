@@ -181,8 +181,8 @@ async function askShift(ctx, p, c) {
   const row = await db.insert('help_items', { item_id: id(), client_id: ctx.clientId, title: 'Stay with ' + pf, detail: clean(p.note, 600), when_text: when, status: 'Open', claimed_by: '', added_by: ctx.email, cov: day + '|' + p.part }, c);
   const after = async () => {
     const to = new Set();
-    const SH = require('./shifts'), al = ((client.extra || {}).shift_allowed || []).map(normEmail);
-    for (const s of await db.all(`select supporter_email, relationship from circle where client_id=$1 and status='Active'`, [ctx.clientId])) if (al.includes(normEmail(s.supporter_email)) || /\b(sister|brother|sibling|mom|mother|dad|father|parent|spouse|wife|husband|partner|fianc\w*|grand\w*|son|daughter|child|step\w*)\b/i.test(s.relationship || '')) to.add(normEmail(s.supporter_email));
+    const SH = require('./shifts');
+    for (const s of await db.all(`select supporter_email, relationship from circle where client_id=$1 and status='Active'`, [ctx.clientId])) if (SH.isInner(client.extra || {}, s.supporter_email, s.relationship)) to.add(normEmail(s.supporter_email));
     for (const u of await db.all(`select email from users where client_id=$1 and active and lower(role)='family'`, [ctx.clientId])) to.add(normEmail(u.email));
     to.delete(normEmail(ctx.email));
     for (const e of to) await mail.notify(e, 'Can you stay with ' + pf + ' ' + when + '?', 'The family is asking the Circle for someone to be with ' + pf + ' ' + when + '.' + (row.detail ? ' ' + row.detail : ''), 'The first person to say yes gets it, and the family sees who.', 'Open the Circle');

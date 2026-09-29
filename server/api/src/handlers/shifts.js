@@ -23,12 +23,18 @@ const approver = ctx => ctx.role === 'client' || (ctx.role === 'family' && ctx.u
 // Who is with them is for the inner circle (Joe 2026-09-29): family with their own sign-in, close family in the Circle
 // (a parent, sibling, spouse, child, grandparent), and anyone else the people who hold the page allow.
 const CLOSE = /\b(sister|brother|sibling|mom|mother|dad|father|parent|spouse|wife|husband|partner|fianc\w*|grand\w*|son|daughter|child|step\w*)\b/i;
+// One rule for everyone following: the page holders' check wins; otherwise close family is in and everyone else out.
+function isInner(ex, email, relationship) {
+  const e = normEmail(email);
+  if ((ex.shift_denied || []).map(normEmail).includes(e)) return false;
+  if ((ex.shift_allowed || []).map(normEmail).includes(e)) return true;
+  return CLOSE.test(relationship || '');
+}
 async function allowedIn(ctx, client, c) {
   if (isFam(ctx)) return true; if (ctx.role !== 'supporter') return false;
   const me = normEmail(ctx.email), ex = extraOf(client || await core.clientById(ctx.clientId, c));
-  if ((ex.shift_allowed || []).map(normEmail).includes(me)) return true;
   const row = await db.one(`select relationship from circle where client_id=$1 and lower(supporter_email)=$2 and status='Active'`, [ctx.clientId, me], c);
-  return !!row && CLOSE.test(row.relationship || '');
+  return !!row && isInner(ex, me, row.relationship);
 }
 const inCircle = ctx => isFam(ctx) || ctx.role === 'supporter';
 async function mustIn(ctx, c) { must(await allowedIn(ctx, null, c), 'This is for the family’s inner circle.'); }
@@ -98,7 +104,7 @@ async function grid(ctx, c, days) {
     return s;
   }) }));
   let people;
-  if (fam) { const al = (ex.shift_allowed || []).map(normEmail); people = (await db.all(`select supporter_email email, supporter_name name, relationship from circle where client_id=$1 and status='Active' order by supporter_name`, [ctx.clientId], c)).map(r => ({ email: normEmail(r.email), name: r.name || r.email, relationship: r.relationship || '', close: CLOSE.test(r.relationship || ''), allowed: al.includes(normEmail(r.email)) })); }
+  if (fam) people = (await db.all(`select supporter_email email, supporter_name name, relationship from circle where client_id=$1 and status='Active' order by supporter_name`, [ctx.clientId], c)).map(r => ({ email: normEmail(r.email), name: r.name || r.email, relationship: r.relationship || '', close: CLOSE.test(r.relationship || ''), allowed: isInner(ex, r.email, r.relationship) }));
   return { days: out, parts: PARTS, visitsOff: isTrue(ex.visits_off), home, fam, canNames: approver(ctx), canAllow: approver(ctx), people,
     medNamesFor: fam ? names : undefined, shiftPeople: fam ? [...new Map(cov.filter(x => x.kind === 'with' && x.email).map(x => [normEmail(x.email), x.who])).entries()].map(([email, who]) => ({ email, who, names: names.includes(email) })) : undefined,
     pf: first(client.patient_first_name) || '' };
@@ -201,11 +207,13 @@ async function doneChore(ctx, p, c) {
 async function setShiftAllowed(ctx, p, c) {
   needFamily(ctx); must(approver(ctx), 'Only the patient or the family members who hold the page decide this');
   const client = await core.clientById(ctx.clientId, c), email = normEmail(p.email); must(email, 'Who?');
-  const list = new Set((extraOf(client).shift_allowed || []).map(normEmail)); if (isTrue(p.on)) list.add(email); else list.delete(email);
-  await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object('shift_allowed', $2::jsonb) where client_id=$1`, [ctx.clientId, JSON.stringify([...list])], c);
+  const ex = extraOf(client), al = new Set((ex.shift_allowed || []).map(normEmail)), dn = new Set((ex.shift_denied || []).map(normEmail));
+  if (isTrue(p.on)) { al.add(email); dn.delete(email); } else { al.delete(email); dn.add(email); }
+  await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object('shift_allowed', $2::jsonb, 'shift_denied', $3::jsonb) where client_id=$1`, [ctx.clientId, JSON.stringify([...al]), JSON.stringify([...dn])], c);
   return grid(ctx, c, 7);
 }
 
 module.exports = { setShiftAllowed, addChore, dropChore, doneChore, careGrid, setNeed, setVisits, setMedNames, takeShift, releaseShift, planVisit, askAllNeeds, shiftDose };
 Object.defineProperty(module.exports, 'grid', { value: grid, enumerable: false });
 Object.defineProperty(module.exports, 'allowedIn', { value: allowedIn, enumerable: false });
+Object.defineProperty(module.exports, 'isInner', { value: isInner, enumerable: false });

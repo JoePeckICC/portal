@@ -111,7 +111,8 @@ async function bootstrap(ctx) {
   // Threads a family started among themselves are theirs; the coordinator's view leaves them out entirely.
   if (ctx.role === 'coordinator') { const fo = {}; out.topics = out.topics.filter(t => { if (t.kind === 'family') { fo[t.topic_id] = 1; return false; } return true; }); out.messages = out.messages.filter(m => !fo[m.topic_id]); }
   else out.topics = out.topics.filter(t => t.kind !== 'family' || ((t.extra && t.extra.to) || []).includes(ctx.email));
-   out.circle = circle;
+   // Each follower marked in or out of the inner circle, for the People list (Joe 2026-09-29).
+  { const SH = require('./shifts'); out.circle = circle.map(m => ({ ...m, inner: SH.isInner(ce, m.supporter_email, m.relationship) })); }
   const co = await core.coordinatorFor(client); out.coordinator = pubCo(co);
   const { apptPublic, localStamp } = require('../time');
   out.appointments = appointments.map(apptPublic); out.goals = goals; out.careTeam = careTeam; out.meds = meds.map(require('./meds').medPublic); out.vendorBills = vendorBills; out.assistance = assistance;
