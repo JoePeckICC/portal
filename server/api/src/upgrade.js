@@ -309,6 +309,9 @@ const STEPS = [
   `alter table help_items add column if not exists cov text not null default ''`,
   // ---- who is with them, visits (handlers/shifts.js)
   `alter table coverage add column if not exists email text not null default ''`,
+  // a meal, a ride or an errand asked for a day and part of the day sits on that day of the week (Joe 2026-09-29)
+  `alter table help_items add column if not exists day date`,
+  `alter table help_items add column if not exists part text not null default ''`,
   `create table if not exists coverage_needs (
      client_id text not null references clients(client_id) on delete cascade, day date not null, part text not null,
      need text not null, set_by text not null default '', primary key (client_id, day, part))`,
