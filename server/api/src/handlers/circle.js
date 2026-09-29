@@ -166,7 +166,11 @@ async function blockCircle(ctx, p, c) {
 async function addHelp(ctx, p, c) {
   actOrFam(ctx); needFamily(ctx);
   const title = clean(p.title, 160).trim(); must(title, 'Say what would help');
-  const row = await db.insert('help_items', { item_id: id(), client_id: ctx.clientId, title, detail: clean(p.detail, 600), when_text: clean(p.when, 120), status: 'Open', claimed_by: '', added_by: ctx.email }, c);
+  // A day and part of the day put it on This week; without them it is Anytime.
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(String(p.day || '')) ? p.day : null, part = ['morning', 'afternoon', 'evening', 'night'].includes(p.part) ? p.part : '';
+  must(!part || day, 'Pick a day');
+  const when = day ? new Date(day + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' }) + (part ? ', ' + part : '') : clean(p.when, 120);
+  const row = await db.insert('help_items', { item_id: id(), client_id: ctx.clientId, title, detail: clean(p.detail, 600), when_text: when, status: 'Open', claimed_by: '', added_by: ctx.email, day, part: day ? (part || 'afternoon') : '' }, c);
   return { item: row };
 }
 // Who is with them (Joe 2026-09-29): we never put people with a patient; the family asks its own Circle. A shift

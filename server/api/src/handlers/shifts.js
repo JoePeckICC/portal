@@ -64,7 +64,7 @@ const doseDay = (day, t) => Number(t.slice(0, 2)) < 5 ? addDays(day, 1) : day;
 async function grid(ctx, c, days) {
   const client = await core.clientById(ctx.clientId, c), ex = extraOf(client), fam = isFam(ctx), me = normEmail(ctx.email);
   const start = ymdTZ(new Date()), list = Array.from({ length: days || 7 }, (_, i) => addDays(start, i)), end = list[list.length - 1];
-  const [needs, cov, vis, asks, doses, taken, todos, home, jobs, chores, done] = await Promise.all([
+  const [needs, cov, vis, asks, doses, taken, todos, home, jobs, chores, done, helps] = await Promise.all([
     db.all(`select to_char(day,'YYYY-MM-DD') as day, part, need from coverage_needs where client_id=$1 and day between $2 and $3`, [ctx.clientId, start, end], c),
     db.all(`select to_char(day,'YYYY-MM-DD') as day, part, kind, who, note, email, added_by from coverage where client_id=$1 and day between $2 and $3`, [ctx.clientId, start, end], c),
     db.all(`select visit_id, to_char(day,'YYYY-MM-DD') as day, part, who, email from visits where client_id=$1 and day between $2 and $3`, [ctx.clientId, start, end], c),
@@ -78,7 +78,10 @@ async function grid(ctx, c, days) {
     // While you're there: the family's everyday things anyone can do on a visit (walk the dog, feed the cat, the trash).
     db.all(`select chore_id, title, part, coalesce(to_char(day,'YYYY-MM-DD'),'') as day from shift_chores where client_id=$1 and active order by added_at`, [ctx.clientId], c),
     db.all(`select chore_id, to_char(day,'YYYY-MM-DD') as day, by_name from chore_done where client_id=$1 and day between $2 and $3`, [ctx.clientId, start, end], c),
+    // What would help, in the same week (Joe 2026-09-29): a meal or a ride with a day sits on it; the rest is Anytime.
+    db.all(`select item_id, title, detail, when_text, status, claimed_by, claimed_email, coalesce(to_char(day,'YYYY-MM-DD'),'') as day, part from help_items where client_id=$1 and cov='' and job_id='' and status in ('Open','Claimed','Done') and (day is null or day between $2 and $3) order by added_at`, [ctx.clientId, start, end], c),
   ]);
+  const helpOut = h => ({ item_id: h.item_id, title: h.title, detail: h.detail, when: h.when_text, status: h.status, by: fam ? h.claimed_by : (h.claimed_email && normEmail(h.claimed_email) === me ? 'You' : first(h.claimed_by)), mine: !!h.claimed_email && normEmail(h.claimed_email) === me });
   const jobAt = jobs.map(j => { const d = new Date(j.starts_at), hh = String(hourIn(C.TZ || 'America/Chicago', d)).padStart(2, '0'); return { day: ymdTZ(d), part: partOf(hh + ':00'), time: new Intl.DateTimeFormat('en-US', { timeZone: C.TZ || 'America/Chicago', hour: 'numeric', minute: '2-digit' }).format(d), service: (j.extra && j.extra.meet) ? 'Meet first' : j.service, who: j.status === 'Taken' && j.vendor_name ? j.vendor_name : '', open: j.status === 'Open' }; });
   const names = Array.isArray(ex.med_names_for) ? ex.med_names_for.map(normEmail) : [];
   const tk = new Set(taken.map(t => t.med_id + '|' + new Date(t.due_at).toISOString()));
@@ -93,6 +96,7 @@ async function grid(ctx, c, days) {
     const s = { part, need, set: !!set, asked: asks.some(a => a.cov === day + '|' + part && a.status === 'Open') };
     if (w) s.with = fam ? { who: w.who, note: w.note, mine } : { who: mine ? 'You' : (first(w.who) || 'Someone'), mine };
     if (fam) s.visits = vs.map(x => x.who); else s.myVisit = vs.some(x => x.email && normEmail(x.email) === me);
+    s.asks = helps.filter(h => h.day === day && (h.part || 'afternoon') === part).map(helpOut);
     s.booked = jobAt.filter(j => j.day === day && j.part === part).map(j => ({ service: j.service, time: j.time, who: fam ? j.who : (j.who ? first(j.who) : ''), open: j.open }));
     s.chores = chores.filter(ch => ch.part === part && (!ch.day || String(ch.day).slice(0, 10) === day)).map(ch => { const dn = done.find(x => x.chore_id === ch.chore_id && x.day === day); return { chore_id: ch.chore_id, title: ch.title, done: !!dn, by: dn ? (fam ? dn.by_name : first(dn.by_name)) : '' }; });
     // The checklist: the family always; whoever holds this shift.
@@ -105,7 +109,7 @@ async function grid(ctx, c, days) {
   }) }));
   let people;
   if (fam) people = (await db.all(`select supporter_email email, supporter_name name, relationship from circle where client_id=$1 and status='Active' order by supporter_name`, [ctx.clientId], c)).map(r => ({ email: normEmail(r.email), name: r.name || r.email, relationship: r.relationship || '', close: CLOSE.test(r.relationship || ''), allowed: isInner(ex, r.email, r.relationship) }));
-  return { days: out, parts: PARTS, visitsOff: isTrue(ex.visits_off), home, fam, canNames: approver(ctx), canAllow: approver(ctx), people,
+  return { anytime: helps.filter(h => !h.day && h.status !== 'Done').map(helpOut), days: out, parts: PARTS, visitsOff: isTrue(ex.visits_off), home, fam, canNames: approver(ctx), canAllow: approver(ctx), people,
     medNamesFor: fam ? names : undefined, shiftPeople: fam ? [...new Map(cov.filter(x => x.kind === 'with' && x.email).map(x => [normEmail(x.email), x.who])).entries()].map(([email, who]) => ({ email, who, names: names.includes(email) })) : undefined,
     pf: first(client.patient_first_name) || '' };
 }
