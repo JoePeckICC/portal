@@ -485,6 +485,15 @@ test('who is with them: needs sized, a supporter takes a shift, sees a checklist
   assert.match((await api(kay, 'planVisit', { day, part: 'morning' })).error, /not taking visits/);
   { const r = await api(kay, 'releaseShift', { day, part: 'evening' }); assert.equal(r.ok, true, r.error); assert.equal(r.days[1].slots[2].with, undefined); }
   { const r = await api(sam, 'askAllNeeds', {}); assert.equal(r.ok, true, r.error); assert.ok(r.asked >= 1); assert.equal(r.days[1].slots[2].asked, true); }
+  // while you're there: walk the dog, anyone who is there checks it off
+  { const r = await api(sam, 'addChore', { title: 'Walk Biscuit', part: 'evening' }); assert.equal(r.ok, true, r.error); assert.equal(r.days[3].slots[2].chores[0].title, 'Walk Biscuit', 'every day'); }
+  assert.ok((await api(kay, 'addChore', { title: 'x', part: 'evening' })).error, 'only the family adds');
+  const ch = (await api(kay, 'careGrid', {})).days[1].slots[2].chores[0];
+  { const r = await api(kay, 'doneChore', { choreId: ch.chore_id, day }); assert.equal(r.ok, true, r.error); assert.equal(r.days[1].slots[2].chores[0].done, true); }
+  assert.equal((await api(sam, 'careGrid', {})).days[1].slots[2].chores[0].by, 'Cousin Kay');
+  // booked help shows at its time
+  await db.q(`insert into jobs (job_id, client_id, service, city, state, starts_at, details, address, status, created_by) values ('j-shift','c2','Pet care','Nashville','TN',($1 || ' 18:00')::timestamp at time zone 'America/Chicago','','','Open','sam@example.com') on conflict (job_id) do nothing`, [day]);
+  assert.equal((await api(kay, 'careGrid', {})).days[1].slots[2].booked[0].service, 'Pet care');
   await db.q(`update clients set extra = extra - 'visits_off' where client_id='c2'`);
 });
 
