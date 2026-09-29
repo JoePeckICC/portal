@@ -53,6 +53,7 @@ async function dailyDigest() {
   if (hour === 4) await db.q(`delete from audit where at < now() - interval '366 days'`);
   if (hour === 9) { try { await intakeNudges(); } catch (e) { console.error('nudge', e.message); } try { await twoDayReminders(); } catch (e) { console.error('twoDay', e.message); } try { await quietFamilies(); } catch (e) { console.error('quiet', e.message); } try { await circleNudges(); } catch (e) { console.error('circleNudge', e.message); } }
   try { await hospitalQuiet(); } catch (e) { console.error('hospitalQuiet', e.message); }
+  if (hour === 16) { try { await weekCheck(); } catch (e) { console.error('weekCheck', e.message); } }
   let sent = 0;
   for (const u of await db.all(`select * from users where lower(role)='coordinator' and active`)) {
     const s = core.coSettings(u);
@@ -156,6 +157,21 @@ async function hospitalQuiet(anyHour) {
   }
   return { flagged: n };
 }
+// Sunday at 4 PM (Joe 2026-09-29): the people who hold the page get one note asking if the week ahead looks right.
+// Once per week per family, and not if someone already confirmed it. The home screen shows the same check.
+async function weekCheck(force) {
+  const today = ymd(new Date(), C.TZ); if (!force && new Date(today + 'T12:00:00Z').getUTCDay() !== 0) return { asked: 0 };
+  const wk = require('./handlers/shifts').weekOf(today);
+  const rows = await db.all(`select c.* from clients c where c.circle_enabled and c.paid and lower(c.status) not in ('closed','archived') and coalesce(c.current_stage,'')<>'Finding wisdom'
+    and coalesce(c.extra->'week_ok'->>'week','') <> $1 and coalesce(c.extra->>'week_ask_for','') <> $1`, [wk]);
+  for (const cl of rows) {
+    const pf = first(cl.patient_first_name) || 'your';
+    for (const u of await db.all(`select * from users where client_id=$1 and active and (lower(role)='client' or (lower(role)='family' and coalesce(extra->>'delegate','')='true'))`, [cl.client_id]))
+      if (core.prefs(u).message) await mail.notify(u.email, 'Does next week look right?', 'Take a minute with the plan for ' + (pf === 'your' ? 'your' : pf + '’s') + ' week: appointments, who is staying, meals and rides. If it matches what you expect, one tap confirms it and your inner circle hears the plan is set.', '', 'Check the week');
+    await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object('week_ask_for', $2::text) where client_id=$1`, [cl.client_id, wk]);
+  }
+  return { asked: rows.length };
+}
 // A paid family nobody has heard from: no sign-in and no message for QUIET_DAYS. The coordinator gets one note, then not again for another stretch.
 async function quietFamilies() {
   const rows = await db.all(`select c.* from clients c where c.paid and c.plan_ready and lower(c.status) not in ('closed','archived') and coalesce(c.current_stage,'')<>'Finding wisdom'
@@ -188,4 +204,4 @@ async function run(name) {
   try { const out = await fn(); await core.audit({ email: 'system', role: 'job', clientId: '' }, name, out || {}, ''); return { ok: true, ms: Date.now() - t, ...out }; }
   catch (e) { await core.audit({ email: 'system', role: 'job', clientId: '' }, name, {}, e.message); throw e; }
 }
-module.exports = { run, JOBS, hospitalQuiet };
+module.exports = { run, JOBS, hospitalQuiet, weekCheck };
