@@ -252,6 +252,8 @@ html[data-env=staging] body::before{content:'TEST SITE · made-up families only'
 .tap{cursor:pointer}.medalert.tap:hover,.hsec.tap:hover .tm{border-color:var(--gold)}
 .sheet{position:fixed;inset:0;z-index:1200;background:var(--ground);display:flex;flex-direction:column}.sheet .mapfsh{background:#fff}.sheet .shb{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}.sheet .shi{max-width:760px;margin:0 auto;padding:20px 16px 40px}.sheet .cmap iframe{height:min(60vh,520px)}
 .hgo{border-left:4px solid var(--gold);padding:4px 0 4px 16px}.hgo .hgt{font-family:'Fraunces',Georgia,serif;font-size:26px;line-height:1.2;margin:4px 0 2px}
+.shwk{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;margin:0 0 12px;border:1px solid var(--gold);border-radius:3px}.shok{margin:0 0 10px}
+.wkc .wkl{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px}.wkc .wkb{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 .hck{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px;background:#fff;border:1px solid var(--line);border-radius:3px;text-decoration:none;color:var(--ink)}.hck:hover{border-color:var(--gold)}
 .hero .hsub{position:relative;color:rgba(255,255,255,.82);font-size:15px;font-weight:600;margin-top:4px}
 @media (max-width:760px){.medalert,.hosp{padding:16px}.medalert .man{font-size:21px}.medalert .mar{flex-wrap:wrap}.medalert .mab{width:100%}}
@@ -1166,6 +1168,7 @@ function homeSimple(){
   mineAll.slice(0,3).forEach(function(t){var w=toDate(t.due_date);var r=el('<div class="row"><button type="button" class="chk" aria-pressed="false" aria-label="Mark done: '+esc(t.title)+'"></button><div class="t">'+esc(t.title)+'<div class="d">'+[w?(w>=t0&&w<t1?'Today':w<t0?'Was due '+fmtDate(w):'By '+fmtDate(w)):'',t.notes].filter(Boolean).map(esc).join(' · ')+'</div></div></div>');$('.chk',r).onclick=function(){this.classList.add('on');call('setTaskStatus',{taskId:t.task_id,status:'Done'}).then(refresh).catch(alertErr)};list.appendChild(r)});
   if(mineAll.length>3){var mo=el('<a href="#tasks" class="small hmore">'+(mineAll.length-3)+' more on your list ›</a>');mo.onclick=function(ev){ev.preventDefault();go('tasks')};list.appendChild(mo)}
   if(list.children.length)sec('Today',list);
+  var wkc=weekCheckEl();if(wkc)v.appendChild(wkc);
   // A nudge to tell the Circle: when there is a day worth telling about and nothing has gone out lately (Joe 2026-09-29:
   // the Circle plays off what happens everywhere else). One tap opens the post with a headline started.
   if(c.circle_enabled&&isApprover()){var lastS=(d.updates||[]).filter(function(u){return u.visible_to_circle===true||String(u.visible_to_circle)==='TRUE'})[0],ago=lastS?(now-toDate(lastS.posted_at))/36e5:1e9;
@@ -3480,6 +3483,21 @@ function journalPage(){
 // Who is with them, visits and the shift checklist (Joe 2026-09-29). One list of the week: the times someone is
 // needed are big and gold, good times to visit are normal, fine-alone times shrink to a line. The family sets each
 // time and asks its Circle; the Circle stays a shift or stops by. Whoever holds a shift sees its checklist.
+// Sunday and Monday on the home screen (Joe 2026-09-29): does the week ahead look right? One tap confirms it; Change
+// something opens This week in Your Circle. Only for the people who hold the page, and only until someone answers.
+function weekCheckEl(){
+  var d=S.data,c=d.client;if(!c||!c.circle_enabled||!isApprover())return null;var wd=new Date().getDay();if(wd!==0&&wd!==1)return null;
+  var g=S.cg;if(!g){if(!S.cgLoad){S.cgLoad=true;call('careGrid',{}).then(function(r){S.cg=r;render()}).catch(function(){})}return null}
+  if(!g.week||!g.week.due)return null;
+  var pn=yo(g.pf||'them').n,open=0,lines=g.days.filter(function(x){return x.day>=g.week.start}).map(function(x){var it=[];
+    x.slots.forEach(function(s){(s.appts||[]).forEach(function(a){it.push(a.title+(a.time?' '+a.time:''))});
+      if(s.with)it.push(s.with.who+' stays the '+s.part);else if(s.need==='need'){open++;it.push('nobody yet for the '+s.part)}
+      (s.booked||[]).forEach(function(j){it.push(j.service+' '+j.time)});(s.asks||[]).forEach(function(h){if(h.status!=='Done')it.push(h.title+(h.status==='Open'?', nobody yet':', '+h.by))})});
+    var dd=new Date(x.day+'T12:00:00');return'<div class="wkl"><b>'+esc(dd.toLocaleDateString(undefined,{weekday:'short'}))+'</b><span'+(it.length?'':' class="muted"')+'>'+(it.length?esc(it.join(' · ')):'Nothing planned')+'</span></div>'}).join('');
+  var s=el('<section class="hsec wkc"><h2 class="k">Does next week look right?</h2><p style="margin:4px 0 10px">Appointments, who is with '+esc(pn)+', meals and rides.'+(open?' <b>'+open+' time'+(open===1?'':'s')+' still need'+(open===1?'s':'')+' someone.</b>':'')+'</p>'+lines+'<div class="wkb"><button type="button" class="btn">Looks good</button><button type="button" class="btn quiet">Change something</button></div></section>');
+  var bs=$all('.wkb button',s);bs[0].onclick=function(){busy(bs[0],true,'…');call('confirmWeek',{}).then(function(r){S.cg=r;toast('Confirmed. Your inner circle knows the plan is set.');render()}).catch(alertErr)};
+  bs[1].onclick=function(){setView('circle');S.pop='ci:week';render();scrollTo(0,0)};
+  return s}
 function shiftsEl(mode){
   var fam=mode==='fam',g=S.cg,w=el('<div class="shw8"></div>');
   if(!g){w.appendChild(el('<p class="small muted">Loading the week…</p>'));call('careGrid',{}).then(function(r){S.cg=r;render()}).catch(function(e){w.innerHTML='<p class="err">'+esc(e.message)+'</p>'});return w}
@@ -3487,11 +3505,21 @@ function shiftsEl(mode){
   function upd(action,params,msg){return call(action,params).then(function(r){S.cg=r;if(msg)toast(msg);render()}).catch(alertErr)}
   if(fam){
     var open=0;g.days.forEach(function(d){d.slots.forEach(function(s){if(s.need==='need'&&!s.with&&!s.asked)open++})});
-    var top=el('<div class="shtop"><button type="button" class="btn askb">+ Ask for help</button><label class="cmsw"><input type="checkbox"'+(g.visitsOff?'':' checked')+'> <span>Visits are welcome<span class="small muted"> · your inner circle sees good times to stop by</span></span></label>'+(open?'<button type="button" class="btn quiet sm opena">Ask for someone at '+(open===1?'the open time':'all '+open+' open times')+'</button>':'')+'</div>');
+    var top=el('<div class="shtop"><button type="button" class="btn askb">+ Ask for help</button><button type="button" class="btn quiet apb">+ Appointment</button><label class="cmsw"><input type="checkbox"'+(g.visitsOff?'':' checked')+'> <span>Visits are welcome<span class="small muted"> · your inner circle sees good times to stop by</span></span></label>'+(open?'<button type="button" class="btn quiet sm opena">Ask for someone at '+(open===1?'the open time':'all '+open+' open times')+'</button>':'')+'</div>');
     $('input',top).onchange=function(){upd('setVisits',{on:this.checked},this.checked?'Visits are on.':'Visits are off.')};
     var ab=$('.opena',top);if(ab)ab.onclick=function(){busy(ab,true,'Asking…');upd('askAllNeeds',{},'Asked your inner circle.')};
-    $('.askb',top).onclick=function(){S.cgAsk=!S.cgAsk;render()};
+    $('.askb',top).onclick=function(){S.cgAsk=!S.cgAsk;S.cgAp=false;render()};
+    $('.apb',top).onclick=function(){S.cgAp=!S.cgAp;S.cgAsk=false;render()};
+    // The Sunday check (Joe 2026-09-29): the people who hold the page confirm the week matches what they expect.
+    if(g.week&&g.canAllow){if(g.week.ok)w.appendChild(el('<p class="small muted shok">This week is confirmed'+(g.week.ok.by?' by '+esc(g.week.ok.by):'')+'.</p>'));
+      else if(g.week.due){var wc=el('<div class="shwk"><span><b>Does this week look right?</b><span class="small muted"> Check the days below, then confirm. Your inner circle hears the plan is set.</span></span><button type="button" class="btn sm">Looks good</button></div>');var wb=$('button',wc);wb.onclick=function(){busy(wb,true,'…');upd('confirmWeek',{},'Confirmed. Your inner circle knows the plan is set.')};w.appendChild(wc)}}
     w.appendChild(top);
+    // An appointment on the week: a calendar item only (what, when, where). The inner circle sees that there is one, and when.
+    if(S.cgAp){var dys2=g.days.map(function(x){return x.day});
+      var apf=el('<form class="card shask"><div class="k">Add an appointment</div><input name="title" placeholder="What it is, like Follow-up visit" maxlength="200" required><div class="shaskr"><select name="day" required>'+dys2.map(function(x){var dd=new Date(x+'T12:00:00');return'<option value="'+x+'">'+esc(dd.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}))+'</option>'}).join('')+'</select><input name="time" type="time" value="09:00"></div><input name="location" placeholder="Where (optional)" maxlength="200"><div style="display:flex;gap:10px;align-items:center"><button class="btn" type="submit">Add</button><a href="#" class="small cx">Cancel</a></div><p class="small muted" style="margin:0">Only your family sees what it is. Your inner circle sees “Appointment” and the time, so they can offer a ride.</p><p class="err"></p></form>');
+      $('.cx',apf).onclick=function(ev){ev.preventDefault();S.cgAp=false;render()};
+      apf.onsubmit=function(ev){ev.preventDefault();var fd=formData(apf),b=$('button[type=submit]',apf);busy(b,true,'Adding…');call('addWeekAppt',{title:fd.title,day:fd.day,time:fd.time,location:fd.location}).then(function(r){S.cg=r;S.cgAp=false;toast('Added to the week.');render()}).catch(function(e){$('.err',apf).textContent=e.message;busy(b,false,'Add')})};
+      w.appendChild(apf)}
     // One way to ask for anything (Joe 2026-09-29): a meal, a ride, an errand, or someone to stay. A day puts it on the week.
     if(S.cgAsk){var dys=g.days.map(function(x){return x.day}),sg=['A meal','Groceries','A ride','Walk the dog','Errands','Stay with '+pn].concat((S.data.pets||[]).filter(function(q){return q.kind==='Dog'}).map(function(q){return 'Walk '+q.name}).slice(0,1));
       var af=el('<form class="card shask"><div class="k">Ask your inner circle</div><input name="title" placeholder="What would help" maxlength="160" required><div class="pfp">'+sg.filter(function(v,i,a){return a.indexOf(v)===i}).map(function(t){return'<button type="button" class="pfc">'+esc(t)+'</button>'}).join('')+'</div><div class="shaskr"><select name="day"><option value="">Anytime</option>'+dys.map(function(x){var dd=new Date(x+'T12:00:00');return'<option value="'+x+'">'+esc(dd.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}))+'</option>'}).join('')+'</select><select name="part">'+['morning','afternoon','evening','night'].map(function(p){return'<option'+(p==='evening'?' selected':'')+'>'+p+'</option>'}).join('')+'</select></div><input name="detail" placeholder="Anything they should know (optional)" maxlength="600"><div style="display:flex;gap:10px;align-items:center"><button class="btn" type="submit">Ask</button><a href="#" class="small cx">Cancel</a></div><p class="err"></p></form>');
@@ -3514,7 +3542,7 @@ function shiftsEl(mode){
       if(fam&&s.visits&&s.visits.length)st+=' · '+s.visits.length+' visiting';
       if(!fam&&s.myVisit)st+=' · you’re stopping by';
       // What else happens then: help that is booked, and the everyday things anyone there can do.
-      var also=(s.booked||[]).map(function(j){return (j.who?first(j.who)+' ':'')+j.service.toLowerCase()+' '+j.time}).concat((s.asks||[]).map(function(h){return h.title+(h.status==='Open'?' needed':' · '+h.by)})).concat((s.chores||[]).map(function(ch){return ch.title+(ch.done?' ✓':'')}));
+      var also=(s.appts||[]).map(function(a){return a.title+(a.time?' '+a.time:'')}).concat((s.booked||[]).map(function(j){return (j.who?first(j.who)+' ':'')+j.service.toLowerCase()+' '+j.time})).concat((s.asks||[]).map(function(h){return h.title+(h.status==='Open'?' needed':' · '+h.by)})).concat((s.chores||[]).map(function(ch){return ch.title+(ch.done?' ✓':'')}));
       var cls=rest||need==='alone'?'alone':need,b=el('<button type="button" class="shs '+cls+(s.with?' cov':'')+(S.cgSel===key?' on':'')+'"><span class="shlt"><b>'+esc(P)+'</b>'+(also.length&&cls!=='alone'?'<small>'+esc(also.join(' · '))+'</small>':'')+'</span><span class="st'+(need==='need'&&!s.with?' open':'')+'">'+st+'</span></button>');
       b.onclick=function(){S.cgSel=S.cgSel===key?null:key;render()};w.appendChild(b);
       if(S.cgSel!==key)return;
@@ -3533,6 +3561,7 @@ function shiftsEl(mode){
         if(!g.visitsOff&&!(s.with&&s.with.mine)&&need!=='alone'){var vb=el('<button type="button" class="btn '+(s.with||need!=='need'?'':'quiet ')+'sm">'+(s.myVisit?'Cancel my visit':'I’ll stop by')+'</button>');vb.onclick=function(){upd('planVisit',{day:d.day,part:s.part,off:s.myVisit},s.myVisit?'Visit canceled.':'See you then.')};acts.appendChild(vb)}
         if(acts.children.length)x.appendChild(acts);else x.appendChild(el('<p class="small muted" style="margin:0">'+(need==='alone'?esc(pf)+' is fine alone then.':'Nothing to do here.')+'</p>'));
       }
+      if((s.appts||[]).length){var apx=el('<div class="shcl"><div class="k" style="margin:12px 0 6px">Appointments</div></div>');s.appts.forEach(function(a){var r=el('<div class="shci"><span>'+(a.time?'<b>'+esc(a.time)+'</b> ':'')+esc(a.title)+(a.location?'<span class="small muted"> · '+esc(a.location)+'</span>':'')+'</span>'+(fam&&a.mine?'<a href="#" class="small muted">Remove</a>':'')+'</div>'),rm=$('a',r);if(rm)rm.onclick=function(ev){ev.preventDefault();upd('dropWeekAppt',{apptId:a.appt_id},'Taken off the week.')};apx.appendChild(r)});x.appendChild(apx)}
       // What the family asked for at this time (a meal, a ride), then booked help, then While you're there.
       if((s.asks||[]).length){var ak2=el('<div class="shcl"><div class="k" style="margin:12px 0 6px">Asked for</div></div>');s.asks.forEach(function(h){ak2.appendChild(askRow(h))});x.appendChild(ak2)}
       // Booked help at this time, then While you're there (Joe 2026-09-29: a visit is more than medicine).
