@@ -140,7 +140,17 @@ input,select,textarea,button{scroll-margin-top:110px}
 .post p{white-space:pre-wrap;margin:10px 0 0;font-size:16px;line-height:1.6}
 
 /* circle */
-.ycare{margin-bottom:16px}.ycr{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid var(--line);text-decoration:none;color:inherit}.ycr:first-child{border-top:0}
+.ycare{margin-bottom:16px}
+.shtop{display:grid;gap:10px;margin:0 0 6px}.shd{margin:16px 2px 6px;font-weight:700;font-size:13px}
+.shs{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 14px;margin:0 0 6px;font:inherit;color:var(--ink);cursor:pointer}
+.shs .st{font-size:13px;color:var(--muted);text-align:right}.shs.cov .st{color:var(--ink)}
+.shs.need{border:2px solid var(--gold);padding:16px;background:#FFFBF0}.shs.need b{font-size:17px}.shs.need .st.open{color:#9B2C2C;font-weight:600}
+.shs.alone{border:0;border-bottom:1px dashed var(--line);border-radius:0;background:none;padding:3px 14px;margin:0 0 4px;font-size:12px;color:var(--faint)}.shs.alone b{font-weight:500}.shs.alone .st{font-size:12px;color:var(--faint)}
+.shs.on{box-shadow:0 0 0 2px var(--ink) inset}
+.shx{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:-2px 0 10px;background:#fff}
+.shseg{display:flex;gap:6px;flex-wrap:wrap}.shseg button{font:inherit;font-size:13px;padding:6px 12px;border-radius:16px;border:1px solid var(--line2);background:#fff;cursor:pointer;color:var(--ink)}.shseg button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.shnf{display:flex;gap:8px;margin-top:10px}.shnf input{flex:1}.shacts{display:flex;gap:8px;flex-wrap:wrap}
+.shci{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:14px;border-top:1px solid var(--line)}.shci input{width:auto;margin-top:3px}.shci span{font-weight:400}.shci b{font-weight:700}.covask{display:grid;gap:8px}.covaskr{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ycr{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid var(--line);text-decoration:none;color:inherit}.ycr:first-child{border-top:0}
 .carehd{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;margin:4px 0 16px}.carehd h1{text-align:center;margin:0;font-size:30px}.carehd .cib{border:0;background:none}
 .cbar .cib,.imbar .cib{border:0;background:none}.imbar .cib span{font-size:16px;font-weight:600}
 .circ .cbar{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;margin:4px 0 16px}.circ .cbar h1{text-align:center;margin:0;font-size:30px}.cib{position:relative;width:44px;height:44px;border-radius:22px;border:1px solid var(--line2);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}.cib svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.cib:hover{border-color:var(--gold)}.cib .bdg{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:#7A2E2E;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}.cfeed{max-width:720px;margin:0 auto}.circ .cirl{max-width:720px;margin-left:auto;margin-right:auto}.rxsum{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:13px;color:var(--muted)}.rxsum .rxic{display:flex}.rxsum .rxic i{width:22px;height:22px;border-radius:11px;background:var(--panel);border:2px solid var(--ground);display:flex;align-items:center;justify-content:center;margin-left:-6px}.rxsum .rxic i:first-child{margin-left:0}.rxsum svg{width:13px;height:13px;fill:none;stroke:var(--gold-ink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -1428,8 +1438,12 @@ function yourCare(){
   if(!show.length)ul.appendChild(el('<p class="small muted" style="margin:8px 0 0">Nothing set up yet. Pick what you need below.</p>'));
   show.forEach(function(it){var r;
     if(it.a){var a=it.a;r=el('<a href="#" class="ycr"><b>'+esc(fmtWhen(a.starts_at))+'</b><span>'+esc(a.title)+'</span><span class="small cumore">Details ›</span></a>');r.onclick=function(ev){ev.preventDefault();S.pop='cu:a:'+a.appt_id;render()}}
-    else{var j=it.j;r=el('<a href="#" class="ycr"><b>'+esc(jobWhen(j))+'</b><span>'+esc(vjWhat(j))+'</span><span class="small muted">'+jobStatus(j)+'</span><span class="small cumore">Details ›</span></a>');r.onclick=function(ev){ev.preventDefault();S.pop='cu:j:'+j.job_id;render()}}
+    else{var j=it.j,ph=j.vendor_name?pastHelper('',j.vendor_name):null;r=el('<a href="#" class="ycr"><b>'+esc(jobWhen(j))+'</b><span>'+esc(vjWhat(j))+'</span><span class="small muted">'+jobStatus(j)+'</span><span class="small"><span class="cumore">Details ›</span>'+(ph?' <span class="muted">·</span> <span class="bka cumore">Book '+esc(first(j.vendor_name))+' again ›</span>':'')+'</span></a>');r.onclick=function(ev){ev.preventDefault();if(ph&&ev.target.closest('.bka')){S.fw='v:'+ph.topic_id;render();return}S.pop='cu:j:'+j.job_id;render()}}
     ul.appendChild(r)});
+  // The last person who helped, when nothing is on the calendar with them: one tap to have them back.
+  var last=(d.jobs||[]).filter(function(j){var w=toDate(j.starts_at);return j.vendor_name&&w&&w<t0&&j.status==='Taken'})[0],lh=last?pastHelper('',last.vendor_name):null;
+  if(lh&&!show.some(function(it){return it.j&&it.j.vendor_name===last.vendor_name})){var ba=el('<a href="#" class="ycr"><b>Book '+esc(last.vendor_name)+' again</b><span class="small muted">'+esc(vjWhat(last))+', last on '+esc(fmtShort(toDate(last.starts_at)))+'</span></a>');ba.onclick=function(ev){ev.preventDefault();S.fw='v:'+lh.topic_id;render()};ul.appendChild(ba)}
+
   var rest=items.length-show.length;if(rest>0){var mo=el('<a href="#" class="small hmore" style="display:inline-block;margin-top:10px">All care coming up ('+items.length+') ›</a>');mo.onclick=function(ev){ev.preventDefault();S.pop='cu:all';render()};c.appendChild(mo)}
   return c}
 function findView(){
@@ -1459,9 +1473,11 @@ function popsInto(v){var a=fwPop();if(a){v.appendChild(a);return}var p=String(S.
 function toTiles(){requestAnimationFrame(function(){var t=$('.tiles'),h=$('.sitebar');if(!t){scrollTo(0,0);return}var y=scrollY+t.getBoundingClientRect().bottom-(h?h.getBoundingClientRect().height:0)-70;scrollTo(0,Math.max(0,y))})}
 // How can we help? First a plain menu, who to talk to, or what kind of help, each one a button with a line
 // saying what it is. Tap one and only that form shows, with a way back to the menu. One thing at a time.
-var HELP_WHAT={'Rides':'To an appointment or the airport, set up ahead','Meals':'A meal delivered, or a grocery run','Childcare':'Someone to watch the kids','Pet care':'Walks, feeding, a sitter','Lodging':'A place to stay near the hospital','Help at home':'Errands, chores, a handyman for grab bars','Medical equipment':'Borrow a walker, a wheelchair and more','Other':'Anything else'};
+var HELP_WHAT={'Rides':'To appointments and back','Meals':'A meal or a grocery run','Childcare':'Someone to watch the kids','Pet care':'Walks, feeding, a sitter','Lodging':'Near the hospital','Help at home':'Errands, chores, a handyman','Medical equipment':'Walker, wheelchair and more','Other':'Anything else, non-medical'};
 var INTAKE_KEY={'Rides, parking, and getting to appointments':'rides','Meals, groceries, and errands':'meals','Childcare coverage':'childcare','Pet care':'pets','Lodging near the hospital for family traveling in':'lodging','Equipment and supplies, walker, shower chair, wound supplies':'equipment','Getting the house ready before surgery':'house','Prescription pickups and pharmacy runs':'pharmacy'};
 var HELP_TITLE={'Rides':'Plan a ride','Meals':'Meals and groceries','Childcare':'Childcare','Pet care':'Pet care','Lodging':'A place to stay','Help at home':'Help around the house','Medical equipment':'Borrow equipment','Other':'Something else'};
+// The person this family already used for a kind of help, or by name (Joe 2026-09-29: repeat people over strangers).
+function pastHelper(svc,name){return (S.data.topics||[]).filter(function(t){var x=t.extra||{};if(t.kind!=='vendor')return false;if(name)return String(x.vendor_name||'').toLowerCase()===String(name).toLowerCase();return (x.vendor_services&&x.vendor_services.length?x.vendor_services:[x.service]).indexOf(svc)>=0})[0]||null}
 function findPick(){
   var d=S.data,co=d.me.role==='coordinator',cf=first(d.coordinator&&d.coordinator.name)||'your coordinator',svc=d.jobServices||Object.keys(HELP_WHAT);
   var vts=(d.topics||[]).filter(function(t){return t.kind==='vendor'});
@@ -1480,16 +1496,17 @@ function findPick(){
     // One set of boxes, most likely first (Joe: no headings): people they already use, what they said they need,
     // who is with them, then the rest.
     var pfn=yo(first((d.client||{}).patient_first_name)||'them');
-    group('',vts.map(function(t){var x=t.extra||{};return['v:'+t.topic_id,x.vendor_name||'Support team',((x.vendor_services&&x.vendor_services.length?x.vendor_services:[x.service]).filter(Boolean).join(', '))+' · book again, or meet them first']}).concat(favS.map(sv)).concat([['cov','Who is with '+pfn.n,'Who is staying each morning, afternoon, evening and night']]).concat(rest.map(sv)));
+    group('',vts.map(function(t){var x=t.extra||{};return['v:'+t.topic_id,x.vendor_name||'Support team',((x.vendor_services&&x.vendor_services.length?x.vendor_services:[x.service]).filter(Boolean).join(', '))+' · book again']}).concat(favS.map(sv)).concat(rest.map(sv)).concat([['cov','Who is with '+pfn.n,'Ask your Circle to take a shift']]));
     return m}}
 // Tap a box and its form rises over the menu; Done puts it away. The booking confirmation shows there too.
 function fwPop(){
   var d=S.data,co=d.me.role==='coordinator',cf=first(d.coordinator&&d.coordinator.name)||'your coordinator',w=S.fw,vts=(d.topics||[]).filter(function(t){return t.kind==='vendor'});
-  function close(){S.fw=null;S.vst=null;S.hst=null;S.bk=null}
+  function close(){S.fw=null;S.vst=null;S.hst=null;S.bk=null;S.fwNew=null}
+  if(w&&w.indexOf('svc:')===0&&!S.fwNew&&!co){var ph=pastHelper(w.slice(4));if(ph){var pb=el('<div class="fpick"></div>'),nw=el('<p class="small" style="margin:0 0 12px">Booking '+esc((ph.extra||{}).vendor_name||'them')+', who helped before. <a href="#">Someone new instead</a></p>');$('a',nw).onclick=function(ev){ev.preventDefault();S.fwNew=true;render()};pb.appendChild(nw);pb.appendChild(imSchedPop(ph,true));return popEl('Book '+((ph.extra||{}).vendor_name||'them')+' again',pb,close)}}
   if(S.bk&&S.bk.done){var a=S.bk.done;return popEl('Booked',el('<div class="imsec"><h3 style="margin:0 0 6px">'+esc(a.title)+'</h3><p style="margin:0">'+esc(fmtWhen(a.starts_at))+' · '+esc(a.location)+'</p><p class="small muted" style="margin:6px 0 0">'+esc(a.note)+'. An invite is in your email'+(a.link?', with the video link':'')+'.</p></div>'),close)}
   if(!w)return null;
   var t=w.indexOf('v:')===0?vts.filter(function(x){return x.topic_id===w.slice(2)})[0]:null;if(w.indexOf('v:')===0&&!t){S.fw=null;return null}
-  if(w==='cov'){var cb=el('<div class="fpick"></div>');cb.appendChild(coverageEl({edit:true}));return popEl('Who is with',cb,close,true)}
+  if(w==='cov'){var cb=el('<div class="fpick"></div>');cb.appendChild(shiftsEl('fam'));return popEl('Who is with '+yo(first((d.client||{}).patient_first_name)||'them').n,cb,function(){close();S.cg=null;S.cgSel=null})}
   var title=w==='co'?(co?'A call with the family':'Talk with '+cf):t?'Book '+((t.extra||{}).vendor_name||'them'):(HELP_TITLE[w.slice(4)]||w.slice(4));
   var b=el('<div class="fpick"></div>');
   if(w==='co')b.appendChild(coSched(function(ap){S.fw=null;S.bk={done:ap};refresh()}));
@@ -3326,7 +3343,7 @@ function supporterPage(){
   if(d.what_i_need)$('#need',p).appendChild(el('<div class="note" style="margin-bottom:20px"><div class="k" style="margin-bottom:6px">From the family</div>'+esc(d.what_i_need).replace(/\n/g,'<br>')+'</div>'));
   var feed=$('#feed',p);var ql=quietLine(d.tracker,d.updates,'');if(ql)feed.appendChild(ql);feed.appendChild(tlFeed(d.updates||[],c,{compact:true,soc:socFor(d),empty:'Nothing shared yet. You will get an email when there is.'}));feed.style.marginBottom='24px';
   var h=helpFor(d,false);h.style.marginBottom='24px';$('#help',p).appendChild(h);
-  var cv=coverageEl({edit:false});cv.style.marginBottom='24px';$('#help',p).appendChild(cv);var fe=fundEl(false);if(fe){fe.style.marginBottom='24px';$('#help',p).appendChild(fe)}
+  var cv=el('<div class="card" style="margin-bottom:24px"><span class="k">Plan a visit</span></div>');cv.appendChild(shiftsEl('circle'));$('#help',p).appendChild(cv);var fe=fundEl(false);if(fe){fe.style.marginBottom='24px';$('#help',p).appendChild(fe)}
   return p;
 }
 
@@ -3447,6 +3464,60 @@ function journalPage(){
   return v}
 // Who is with them: a week of mornings, afternoons, evenings and nights. Family and coordinator fill it; the Circle
 // sees the open nights and can offer.
+// Who is with them, visits and the shift checklist (Joe 2026-09-29). One list of the week: the times someone is
+// needed are big and gold, good times to visit are normal, fine-alone times shrink to a line. The family sets each
+// time and asks its Circle; the Circle stays a shift or stops by. Whoever holds a shift sees its checklist.
+function shiftsEl(mode){
+  var fam=mode==='fam',g=S.cg,w=el('<div class="shw8"></div>');
+  if(!g){w.appendChild(el('<p class="small muted">Loading the week…</p>'));call('careGrid',{}).then(function(r){S.cg=r;render()}).catch(function(e){w.innerHTML='<p class="err">'+esc(e.message)+'</p>'});return w}
+  var pf=g.pf||'them',pn=fam?yo(pf).n:pf;
+  function upd(action,params,msg){return call(action,params).then(function(r){S.cg=r;if(msg)toast(msg);render()}).catch(alertErr)}
+  if(fam){
+    var open=0;g.days.forEach(function(d){d.slots.forEach(function(s){if(s.need==='need'&&!s.with&&!s.asked)open++})});
+    var top=el('<div class="shtop"><label class="cmsw"><input type="checkbox"'+(g.visitsOff?'':' checked')+'> <span>Visits are welcome<span class="small muted"> · the Circle sees good times to stop by</span></span></label>'+(open?'<button type="button" class="btn sm">Ask the Circle for '+(open===1?'the open time':'all '+open+' open times')+'</button>':'')+'</div>');
+    $('input',top).onchange=function(){upd('setVisits',{on:this.checked},this.checked?'Visits are on.':'Visits are off.')};
+    var ab=$('button',top);if(ab)ab.onclick=function(){busy(ab,true,'Asking…');upd('askAllNeeds',{},'Asked your Circle.')};
+    w.appendChild(top);
+  }else{
+    w.appendChild(el('<p class="small muted" style="margin:0 0 6px">'+(g.visitsOff?'The family is resting and not taking visits right now. The gold times are when '+esc(pf)+' still needs someone to stay.':'Gold times are when '+esc(pf)+' needs someone. Staying then covers it. The others are good times to stop by.')+'</p>'));
+  }
+  var t0=ymdLocal(new Date()),t1=ymdLocal(new Date(Date.now()+864e5));
+  g.days.forEach(function(d){
+    var dd=new Date(d.day+'T12:00:00');w.appendChild(el('<div class="shd">'+(d.day===t0?'Today':d.day===t1?'Tomorrow':esc(dd.toLocaleDateString(undefined,{weekday:'long'})))+' <span class="muted" style="font-weight:400">'+esc(dd.toLocaleDateString(undefined,{month:'short',day:'numeric'}))+'</span></div>'));
+    d.slots.forEach(function(s){
+      var key=d.day+'|'+s.part,P=s.part.charAt(0).toUpperCase()+s.part.slice(1),need=s.need,rest=!fam&&g.visitsOff&&need!=='need';
+      var st=s.with?(s.with.mine?'You’re staying':esc(s.with.who)+' is here'):need==='need'?(fam?(s.asked?'Asked the Circle':'Nobody yet'):'Needs someone'):rest?'Resting':need==='alone'?'Fine alone':'Good time to visit';
+      if(fam&&s.visits&&s.visits.length)st+=' · '+s.visits.length+' visiting';
+      if(!fam&&s.myVisit)st+=' · you’re stopping by';
+      var cls=rest||need==='alone'?'alone':need,b=el('<button type="button" class="shs '+cls+(s.with?' cov':'')+(S.cgSel===key?' on':'')+'"><b>'+esc(P)+'</b><span class="st'+(need==='need'&&!s.with?' open':'')+'">'+st+'</span></button>');
+      b.onclick=function(){S.cgSel=S.cgSel===key?null:key;render()};w.appendChild(b);
+      if(S.cgSel!==key)return;
+      var x=el('<div class="shx"></div>');
+      if(fam){
+        var seg=el('<div class="shseg">'+[['need','Needs someone'],['welcome','Welcome'],['alone','Fine alone']].map(function(o){return'<button type="button" data-n="'+o[0]+'"'+(need===o[0]?' class="on"':'')+'>'+o[1]+'</button>'}).join('')+'</div>');
+        $all('button',seg).forEach(function(bb){bb.onclick=function(){upd('setNeed',{day:d.day,part:s.part,need:bb.dataset.n})}});x.appendChild(seg);
+        if(s.with){var wr=el('<p style="margin:10px 0 0"><b>'+esc(s.with.who)+'</b> is with '+esc(pn)+'. <a href="#">Clear</a></p>');$('a',wr).onclick=function(ev){ev.preventDefault();call('setCoverage',{day:d.day,part:s.part,who:'',kind:'with'}).then(function(){S.cg=null;render()}).catch(alertErr)};x.appendChild(wr)}
+        else{var nf=el('<form class="shnf"><input name="who" placeholder="Who is with '+esc(pn)+'" maxlength="120"><button class="btn sm" type="submit">Save</button></form>');nf.onsubmit=function(ev){ev.preventDefault();var v=$('input',nf).value.trim();if(!v)return;call('setCoverage',{day:d.day,part:s.part,who:v,kind:'with'}).then(function(){S.cg=null;render()}).catch(alertErr)};x.appendChild(nf);
+          if(!s.asked){var ak=el('<button type="button" class="btn quiet sm" style="margin-top:8px">Ask the Circle for this '+esc(s.part)+'</button>');ak.onclick=function(){busy(ak,true,'Asking…');call('askShift',{day:d.day,part:s.part}).then(function(){S.cg=null;toast('Asked your Circle.');render()}).catch(alertErr)};x.appendChild(ak)}}
+        if(s.visits&&s.visits.length)x.appendChild(el('<p class="small" style="margin:10px 0 0">Visiting: '+s.visits.map(esc).join(', ')+'</p>'));
+      }else{
+        var acts=el('<div class="shacts"></div>');
+        if(s.with&&s.with.mine){var rl=el('<button type="button" class="btn quiet sm">I can’t make it</button>');rl.onclick=function(){upd('releaseShift',{day:d.day,part:s.part},'The family knows. Thank you.')};acts.appendChild(rl)}
+        else if(!s.with&&need!=='alone'&&!rest){var tk=el('<button type="button" class="btn sm">I can stay the '+esc(s.part)+'</button>');tk.onclick=function(){busy(tk,true,'…');upd('takeShift',{day:d.day,part:s.part},'Thank you. The family knows.')};acts.appendChild(tk)}
+        if(!g.visitsOff&&!(s.with&&s.with.mine)&&need!=='alone'){var vb=el('<button type="button" class="btn '+(s.with||need!=='need'?'':'quiet ')+'sm">'+(s.myVisit?'Cancel my visit':'I’ll stop by')+'</button>');vb.onclick=function(){upd('planVisit',{day:d.day,part:s.part,off:s.myVisit},s.myVisit?'Visit canceled.':'See you then.')};acts.appendChild(vb)}
+        if(acts.children.length)x.appendChild(acts);else x.appendChild(el('<p class="small muted" style="margin:0">'+(need==='alone'?esc(pf)+' is fine alone then.':'Nothing to do here.')+'</p>'));
+      }
+      // The checklist for this shift: the family, and whoever is staying.
+      if(s.checklist&&(fam||(s.with&&s.with.mine))&&(s.checklist.length||(s.todos&&s.todos.length))){
+        var cl=el('<div class="shcl"><div class="k" style="margin:12px 0 6px">During this '+esc(s.part)+'</div></div>');
+        s.checklist.forEach(function(it){var r=el('<label class="shci"><input type="checkbox"'+(it.done?' checked':'')+'><span><b>'+esc(fmtTime(new Date(it.day+'T'+it.time)))+'</b> '+esc(it.label)+' is due. '+(pn==='you'?'Check it off once taken.':'Remind '+esc(pn)+' and check it off.')+'</span></label>');$('input',r).onchange=function(){upd('shiftDose',{day:d.day,part:s.part,medId:it.med_id,time:it.time,undo:!this.checked})};cl.appendChild(r)});
+        (s.todos||[]).forEach(function(t){cl.appendChild(el('<div class="shci"><span>Today: '+esc(t)+'</span></div>'))});
+        if(!fam)cl.appendChild(el('<p class="small muted" style="margin:8px 0 0">You remind; you never give or change a medicine. For an emergency, call 911.</p>'));
+        x.appendChild(cl)}
+      w.appendChild(x)})});
+  if(fam&&g.canNames&&g.shiftPeople&&g.shiftPeople.length){var mn=el('<div class="shcl"><div class="k" style="margin:18px 0 6px">Medicine names</div><p class="small muted" style="margin:0 0 6px">People staying a shift see “A medicine is due” unless you let them see the names.</p></div>');
+    g.shiftPeople.forEach(function(p){var r=el('<label class="cmsw"><input type="checkbox"'+(p.names?' checked':'')+'> <span>'+esc(p.who)+'</span></label>');$('input',r).onchange=function(){upd('setMedNames',{email:p.email,on:this.checked})};mn.appendChild(r)});w.appendChild(mn)}
+  return w}
 function coverageEl(opts){
   opts=opts||{};var d=S.data,rows=d.coverage||[],parts=d.coverageParts||['morning','afternoon','evening','night'],edit=!!opts.edit,pf=first((d.client||{}).patient_first_name)||'them';
   var t0=new Date();t0.setHours(0,0,0,0);var days=[];for(var i=0;i<7;i++){var x=new Date(t0.getTime()+i*864e5);days.push(x)}
@@ -3454,11 +3525,14 @@ function coverageEl(opts){
   var sd=toDate((d.client||{}).surgery_date),first7=function(day){return sd&&day>=sd&&day<new Date(sd.getTime()+7*864e5)};
   var w=el('<div class="card cov"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><span class="k">Who is with '+esc(yo(pf).n)+'</span><span class="small muted">this week</span></div><p class="small muted" style="margin:6px 0 8px">'+(edit?'Tap a slot and write a name. Nights the first week home matter most; an empty one shows in red.':'Open slots are where a hand would help. Tell the family.')+'</p><div class="covg"><div></div>'+parts.map(function(p){return'<div class="covh">'+esc(p)+'</div>'}).join('')+'</div></div>'),g=$('.covg',w);
   days.forEach(function(day){var k=ymdLocal(day);g.appendChild(el('<div class="covd"><b>'+esc(day.toLocaleDateString(undefined,{weekday:'short'}))+'</b><br><span class="small muted">'+esc(day.toLocaleDateString(undefined,{month:'short',day:'numeric'}))+'</span></div>'));
-    parts.forEach(function(p){var r=by[k+'|'+p+'|with'],vis=by[k+'|'+p+'|visit'],gap=!r&&p==='night'&&first7(day);
-      var cell=el('<div class="covc'+(r?' on':'')+(gap?' gap':'')+(edit?' can':'')+'">'+(r?'<b>'+esc(r.who)+'</b>'+(r.note?'<div class="small muted">'+esc(r.note)+'</div>':''):'<span class="small muted">'+(gap?'nobody yet':'Not set')+'</span>')+(vis?'<div class="small" style="color:var(--gold-ink)">visit: '+esc(vis.who)+(edit?' <a href="#" class="vx" aria-label="Remove the visit from '+esc(vis.who)+'">×</a>':'')+'</div>':'')+'</div>');
+    parts.forEach(function(p){var r=by[k+'|'+p+'|with'],vis=by[k+'|'+p+'|visit'],gap=!r&&p==='night'&&first7(day),asked=!r&&(d.help||[]).some(function(h){return h.cov===k+'|'+p&&h.status==='Open'});
+      var cell=el('<div class="covc'+(r?' on':'')+(gap?' gap':'')+(edit?' can':'')+'">'+(r?'<b>'+esc(r.who)+'</b>'+(r.note?'<div class="small muted">'+esc(r.note)+'</div>':''):'<span class="small muted">'+(asked?'Asked the Circle':gap?'nobody yet':'Not set')+'</span>')+(vis?'<div class="small" style="color:var(--gold-ink)">visit: '+esc(vis.who)+(edit?' <a href="#" class="vx" aria-label="Remove the visit from '+esc(vis.who)+'">×</a>':'')+'</div>':'')+'</div>');
       var vx=$('.vx',cell);if(vx)vx.onclick=function(ev){ev.preventDefault();ev.stopPropagation();if(!uiOk('Remove the visit from '+vis.who+'?',this,arguments))return;call('setCoverage',{day:k,part:p,who:'',kind:'visit'}).then(function(){return savedRefresh('Visit removed.')}).catch(alertErr)};
       if(edit)cell.onclick=function(){var who=uiAsk('Who is with '+yo(pf).n+' '+p+' on '+day.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})+'? (blank clears)',r?r.who:'',this,arguments);if(who===null)return;call('setCoverage',{day:k,part:p,who:who,kind:'with'}).then(refresh).catch(alertErr)};
       g.appendChild(cell)})});
+  // Asking the Circle (Joe 2026-09-29): we never put people with them; their own people can take a shift.
+  if(edit){var af=el('<form class="covask"><div class="k" style="margin:14px 0 6px">Ask your Circle</div><p class="small muted" style="margin:0 0 8px">Everyone following gets an email. The first to say yes fills the slot.</p><div class="covaskr"><select name="day">'+days.map(function(x){return'<option value="'+ymdLocal(x)+'">'+esc(x.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}))+'</option>'}).join('')+'</select><select name="part">'+parts.map(function(p){return'<option'+(p==='night'?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div><input name="note" placeholder="Anything they should know (optional)" maxlength="300"><button class="btn sm" type="submit">Ask the Circle</button><p class="err"></p></form>');
+    af.onsubmit=function(ev){ev.preventDefault();var b=$('button',af);busy(b,true,'Asking…');call('askShift',formData(af)).then(function(){return savedRefresh('Asked your Circle.')}).catch(function(e){$('.err',af).textContent=e.message;busy(b,false,'Ask the Circle')})};w.appendChild(af)}
   if(edit){var vf=el('<form class="covv"><span class="small muted">Add a visitor:</span><input type="date" name="day" value="'+ymdLocal(t0)+'"><select name="part">'+parts.map(function(p){return'<option>'+esc(p)+'</option>'}).join('')+'</select><input name="who" placeholder="Who" maxlength="120" required><button class="btn sm" type="submit">Add</button></form>');vf.onsubmit=function(ev){ev.preventDefault();var fd=formData(vf);fd.kind='visit';call('setCoverage',fd).then(function(){return savedRefresh('Visit added.')}).catch(alertErr)};w.appendChild(vf)}
   return w}
 // The fundraiser link: the family's own page, shown to everyone who follows. We host nothing and take nothing.
