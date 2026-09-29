@@ -20,11 +20,11 @@ async function bootstrap(ctx) {
   must(client, 'No family on file for this account yet.');
   out.client = core.publicClient(client);
   const CIRCLE = require('./circle');
-  const withPhoto = (rows, role) => rows.map(u => { const e = u.extra || {}; const o = { ...u, extra: undefined }; if (e.photo) { o.photo = CIRCLE.photoVisible(u, role) ? core.fileUrl(ctx, { upload_id: e.photo, storage_key: 'x' }) : ''; o.photo_ok = isTrue(e.photo_ok); o.sensitive = isTrue(e.sensitive); o.photo_id = e.photo; } if (isTrue(e.pending_share)) o.pending_share = true; return o; });
+  const withPhoto = (rows, role) => rows.map(u => { const e = u.extra || {}; const o = { ...u, extra: undefined }; if (e.photo) { o.photo = CIRCLE.photoVisible(u, role) ? core.fileUrl(ctx, { upload_id: e.photo, storage_key: 'x' }) : ''; o.photo_ok = isTrue(e.photo_ok); o.sensitive = isTrue(e.sensitive); o.photo_id = e.photo; } if (isTrue(e.pending_share)) o.pending_share = true; if (Array.isArray(e.kinds)) o.kinds = e.kinds; if (e.step) o.step = e.step; if (isTrue(e.public)) o.public = true; return o; });
   const ce = client.extra || {};
   if (ctx.role === 'supporter') {
     out.updates = withPhoto(await db.all(`select * from updates where client_id=$1 and visible_to_circle order by posted_at desc`, [ctx.clientId]), 'supporter');
-    out.tracker = ce.tracker || null; out.trackerSteps = CIRCLE.TRACKER; out.reactions = CIRCLE.REACTIONS; out.what_i_need = ce.what_i_need || '';
+    out.tracker = ce.tracker || null; out.trackerSteps = CIRCLE.TRACKER; out.reactions = CIRCLE.REACTIONS; out.what_i_need = ce.what_i_need || ''; out.comments_off = isTrue(ce.comments_off);
     out.comments = await CIRCLE.commentsFor(ctx.clientId, true); out.reactionCounts = await CIRCLE.reactionsFor(ctx.clientId);
     out.myReactions = await db.all(`select r.update_id, r.kind from update_reactions r join updates u on u.update_id=r.update_id where u.client_id=$1 and r.who=$2`, [ctx.clientId, ctx.email]);
     out.help = await db.all(`select item_id, title, detail, when_text, status, claimed_by, claimed_email from help_items where client_id=$1 and status<>'Removed' order by added_at`, [ctx.clientId]);
@@ -75,7 +75,7 @@ async function bootstrap(ctx) {
   out.circleAsk = core.fam(ctx) ? (await require('./jobs').circleNear(cid, ctx.email, null, true)).map(x => ({ email: x.email, name: x.name, text: !!x.phone })) : []; out.circleNear = out.circleAsk.length;
   out.jobs = await require('./jobs').jobsFor(cid); out.careNotes = ce.care_notes || {}; out.pets = Array.isArray(ce.pets) ? ce.pets : require('./jobs').petsFromIntake((out.intake || await intake.readIntake(cid)).answers); out.jobServices = require('./market').SERVICES;
   out.updates = withPhoto(updates, ctx.role);
-  out.tracker = ce.tracker || null; out.trackerSteps = CIRCLE.TRACKER; out.reactions = CIRCLE.REACTIONS; out.what_i_need = ce.what_i_need || '';
+  out.tracker = ce.tracker || null; out.trackerSteps = CIRCLE.TRACKER; out.reactions = CIRCLE.REACTIONS; out.what_i_need = ce.what_i_need || ''; out.comments_off = isTrue(ce.comments_off);
   out.share_token = CIRCLE.canAct(ctx) || ctx.role === 'family' ? (ce.share_token || '') : '';
   out.comments = await CIRCLE.commentsFor(ctx.clientId, false); out.reactionCounts = await CIRCLE.reactionsFor(ctx.clientId);
   out.myReactions = await db.all(`select r.update_id, r.kind from update_reactions r join updates u on u.update_id=r.update_id where u.client_id=$1 and r.who=$2`, [ctx.clientId, ctx.email]);

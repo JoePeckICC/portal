@@ -37,7 +37,7 @@ async function setTracker(ctx, p, c) {
   if (!stage) return { ok: true };
   await require('./learn').fromTracker(ctx.clientId, stage, ctx.email, c);
   const want = isTrue(client.circle_enabled), visible = want && approver(ctx);
-  const u = await db.insert('updates', { update_id: id(), client_id: ctx.clientId, posted_by: ctx.email, stage: client.current_stage || '', title: stage + '.', body: clean(p.note, 600), visible_to_circle: visible, kind: 'Clinical', detail: '', quote: '', quote_ref: '', extra: JSON.stringify(want && !visible ? { pending_share: true } : {}) }, c);
+  const u = await db.insert('updates', { update_id: id(), client_id: ctx.clientId, posted_by: ctx.email, stage: client.current_stage || '', title: stage + '.', body: clean(p.note, 600), visible_to_circle: visible, kind: 'Clinical', detail: '', quote: '', quote_ref: '', extra: JSON.stringify(want && !visible ? { pending_share: true, step: stage } : { step: stage }) }, c);
   const after = async () => {
     if (!visible) return;
     for (const s of await db.all(`select supporter_email from circle where client_id=$1 and status='Active'`, [ctx.clientId]))
@@ -80,18 +80,19 @@ async function react(ctx, p, c) {
 }
 async function comment(ctx, p, c) {
   needFamily(ctx);
+  if (ctx.role === 'supporter') { const cl = await core.clientById(ctx.clientId, c); must(!isTrue(extraOf(cl).comments_off), 'Comments are off for now.'); }
   const body = clean(p.body, 2000).trim(); must(body, 'Write something');
   const u = await db.one(`select * from updates where update_id=$1 and client_id=$2`, [String(p.updateId || ''), ctx.clientId], c); must(u, 'Not found');
   if (ctx.role === 'supporter') must(isTrue(u.visible_to_circle), 'Not found');
   const status = ctx.role === 'supporter' ? 'Pending' : 'Approved';   // the coordinator moderates what the Circle writes
   const row = await db.insert('update_comments', { comment_id: id(), update_id: u.update_id, client_id: ctx.clientId, author: clean(ctx.user.name || ctx.email, 120), email: ctx.email, body, status, by_role: ctx.role }, c);
-  const after = status === 'Pending' ? async () => { for (const a of await approversOf(ctx.clientId)) await mail.notify(a.email, 'A word to approve', (ctx.user.name || ctx.email) + ' wrote under “' + u.title + '”', body.slice(0, 300), 'Open the Circle'); } : null;
+  const after = status === 'Pending' ? async () => { const cl = await core.clientById(ctx.clientId); await core.notifyCo(await core.coordinatorFor(cl), 'comment', 'A comment to approve, ' + (cl.family_name || ''), (ctx.user.name || ctx.email) + ' wrote under “' + u.title + '”', body.slice(0, 300), 'Open the Circle'); } : null;
   return { comment: row, _after: after };
 }
 async function moderateComment(ctx, p, c) {
-  needFamily(ctx); must(approver(ctx) || ctx.role === 'coordinator', 'Not allowed');
+  // The coordinator approves what the Circle writes (Joe 2026-09-29); families do not moderate comments.
+  needFamily(ctx); must(ctx.role === 'coordinator', 'Your coordinator approves comments');
   const status = String(p.status || ''); must(['Approved', 'Hidden', 'Pending'].indexOf(status) >= 0, 'Bad status');
-  if (!approver(ctx)) must(status === 'Hidden', 'Only the patient approves what the Circle sees. You can hide it.');
   const r = await db.update('update_comments', { client_id: ctx.clientId, comment_id: String(p.commentId || '') }, { status }, c); must(r.length, 'Not found');
   return { ok: true };
 }
@@ -112,6 +113,7 @@ async function approvePhoto(ctx, p, c) {
 function photoVisible(u, role) {
   const e = u.extra || {}; if (!e.photo) return false;
   if (role === 'coordinator' || role === 'client' || role === 'family') return true;
+  if (role === 'public' && !isTrue(e.public)) return false;
   return isTrue(u.visible_to_circle) && isTrue(e.photo_ok);
 }
 
@@ -128,6 +130,24 @@ async function approveUpdate(ctx, p, c) {
   await db.q(`update updates set visible_to_circle=$2, extra=$3 where update_id=$1`, [u.update_id, ok, JSON.stringify(extra)], c);
   const after = ok && !was ? async () => { for (const s of await db.all(`select supporter_email from circle where client_id=$1 and status='Active'`, [ctx.clientId])) await mail.notify(s.supporter_email, 'An update on ' + first(client.patient_first_name), u.title, u.body, 'Read it'); } : null;
   return { ok: true, _after: after };
+}
+
+// ---- public or Circle only, one post at a time (Joe 2026-09-29). Only the patient or their delegate decides; the
+// coordinator can take a post off the web.
+async function setUpdatePublic(ctx, p, c) {
+  needFamily(ctx); const on = isTrue(p.on); must(approver(ctx) || (ctx.role === 'coordinator' && !on), 'Only the patient decides what goes on the web');
+  const u = await db.one(`select * from updates where update_id=$1 and client_id=$2`, [String(p.updateId || ''), ctx.clientId], c); must(u, 'Not found');
+  if (on) must(isTrue(u.visible_to_circle), 'Share it with your Circle first');
+  await db.q(`update updates set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object('public', $2::boolean) where update_id=$1`, [u.update_id, on], c);
+  return { ok: true };
+}
+
+// ---- whether the Circle and the public page can leave a word at all (the patient or delegate decides)
+async function setComments(ctx, p, c) {
+  needFamily(ctx); must(ctx.role === 'coordinator', 'Your coordinator turns comments on or off');
+  const client = await core.clientById(ctx.clientId, c);
+  await patchExtra(client, { comments_off: !isTrue(p.on) }, c);
+  return { ok: true };
 }
 
 // ---- block list: never this person, even if someone forwards the link to sign in
@@ -188,24 +208,24 @@ async function setDelegate(ctx, p, c) {
 // ---- the public page (no sign-in): what the family chose to share, read through the link
 async function publicPage(p, req) {
   const client = await clientByShare(p.token); must(client, 'This link is not active.');
-  const updates = await db.all(`select * from updates where client_id=$1 and visible_to_circle order by posted_at desc`, [client.client_id]);
+  const updates = await db.all(`select * from updates where client_id=$1 and visible_to_circle and (extra->>'public')='true' order by posted_at desc`, [client.client_id]);   // the web sees only posts marked public
   const e = extraOf(client);
   const tok = require('crypto').createHash('sha256').update(String(p.token)).digest('hex').slice(0, 24);
   return {
     patient: first(client.patient_first_name) || famName(client.family_name), family: famName(client.family_name), stage: client.current_stage || '', surgery_date: client.surgery_date || '',
     tracker: e.tracker || null, what_i_need: e.what_i_need || '', trackerSteps: TRACKER, reactions: REACTIONS, fund_url: e.fund_url || '', fund_note: e.fund_note || '', theme: e.theme || 'ink', story: e.story && e.story.shared ? { title: e.story.title, body: e.story.body } : null,
-    updates: updates.map(u => ({ update_id: u.update_id, posted_at: u.posted_at, title: u.title, body: u.body, kind: u.kind, stage: u.stage, detail: u.detail, quote: u.quote, quote_ref: u.quote_ref,
+    updates: updates.map(u => ({ step: (u.extra && u.extra.step) || '', kinds: (u.extra && Array.isArray(u.extra.kinds)) ? u.extra.kinds : undefined, update_id: u.update_id, posted_at: u.posted_at, title: u.title, body: u.body, kind: u.kind, stage: u.stage, detail: u.detail, quote: u.quote, quote_ref: u.quote_ref,
       photo: photoVisible(u, 'public') ? `${C.API_URL}/files/${u.extra.photo}?p=${encodeURIComponent(p.token)}` : '', sensitive: !!(u.extra && u.extra.sensitive) })),
     comments: await commentsFor(client.client_id, true), reactionCounts: await reactionsFor(client.client_id),
     help: await db.all(`select item_id, title, detail, when_text, status, claimed_by from help_items where client_id=$1 and status<>'Removed' order by added_at`, [client.client_id]),
-    viewer: tok,
+    viewer: tok, comments_off: isTrue(e.comments_off),
   };
 }
 async function publicReact(p, req) {
   const client = await clientByShare(p.token); must(client, 'This link is not active.');
   must((await auth.bump('pub:' + (req && req.ip || ''), 60)) <= 30, 'Slow down a little.');
   const kind = String(p.kind || ''); must(REACTIONS.indexOf(kind) >= 0, 'Not a reaction');
-  const u = await db.one(`select * from updates where update_id=$1 and client_id=$2 and visible_to_circle`, [String(p.updateId || ''), client.client_id]); must(u, 'Not found');
+  const u = await db.one(`select * from updates where update_id=$1 and client_id=$2 and visible_to_circle and (extra->>'public')='true'`, [String(p.updateId || ''), client.client_id]); must(u, 'Not found');
   const who = 'link:' + clean(p.viewer, 64);
   if (isTrue(p.off)) await db.q(`delete from update_reactions where update_id=$1 and who=$2 and kind=$3`, [u.update_id, who, kind]);
   else { await db.q(`delete from update_reactions where update_id=$1 and who=$2`, [u.update_id, who]); await db.q(`insert into update_reactions (update_id, who, kind) values ($1,$2,$3) on conflict do nothing`, [u.update_id, who, kind]); }
@@ -214,11 +234,12 @@ async function publicReact(p, req) {
 async function publicComment(p, req) {
   const client = await clientByShare(p.token); must(client, 'This link is not active.');
   must((await auth.bump('pubc:' + (req && req.ip || ''), 600)) <= 10, 'Slow down a little.');
+  must(!isTrue(extraOf(client).comments_off), 'Comments are off for now.');
   const name = clean(p.name, 80).trim(), body = clean(p.body, 2000).trim(); must(name && body, 'Your name and a few words');
   must(!/\b\d{3}-\d{2}-\d{4}\b|\b(?:\d[ -]*?){13,16}\b/.test(body), 'That looks like a number that should not be posted here.');
-  const u = await db.one(`select * from updates where update_id=$1 and client_id=$2 and visible_to_circle`, [String(p.updateId || ''), client.client_id]); must(u, 'Not found');
+  const u = await db.one(`select * from updates where update_id=$1 and client_id=$2 and visible_to_circle and (extra->>'public')='true'`, [String(p.updateId || ''), client.client_id]); must(u, 'Not found');
   await db.insert('update_comments', { comment_id: id(), update_id: u.update_id, client_id: client.client_id, author: name, email: '', body, status: 'Pending', by_role: 'link' });
-  for (const a of await approversOf(client.client_id)) await mail.notify(a.email, 'A word to approve', name + ' wrote under “' + u.title + '”', body.slice(0, 300), 'Open the Circle');
+  await core.notifyCo(await core.coordinatorFor(client), 'comment', 'A comment to approve, ' + (client.family_name || ''), name + ' wrote under “' + u.title + '”', body.slice(0, 300), 'Open the Circle');
   return { ok: true, pending: true };
 }
 async function publicClaim(p, req) {
@@ -231,4 +252,4 @@ async function publicClaim(p, req) {
   return { ok: true };
 }
 
-module.exports = { approver, approversOf, approveUpdate, TRACKER, REACTIONS, setTracker, setShare, clientByShare, react, comment, moderateComment, approvePhoto, photoVisible, blockCircle, addHelp, claimHelp, setHelpStatus, setWhatINeed, setDelegate, publicPage, publicReact, publicComment, publicClaim, commentsFor, reactionsFor, canAct };
+module.exports = { setComments, setUpdatePublic, approver, approversOf, approveUpdate, TRACKER, REACTIONS, setTracker, setShare, clientByShare, react, comment, moderateComment, approvePhoto, photoVisible, blockCircle, addHelp, claimHelp, setHelpStatus, setWhatINeed, setDelegate, publicPage, publicReact, publicComment, publicClaim, commentsFor, reactionsFor, canAct };

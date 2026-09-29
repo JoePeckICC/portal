@@ -128,7 +128,7 @@ async function postUpdate(ctx, p, c) {
   must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed');
   must(ctx.clientId, 'Pick a family first');
   const client = await core.clientById(ctx.clientId, c);
-  const title = clean(p.title, 200), body = clean(p.body, 4000);
+  const title = clean(p.title, 200), body = clean(p.body, 8000);   // one box now: the short and the long version (Joe 2026-09-29)
   must(title.trim(), 'Give it a title');
   // Only the patient (or the delegate) puts a post in front of the Circle; anyone else's waits for their yes.
   const CIRCLE = require('./circle'), okd = CIRCLE.approver(ctx);
@@ -144,10 +144,23 @@ async function postUpdate(ctx, p, c) {
     extra = { photo: row.upload_id, photo_ok: okd, sensitive: isTrue(p.sensitive) };
   }
   if (pending) extra = { ...(extra || {}), pending_share: true };
+  // Which step of "Where things are" this post belongs to (Joe 2026-09-29). Picked on the + form, the current one by
+  // default; when the patient (or delegate) posts at a new step, the tracker moves there too.
+  // Public on the web, or the Circle only: the patient's choice per post; anyone else's post starts Circle-only.
+  if (want && okd && isTrue(p.public)) extra = { ...(extra || {}), public: true };
+  // One or more moments per post (Joe 2026-09-29): the first colors the card, all of them show on it.
+  const kinds = [...new Set((Array.isArray(p.kinds) ? p.kinds : [p.kind]).filter(k => C.UPDATE_KINDS.includes(k)))].slice(0, 3);
+  if (kinds.length > 1) extra = { ...(extra || {}), kinds };
+  const step = CIRCLE.TRACKER.includes(p.step) ? p.step : '';
+  if (step) { extra = { ...(extra || {}), step }; const tr = (client.extra && client.extra.tracker) || null;
+    if (CIRCLE.canAct(ctx) && (!tr || tr.stage !== step)) await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object('tracker', $2::jsonb) where client_id=$1`, [ctx.clientId, JSON.stringify({ stage: step, at: new Date().toISOString(), by: ctx.email })], c); }
   const u = await db.insert('updates', { update_id: id(), client_id: ctx.clientId, posted_by: ctx.email, stage: pick(p.stage, C.STAGES, client.current_stage || ''), title, body, visible_to_circle: visible,
-    kind: pick(p.kind, C.UPDATE_KINDS, 'Family'), detail: clean(p.detail, 4000), quote: clean(p.quote, 600), quote_ref: clean(p.quote_ref, 120), extra: JSON.stringify(extra || {}) }, c);
+    kind: kinds[0] || 'Family', detail: clean(p.detail, 4000), quote: clean(p.quote, 600), quote_ref: clean(p.quote_ref, 120), extra: JSON.stringify(extra || {}) }, c);
   if (pending) for (const a of await CIRCLE.approversOf(ctx.clientId)) if (a.email !== ctx.email) await mail.notify(a.email, 'A post to approve', (ctx.user.name || ctx.email) + ' wrote “' + title + '” for your Circle. It goes out once you say yes.', body.slice(0, 300), 'Open the Circle');
+  const moved = !!step && (((client.extra && client.extra.tracker) || {}).stage || '') !== step;   // client is the copy from before this post
   const after = async () => {
+    if (ctx.role !== 'coordinator') { const co = await core.coordinatorFor(client);
+      if (co) await core.notifyCo(co, moved ? 'step' : 'post', (moved ? famName(client.family_name) + ': ' + step : famName(client.family_name) + ' posted') + ', ' + title, (ctx.user.name || ctx.email) + (moved ? ' says they are now at “' + step + '”.' : ' posted an update' + (step ? ' (' + step + ')' : '') + '.'), title + (body ? '\n\n' + body : ''), 'Open their chart'); }
     if (!visible) return;
     for (const s of await db.all(`select supporter_email from circle where client_id=$1 and status='Active'`, [ctx.clientId]))
       await mail.notify(s.supporter_email, 'An update on ' + client.patient_first_name, title, body, 'Read it in the portal');
