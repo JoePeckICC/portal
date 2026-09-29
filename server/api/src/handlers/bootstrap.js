@@ -82,14 +82,14 @@ async function bootstrap(ctx) {
   out.help = await db.all(`select item_id, title, detail, when_text, status, claimed_by, claimed_email from help_items where client_id=$1 and status<>'Removed' order by added_at`, [ctx.clientId]);
   // What the heart on the Circle shows: reactions, words left, and things taken, newest first (not your own).
   out.circleNotes = await db.all(`select * from (
-      select 'react' t, r.at, coalesce(nullif(uu.name,''), nullif(ci.supporter_name,''), case when r.who like 'link:%' then 'Someone with the link' else r.who end) who, r.kind x, up.title ut
+      select 'react' t, r.at, coalesce(nullif(uu.name,''), nullif(ci.supporter_name,''), case when r.who like 'link:%' then 'Someone with the link' else r.who end) who, r.kind x, up.title ut, up.update_id uid
         from update_reactions r join updates up on up.update_id=r.update_id
         left join users uu on lower(uu.email)=lower(r.who) left join circle ci on ci.client_id=up.client_id and lower(ci.supporter_email)=lower(r.who)
        where up.client_id=$1 and lower(r.who)<>lower($2)
       union all
-      select 'comment', cm.at, cm.author, cm.body, up.title from update_comments cm join updates up on up.update_id=cm.update_id where cm.client_id=$1 and lower(cm.email)<>lower($2) and cm.status<>'Hidden'
+      select 'comment', cm.at, cm.author, cm.body, up.title, up.update_id from update_comments cm join updates up on up.update_id=cm.update_id where cm.client_id=$1 and lower(cm.email)<>lower($2) and cm.status<>'Hidden'
       union all
-      select 'help', h.claimed_at, h.claimed_by, h.title, '' from help_items h where h.client_id=$1 and h.claimed_at is not null and h.status in ('Claimed','Done') and lower(h.claimed_email)<>lower($2)
+      select 'help', h.claimed_at, h.claimed_by, h.title, '', '' from help_items h where h.client_id=$1 and h.claimed_at is not null and h.status in ('Claimed','Done') and lower(h.claimed_email)<>lower($2)
     ) n order by at desc nulls last limit 60`, [ctx.clientId, ctx.email]).catch(() => []);
   out.delegate = (await db.one(`select email from users where client_id=$1 and lower(role)='family' and active and (extra->>'delegate')='true' limit 1`, [ctx.clientId]) || {}).email || '';
   out.restrictions = ce.restrictions || {}; out.restrictionKeys = require('./recovery').RESTRICTIONS; out.red_flags = ce.red_flags || ''; out.red_flags_who = ce.red_flags_who || ''; out.reason = ce.reason || ''; out.disaster = ce.disaster || null;
