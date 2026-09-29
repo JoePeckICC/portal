@@ -120,7 +120,7 @@ async function inviteVendor(ctx, p, c) {
   return { _after: after };
 }
 
-// ---- the family: ask for help
+// ---- the family: set something up
 async function requestJob(ctx, p, c) {
   must(core.fam(ctx) || ctx.role === 'coordinator', 'Not allowed'); must(ctx.clientId, 'Pick a family first');
   const service = SERVICES.includes(p.service) ? p.service : 'Other';
@@ -158,7 +158,7 @@ async function requestJob(ctx, p, c) {
     // The family can pick who to ask (Joe: "text someone in your circle"); otherwise everyone who could help.
     const pick = Array.isArray(p.circleTo) ? p.circleTo.map(e => String(e).toLowerCase()) : null;
     const near = all.filter(x => !pick || pick.includes(x.email));
-    must(near.length, 'No one in your circle can be asked yet. Add them in Inner Circle, or ask our support team.');
+    must(near.length, 'No one in your circle is set up for this yet. Add them in Inner Circle, or hand it to our support team.');
     const until = p.circle === 'only' ? '' : new Date(Date.now() + CIRCLE_HRS[p.circle] * 3600e3).toISOString();
     await db.q(`update jobs set extra = extra || jsonb_build_object('circle', $2::jsonb) where job_id=$1`, [j.job_id, JSON.stringify({ until, fallback: !!until })], c);
     const whenTxt = whenLabel({ starts_at: when, extra: timing });
@@ -168,7 +168,7 @@ async function requestJob(ctx, p, c) {
     const after = async () => {
       const people = near;
       const fam = famName(client.family_name);
-      for (const x of people) { const e = x.email; if (x.phone) await sms.send(x.phone, (first(ctx.user.name) || fam) + ' could use a hand: ' + service.toLowerCase() + ', ' + whenTxt + '. Can you? ' + link()); await mail.notify(e, fam + ' could use a hand: ' + service.toLowerCase(), (first(ctx.user.name) || 'The family') + ' is asking their circle first: ' + service.toLowerCase() + ', ' + whenTxt + '.' + (until ? ' If no one steps up by ' + new Date(until).toLocaleTimeString('en-US', { timeZone: C.TZ, hour: 'numeric', minute: '2-digit' }) + ', InCadence finds someone.' : '') + ' The first to step up has it.', detail, 'I can help', link()); }
+      for (const x of people) { const e = x.email; if (x.phone) await sms.send(x.phone, (first(ctx.user.name) || fam) + ' has ' + service.toLowerCase() + ' open, ' + whenTxt + '. Want to take it? ' + link()); await mail.notify(e, fam + ': ' + service.toLowerCase() + ' open', (first(ctx.user.name) || 'The family') + ' is sharing this with their circle first: ' + service.toLowerCase() + ', ' + whenTxt + '.' + (until ? ' If no one takes it by ' + new Date(until).toLocaleTimeString('en-US', { timeZone: C.TZ, hour: 'numeric', minute: '2-digit' }) + ', InCadence finds someone.' : '') + ' The first to say yes has it.', detail, 'I will take it', link()); }
     };
     return { job: { ...j, extra: { ...j.extra, circle: { until, fallback: !!until } } }, _after: after };
   }
@@ -287,7 +287,7 @@ async function passJob(ctx, p, c) {
   const j = await db.one(`select * from jobs where job_id=$1 and status='Open' and extra->>'for_vendor'=$2`, [String(p.jobId || ''), v.vendor_id], c); must(j, 'Not found');
   await db.q(`update jobs set status='Declined' where job_id=$1`, [j.job_id], c);
   const whenTxt = whenLabel(j, true);
-  if (j.extra && j.extra.topic_id) await db.insert('messages', { message_id: id(), client_id: j.client_id, topic_id: j.extra.topic_id, sender_email: 'system', body: v.name + ' can’t make ' + whenTxt + '. Try another time, or ask for help on Find Care.', read_by_client: false, read_by_coordinator: true }, c);
+  if (j.extra && j.extra.topic_id) await db.insert('messages', { message_id: id(), client_id: j.client_id, topic_id: j.extra.topic_id, sender_email: 'system', body: v.name + ' can’t make ' + whenTxt + '. Try another time, or set up another on Find Care.', read_by_client: false, read_by_coordinator: true }, c);
   return { _after: () => core.notifyFamily(j.client_id, 'message', v.name + ' can’t make that time', v.name + ' can’t make ' + whenTxt + '.', '', 'Open the portal') };
 }
 async function finishJob(ctx, p, c) {
