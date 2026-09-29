@@ -471,6 +471,9 @@ test('who is with them: needs sized, a supporter takes a shift, sees a checklist
   // the inner circle only: a cousin needs the patient's OK; a sister would not
   assert.match((await api(kay, 'careGrid', {})).error, /inner circle/, 'a cousin is not in yet');
   assert.equal((await api(kay, 'bootstrap', {})).innerOk, false);
+  const meal = await api(sam, 'addHelp', { title: 'A casserole Tuesday' }); assert.equal(meal.ok, true, meal.error);
+  assert.deepEqual((await api(kay, 'bootstrap', {})).help, [], 'outside the inner circle: no What would help');
+  assert.match((await api(kay, 'claimHelp', { itemId: meal.item.item_id })).error, /inner circle/, 'and no signing up for a meal');
   { const r = await api(sam, 'setShiftAllowed', { email: 'cousin@example.com', on: true }); assert.equal(r.ok, true, r.error); assert.ok(r.people.find(x => x.email === 'cousin@example.com').allowed); }
   assert.equal((await api(kay, 'bootstrap', {})).innerOk, true);
   assert.equal((await api(sam, 'bootstrap', {})).circle.find(m => m.supporter_email === 'cousin@example.com').inner, true, 'the People list shows who is in');
