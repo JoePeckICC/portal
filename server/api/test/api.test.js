@@ -494,6 +494,12 @@ test('who is with them: needs sized, a supporter takes a shift, sees a checklist
   assert.match((await api(kay, 'planVisit', { day, part: 'morning' })).error, /not taking visits/);
   { const r = await api(kay, 'releaseShift', { day, part: 'evening' }); assert.equal(r.ok, true, r.error); assert.equal(r.days[1].slots[2].with, undefined); }
   { const r = await api(sam, 'askAllNeeds', {}); assert.equal(r.ok, true, r.error); assert.ok(r.asked >= 1); assert.equal(r.days[1].slots[2].asked, true); }
+  // What would help on the week: a meal on a day and part sits there; one without a day is Anytime
+  { const r = await api(sam, 'addHelp', { title: 'A meal', day, part: 'evening' }); assert.equal(r.ok, true, r.error); }
+  { const r = await api(sam, 'addHelp', { title: 'Mow the lawn' }); assert.equal(r.ok, true, r.error); }
+  { const g2 = await api(kay, 'careGrid', {}); assert.equal(g2.days[1].slots[2].asks[0].title, 'A meal'); assert.ok(g2.anytime.some(h => h.title === 'Mow the lawn'));
+    const r = await api(kay, 'claimHelp', { itemId: g2.days[1].slots[2].asks[0].item_id }); assert.equal(r.ok, true, r.error);
+    assert.equal((await api(kay, 'careGrid', {})).days[1].slots[2].asks[0].mine, true); }
   // while you're there: walk the dog, anyone who is there checks it off
   { const r = await api(sam, 'addChore', { title: 'Walk Biscuit', part: 'evening' }); assert.equal(r.ok, true, r.error); assert.equal(r.days[3].slots[2].chores[0].title, 'Walk Biscuit', 'every day'); }
   assert.ok((await api(kay, 'addChore', { title: 'x', part: 'evening' })).error, 'only the family adds');
