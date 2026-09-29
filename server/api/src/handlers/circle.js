@@ -202,7 +202,7 @@ async function claimHelp(ctx, p, c) {
   const row = await db.one(`select * from help_items where client_id=$1 and item_id=$2`, [ctx.clientId, String(p.itemId || '')], c); must(row, 'Not found');
   if (isTrue(p.release)) { must(row.claimed_by === ctx.email || row.claimed_email === ctx.email || ctx.role === 'coordinator' || core.fam(ctx), 'Not yours'); await fillShift(row, '', c); await db.update('help_items', { item_id: row.item_id }, { status: 'Open', claimed_by: '', claimed_at: null }, c); if (row.job_id) await db.q(`update jobs set status='Open', taken_at=null, extra = extra - 'circle_by' where job_id=$1 and status='Taken' and extra ? 'circle_by'`, [row.job_id], c); return { ok: true }; }
   must(row.status === 'Open', 'Someone already has this one');
-  if (row.cov) must(await require('./shifts').allowedIn(ctx, null, c), 'This is for the family’s inner circle.');
+  must(await require('./shifts').allowedIn(ctx, null, c), 'This is for the family’s inner circle.');   // all of What would help (Joe 2026-09-29)
   await db.update('help_items', { item_id: row.item_id }, { status: 'Claimed', claimed_by: clean(ctx.user.name || ctx.email, 120), claimed_at: new Date(), claimed_email: ctx.email }, c);
   await fillShift(row, clean(ctx.user.name || ctx.email, 120), c, ctx.email);
   if (row.job_id) must(await require('./jobs').circleTook(row, clean(ctx.user.name || ctx.email, 120), c), 'That one was already taken care of.');   // a casting call: the request is theirs
@@ -248,7 +248,7 @@ async function publicPage(p, req) {
     updates: updates.map(u => ({ step: (u.extra && u.extra.step) || '', kinds: (u.extra && Array.isArray(u.extra.kinds)) ? u.extra.kinds : undefined, update_id: u.update_id, posted_at: u.posted_at, title: u.title, body: u.body, kind: u.kind, stage: u.stage, detail: u.detail, quote: u.quote, quote_ref: u.quote_ref,
       photo: photoVisible(u, 'public') ? `${C.API_URL}/files/${u.extra.photo}?p=${encodeURIComponent(p.token)}` : '', sensitive: !!(u.extra && u.extra.sensitive) })),
     comments: await commentsFor(client.client_id, true), reactionCounts: await reactionsFor(client.client_id),
-    help: await db.all(`select item_id, title, detail, when_text, status, claimed_by from help_items where client_id=$1 and status<>'Removed' and cov='' order by added_at`, [client.client_id]),
+    help: [],   // What would help is for the inner circle, signed in (Joe 2026-09-29)
     viewer: tok, comments_off: isTrue(e.comments_off),
   };
 }
@@ -275,6 +275,7 @@ async function publicComment(p, req) {
 }
 async function publicClaim(p, req) {
   const client = await clientByShare(p.token); must(client, 'This link is not active.');
+  must(false, 'Signing up to help is for the family’s inner circle. Ask the family to add you.');
   must((await auth.bump('pubh:' + (req && req.ip || ''), 600)) <= 10, 'Slow down a little.');
   const name = clean(p.name, 80).trim(); must(name, 'Your name, so the family knows who');
   const row = await db.one(`select * from help_items where client_id=$1 and item_id=$2 and status='Open' and cov=''`, [client.client_id, String(p.itemId || '')]); must(row, 'Someone already has this one');

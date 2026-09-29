@@ -179,7 +179,9 @@ async function requestJob(ctx, p, c) {
 const zipOf = s => { const m = String(s || '').match(/\b(\d{5})(?:-\d{4})?\b(?!.*\b\d{5}\b)/); return m ? m[1] : ''; };
 async function circleNear(clientId, exceptEmail, c, withPeople) {
   const client = await core.clientById(clientId, c); const home = zipOf(client && client.address);
-  const emails = [...new Set([...(await db.all(`select lower(supporter_email) e from circle where client_id=$1 and status='Active'`, [clientId], c)).map(r => r.e), ...(await db.all(`select lower(email) e from users where client_id=$1 and active and lower(role)='family'`, [clientId], c)).map(r => r.e)].filter(e => e && e !== String(exceptEmail || '').toLowerCase()))];
+  // The inner circle only (Joe 2026-09-29): close family and whoever the page holders checked.
+  const SH = require('./shifts'), ex = (client && client.extra) || {};
+  const emails = [...new Set([...(await db.all(`select lower(supporter_email) e, relationship from circle where client_id=$1 and status='Active'`, [clientId], c)).filter(r => SH.isInner(ex, r.e, r.relationship)).map(r => r.e), ...(await db.all(`select lower(email) e from users where client_id=$1 and active and lower(role)='family'`, [clientId], c)).map(r => r.e)].filter(e => e && e !== String(exceptEmail || '').toLowerCase()))];
   if (!emails.length) return [];
   const rows = await db.all(`select lower(email) e, name, extra->>'zip' z, extra->>'phone' ph from users where lower(email) = any($1) and active`, [emails], c);
   // Everyone who could help (Joe, 2026-09-28): nearby, or we don't know where they live yet. Only people with a

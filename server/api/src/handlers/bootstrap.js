@@ -29,7 +29,7 @@ async function bootstrap(ctx) {
     out.myReactions = await db.all(`select r.update_id, r.kind from update_reactions r join updates u on u.update_id=r.update_id where u.client_id=$1 and r.who=$2`, [ctx.clientId, ctx.email]);
     out.help = await db.all(`select item_id, title, detail, when_text, status, claimed_by, claimed_email, cov from help_items where client_id=$1 and status<>'Removed' order by added_at`, [ctx.clientId]);
     out.innerOk = await require('./shifts').allowedIn(ctx, client);   // Who is with them is for the inner circle only
-    if (!out.innerOk) out.help = out.help.filter(h => !h.cov);
+    if (!out.innerOk) out.help = [];   // What would help, shifts and visits: the inner circle only
     out.fund_url = ce.fund_url || ''; out.fund_note = ce.fund_note || ''; out.theme = ce.theme || 'ink'; out.story = ce.story && ce.story.shared ? { title: ce.story.title, body: ce.story.body } : null;
     return out;
   }
