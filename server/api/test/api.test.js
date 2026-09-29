@@ -431,10 +431,25 @@ test('the patient says yes to what the Circle sees; the coordinator only takes t
   const p2 = await api(pat, 'postUpdate', { title: 'From me', body: 'y', visible: true });
   assert.equal(p2.update.visible_to_circle, true, 'the patient posts straight out');
   await db.q(`insert into update_comments (comment_id, update_id, client_id, author, email, body, status, by_role) values ('cmt-t1',$1,$2,'Aunt','aunt@example.com','Love you','Pending','supporter') on conflict (comment_id) do update set status='Pending'`, [p2.update.update_id, cid]);
-  assert.ok((await api(co, 'moderateComment', { clientId: cid, commentId: 'cmt-t1', status: 'Approved' })).error, 'coordinator cannot approve a word');
-  assert.equal((await api(co, 'moderateComment', { clientId: cid, commentId: 'cmt-t1', status: 'Hidden' })).ok, true, 'coordinator can hide');
-  assert.equal((await api(pat, 'moderateComment', { commentId: 'cmt-t1', status: 'Approved' })).ok, true);
+  assert.ok((await api(pat, 'moderateComment', { commentId: 'cmt-t1', status: 'Approved' })).error, 'the patient does not moderate comments');
+  assert.equal((await api(co, 'moderateComment', { clientId: cid, commentId: 'cmt-t1', status: 'Approved' })).ok, true, 'the coordinator approves');
+  assert.ok((await api(pat, 'setComments', { on: false })).error, 'only the coordinator turns comments off');
+  assert.equal((await api(co, 'setComments', { clientId: cid, on: false })).ok, true);
+  assert.equal((await api(co, 'setComments', { clientId: cid, on: true })).ok, true);
   assert.ok((await api(co, 'setDelegate', { clientId: cid, email: 'x@example.com', on: true })).error, 'only the patient names a delegate');
+});
+
+test('a quiet stretch in the hospital tells the coordinator once, and the family gets one nudge', async () => {
+  const jobs = require('../src/jobs');
+  await db.q(`update clients set circle_enabled=true, extra = coalesce(extra,'{}'::jsonb) - 'hosp_quiet_at' || jsonb_build_object('tracker', jsonb_build_object('stage','In a room','at',(now() - interval '8 hours')::text)) where client_id='c1'`);
+  await db.q(`update updates set posted_at = now() - interval '9 hours' where client_id='c1' and posted_at > now() - interval '8 hours'`);
+  const a = await jobs.hospitalQuiet(true); assert.ok(a.flagged >= 1, 'flagged');
+  const b = await jobs.hospitalQuiet(true); assert.equal(b.flagged, 0, 'once per stretch');
+  const mail = require('../src/mail'); const sent0 = (mail.outbox || mail.sent || []).length;
+  const n1 = await jobs.hospitalQuiet('night'); assert.ok(n1.flagged >= 1, 'the 11 PM check still goes out');
+  if (mail.outbox || mail.sent) assert.ok((mail.outbox || mail.sent).slice(sent0).some(m => /before you sleep/i.test(m.subject || '')), 'the family gets the night email');
+  const n2 = await jobs.hospitalQuiet('night'); assert.equal(n2.flagged, 0, 'once a night');
+  await db.q(`update clients set extra = extra - 'tracker' - 'hosp_quiet_at' - 'hosp_night_at' where client_id='c1'`);
 });
 
 test('learning: the tracker fills milestones; only families who said yes count; no range under 11 families', async () => {
