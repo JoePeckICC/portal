@@ -3169,9 +3169,11 @@ function helpEl(items,o){
 // no camera details, nothing but the picture. Longest side 1600px. cb(photo|null, error)
 function photoPick(input,cb){var f=input.files&&input.files[0];if(!f){cb(null);return}if(!/^image\//.test(f.type)){cb(null,'That is not a photo.');return}var img=new Image(),url=URL.createObjectURL(f);img.onload=function(){var m=1600,w=img.naturalWidth,h=img.naturalHeight,s=Math.min(1,m/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.round(w*s);c.height=Math.round(h*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);cb({b64:c.toDataURL('image/jpeg',.85).split(',')[1],name:'photo.jpg'})};img.onerror=function(){URL.revokeObjectURL(url);cb(null,'Could not read that photo.')};img.src=url}
 // Who may move the tracker, turn the link on and off, block someone: the patient, the named delegate, the coordinator.
-function canAct(){var d=S.data,me=d.me;return me.role==='coordinator'||me.role==='client'||(me.role==='family'&&!!d.delegate&&d.delegate.toLowerCase()===String(me.email||'').toLowerCase())}
+// A page holder: one of up to two family members the patient picked (Joe 2026-09-29).
+function isHolder(){var d=S.data,me=d.me,m=String(me.email||'').toLowerCase();return me.role==='family'&&(d.delegates||(d.delegate?[d.delegate]:[])).some(function(e){return String(e).toLowerCase()===m})}
+function canAct(){var d=S.data,me=d.me;return me.role==='coordinator'||me.role==='client'||isHolder()}
 // Who says yes to what the Circle sees: the patient, or the delegate they named. The coordinator moderates (takes down).
-function isApprover(){var d=S.data,me=d.me;return me.role==='client'||(me.role==='family'&&!!d.delegate&&d.delegate.toLowerCase()===String(me.email||'').toLowerCase())}
+function isApprover(){var d=S.data,me=d.me;return me.role==='client'||isHolder()}
 function shareUrl(t){return location.origin+location.pathname+'?share='+encodeURIComponent(t)}
 // The social handlers for a signed-in viewer (family, coordinator, supporter): every action refreshes.
 function socFor(d){var co=d.me.role==='coordinator';return {role:d.me.role,reactions:d.reactions||[],counts:d.reactionCounts||[],mine:d.myReactions||[],comments:d.comments||[],
@@ -3328,9 +3330,9 @@ function shareBoxEl(short,uid){
   return w}
 // Settings keeps what is set once: who can post for the patient, and the note written ahead.
 function delegateEl(){var d=S.data,c=d.client,co=d.me.role==='coordinator',side=el('<div class="stack"></div>');
-  if(co){var dd=(d.inner||[]).filter(function(u){return u.email===d.delegate})[0];side.appendChild(el('<div class="card"><div class="k">If '+esc(yo(first(c.patient_first_name)||'the patient').n)+' can’t</div><p class="small muted" style="margin:6px 0 0">'+(dd?esc(dd.name||dd.email)+' can act for them.':'Nobody named yet.')+' Only the patient picks who.</p></div>'))}
-  if(d.me.role==='client'){var inner=(d.inner||[]),dl=el('<div class="card"><div class="k">If '+esc(yo(first(c.patient_first_name)||'the patient').n)+' can’t</div><p class="small muted" style="margin:6px 0 10px">One family member with their own sign-in who can say yes to posts and words for the Circle, move the tracker, turn the page on or off, and block someone. Only one at a time.</p>'+(inner.length?'<select><option value="">Nobody yet</option>'+inner.map(function(u){return'<option value="'+esc(u.email)+'"'+(u.email===d.delegate?' selected':'')+'>'+esc(u.name||u.email)+'</option>'}).join('')+'</select>':'<div class="small muted">Only family with their own sign-in can do this, and nobody has one yet. Your coordinator can add them.</div>')+'<p class="err"></p></div>'),sel=$('select',dl);
-    if(sel)sel.onchange=function(){var e=sel.value;(e?call('setDelegate',{email:e,on:true}):call('setDelegate',{email:d.delegate,on:false})).then(refresh).catch(function(x){$('.err',dl).textContent=x.message})};
+  if(co){var dds=(d.inner||[]).filter(function(u){return (d.delegates||[]).indexOf(u.email)>=0});side.appendChild(el('<div class="card"><div class="k">Who holds the page</div><p class="small muted" style="margin:6px 0 0">'+(dds.length?esc(dds.map(function(u){return u.name||u.email}).join(' and '))+' with the patient.':'Only the patient so far.')+' Only the patient picks who.</p></div>'))}
+  if(d.me.role==='client'){var inner=(d.inner||[]),hs=(d.delegates||[]).map(function(e){return String(e).toLowerCase()}),dl=el('<div class="card"><div class="k">Who holds the page</div><p class="small muted" style="margin:6px 0 10px">You, plus up to two family members with their own sign-in. They can say yes to posts, move the tracker, turn the page on or off, block someone, and decide who in the Circle sees Who is with you.</p>'+(inner.length?inner.map(function(u){var on=hs.indexOf(String(u.email).toLowerCase())>=0;return'<label class="cmsw"><input type="checkbox" value="'+esc(u.email)+'"'+(on?' checked':'')+(!on&&hs.length>=2?' disabled':'')+'> <span>'+esc(u.name||u.email)+'</span></label>'}).join(''):'<div class="small muted">Only family with their own sign-in can do this, and nobody has one yet. Your coordinator can add them.</div>')+'<p class="err"></p></div>');
+    $all('input',dl).forEach(function(x){x.onchange=function(){call('setDelegate',{email:x.value,on:x.checked}).then(refresh).catch(function(e){x.checked=!x.checked;$('.err',dl).textContent=e.message})}});
     side.appendChild(dl)}
   return side.firstChild}
 
@@ -3344,7 +3346,7 @@ function supporterPage(){
   if(d.what_i_need)$('#need',p).appendChild(el('<div class="note" style="margin-bottom:20px"><div class="k" style="margin-bottom:6px">From the family</div>'+esc(d.what_i_need).replace(/\n/g,'<br>')+'</div>'));
   var feed=$('#feed',p);var ql=quietLine(d.tracker,d.updates,'');if(ql)feed.appendChild(ql);feed.appendChild(tlFeed(d.updates||[],c,{compact:true,soc:socFor(d),empty:'Nothing shared yet. You will get an email when there is.'}));feed.style.marginBottom='24px';
   var h=helpFor(d,false);h.style.marginBottom='24px';$('#help',p).appendChild(h);
-  var cv=el('<div class="card" style="margin-bottom:24px"><span class="k">Plan a visit</span></div>');cv.appendChild(shiftsEl('circle'));$('#help',p).appendChild(cv);var fe=fundEl(false);if(fe){fe.style.marginBottom='24px';$('#help',p).appendChild(fe)}
+  if(d.innerOk){var cv=el('<div class="card" style="margin-bottom:24px"><span class="k">Plan a visit</span></div>');cv.appendChild(shiftsEl('circle'));$('#help',p).appendChild(cv)}var fe=fundEl(false);if(fe){fe.style.marginBottom='24px';$('#help',p).appendChild(fe)}
   return p;
 }
 
@@ -3442,7 +3444,7 @@ function symptomReport(){
   var w=window.open('','_blank');if(!w){alert('Allow pop-ups to print the report.');return}w.document.write(h);w.document.close();setTimeout(function(){w.print()},300)}
 // "In case I can't update": the patient writes it ahead; the delegate or the coordinator posts it.
 function icantEl(){
-  var d=S.data,me=d.me,cl=me.role==='client',co=me.role==='coordinator',del=me.role==='family'&&d.delegate&&d.delegate.toLowerCase()===String(me.email||'').toLowerCase(),ic=d.icant;
+  var d=S.data,me=d.me,cl=me.role==='client',co=me.role==='coordinator',del=isHolder(),ic=d.icant;
   var w=el('<div class="card"><span class="k">In case I can’t update</span><p class="small muted" style="margin:6px 0 10px">'+(cl?'A note to the Circle, written now, that only goes out if you cannot write it yourself that day. Your delegate or your coordinator posts it; until then nobody but '+esc(first(d.coordinator&&d.coordinator.name)||'your coordinator')+' can read it.':ic?'Written ahead by the patient'+(ic.at?', '+esc(fmtShort(ic.at)):'')+'. '+(del||co?'If they cannot write today, post it to the Circle as they wrote it.':'Only the delegate or the coordinator can post it.'):'Nothing written ahead.')+'</p>'+(cl?'<form><textarea name="text" maxlength="3000" placeholder="If you are reading this, I could not write today. …">'+esc(ic?ic.text:'')+'</textarea><div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button class="btn sm" type="submit">Save</button>'+(ic?'<button class="btn sm quiet" type="button">Clear</button>':'')+'<span class="small muted ok"></span></div><p class="err"></p></form>':ic&&(del||co)?'<div class="note small" style="margin-bottom:8px">'+(co?esc(ic.text).replace(/\n/g,'<br>'):'The note is sealed until it is posted.')+'</div><button class="btn sm" type="button">Post it to the Circle now</button><p class="err"></p>':'')+'</div>');
   var f=$('form',w);if(f){f.onsubmit=function(ev){ev.preventDefault();call('setIcant',{text:$('textarea',f).value}).then(function(){$('.ok',f).textContent='Saved.';refresh()}).catch(function(e){$('.err',f).textContent=e.message})};var cb=$('button.quiet',f);if(cb)cb.onclick=function(){call('setIcant',{text:''}).then(refresh).catch(alertErr)}}
   var pb=$('button.btn:not(.quiet)',w);if(pb&&!f)pb.onclick=function(){if(!uiOk('Post the note the patient wrote ahead, to the Circle, now?',this,arguments))return;call('postIcant',{}).then(refresh).catch(function(e){$('.err',w).textContent=e.message})};
@@ -3528,6 +3530,8 @@ function shiftsEl(mode){
         if(!fam)cl.appendChild(el('<p class="small muted" style="margin:8px 0 0">You remind; you never give or change a medicine. For an emergency, call 911.</p>'));
         x.appendChild(cl)}
       w.appendChild(x)})});
+  if(fam&&g.canAllow&&g.people&&g.people.length){var wl=el('<div class="shcl"><div class="k" style="margin:18px 0 6px">Who sees this</div><p class="small muted" style="margin:0 0 6px">Family with their own sign-in and close family in the Circle. Anyone else only if you add them.</p></div>');
+    g.people.forEach(function(p){var r=el('<label class="cmsw"><input type="checkbox"'+(p.close||p.allowed?' checked':'')+(p.close?' disabled':'')+'> <span>'+esc(p.name)+(p.relationship?' <span class="small muted">· '+esc(p.relationship)+(p.close?', included':'')+'</span>':'')+'</span></label>');if(!p.close)$('input',r).onchange=function(){upd('setShiftAllowed',{email:p.email,on:this.checked})};wl.appendChild(r)});w.appendChild(wl)}
   if(fam&&g.canNames&&g.shiftPeople&&g.shiftPeople.length){var mn=el('<div class="shcl"><div class="k" style="margin:18px 0 6px">Medicine names</div><p class="small muted" style="margin:0 0 6px">People staying a shift see “A medicine is due” unless you let them see the names.</p></div>');
     g.shiftPeople.forEach(function(p){var r=el('<label class="cmsw"><input type="checkbox"'+(p.names?' checked':'')+'> <span>'+esc(p.who)+'</span></label>');$('input',r).onchange=function(){upd('setMedNames',{email:p.email,on:this.checked})};mn.appendChild(r)});w.appendChild(mn)}
   return w}
