@@ -52,6 +52,7 @@ async function dailyDigest() {
   const hour = hourIn(C.TZ), today = ymd(new Date(), C.TZ);
   if (hour === 4) await db.q(`delete from audit where at < now() - interval '366 days'`);
   if (hour === 9) { try { await intakeNudges(); } catch (e) { console.error('nudge', e.message); } try { await twoDayReminders(); } catch (e) { console.error('twoDay', e.message); } try { await quietFamilies(); } catch (e) { console.error('quiet', e.message); } try { await circleNudges(); } catch (e) { console.error('circleNudge', e.message); } }
+  try { await hospitalQuiet(); } catch (e) { console.error('hospitalQuiet', e.message); }
   let sent = 0;
   for (const u of await db.all(`select * from users where lower(role)='coordinator' and active`)) {
     const s = core.coSettings(u);
@@ -125,6 +126,36 @@ async function circleNudges() {
   }
   return { nudged: rows.length };
 }
+// A quiet stretch in the hospital (Joe 2026-09-29): the tracker is on a hospital step and nothing has been posted for
+// 6 hours (3 during surgery). Checked hourly from 7 AM to 11 PM. At 11 PM the bar drops to 2 hours: a surgery that runs
+// late must not leave the Circle going to bed with no word because whoever posts fell asleep (Joe's own family lived this).
+// Once per stretch, plus the 11 PM check once a night: the coordinator is told (to call the family), and the family gets
+// one line asking for a short update before they sleep.
+const HOSP = ['On the way', 'In pre-op', 'In surgery', 'In recovery', 'In a room'];
+async function hospitalQuiet(anyHour) {
+  const h = hourIn(C.TZ), night = anyHour === 'night' || h === 23; if (!anyHour && (h < 7 || h > 23)) return { flagged: 0 };
+  const rows = await db.all(`select c.*, greatest((c.extra->'tracker'->>'at')::timestamptz, (select max(u.posted_at) from updates u where u.client_id=c.client_id)) last_at
+    from clients c where c.circle_enabled and lower(c.status) not in ('closed','archived') and c.extra->'tracker'->>'stage' = any($1)`, [HOSP]);
+  let n = 0;
+  for (const cl of rows) {
+    const stage = cl.extra.tracker.stage, hrs = night ? 2 : stage === 'In surgery' ? 3 : 6, last = cl.last_at ? new Date(cl.last_at) : null;
+    if (!last || Date.now() - last < hrs * 36e5) continue;
+    const mark = night ? 'hosp_night_at' : 'hosp_quiet_at';
+    if (cl.extra[mark] && new Date(cl.extra[mark]) > last) continue;
+    const hh = Math.round((Date.now() - last) / 36e5), pf = first(cl.patient_first_name) || 'the patient';
+    if (night) {
+      await core.notifyCo(await core.coordinatorFor(cl), 'quiet', 'Before bed: no update in ' + hh + ' hours, ' + famName(cl.family_name), pf + ' is at “' + stage + '” and the Circle has not heard in ' + hh + ' hours. People are about to go to bed without news. Call the family, or post a short line yourself.', '', 'Open the chart');
+      // Straight out, not held for the morning like other family email after 10 PM: this one only matters tonight.
+      for (const u of await db.all(`select * from users where client_id=$1 and active and lower(role) in ('client','family')`, [cl.client_id]))
+        if (core.prefs(u).message) await mail.notify(u.email, 'One line before you sleep?', 'The Circle has not heard in ' + hh + ' hours and people are going to bed. One line is enough: “Out of surgery, resting. More in the morning.”', '', 'Post an update');
+    } else {
+      await core.notifyCo(await core.coordinatorFor(cl), 'quiet', 'No update in ' + hh + ' hours, ' + famName(cl.family_name), pf + ' is at “' + stage + '” and nothing has been posted for ' + hh + ' hours. The Circle sees a calm “no news” line. A call to the family, then a short post, closes the gap.', '', 'Open the chart');
+      await core.notifyFamily(cl.client_id, 'message', 'A short update for the Circle?', 'Nothing has gone out in ' + hh + ' hours. One line is enough: “Resting. More in the morning.” People are waiting on you, kindly.', '', 'Post an update');
+    }
+    await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object($2::text, now()::text) where client_id=$1`, [cl.client_id, mark]); n++;
+  }
+  return { flagged: n };
+}
 // A paid family nobody has heard from: no sign-in and no message for QUIET_DAYS. The coordinator gets one note, then not again for another stretch.
 async function quietFamilies() {
   const rows = await db.all(`select c.* from clients c where c.paid and c.plan_ready and lower(c.status) not in ('closed','archived') and coalesce(c.current_stage,'')<>'Finding wisdom'
@@ -157,4 +188,4 @@ async function run(name) {
   try { const out = await fn(); await core.audit({ email: 'system', role: 'job', clientId: '' }, name, out || {}, ''); return { ok: true, ms: Date.now() - t, ...out }; }
   catch (e) { await core.audit({ email: 'system', role: 'job', clientId: '' }, name, {}, e.message); throw e; }
 }
-module.exports = { run, JOBS };
+module.exports = { run, JOBS, hospitalQuiet };

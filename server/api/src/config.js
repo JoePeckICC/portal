@@ -4,6 +4,7 @@ const env = process.env;
 
 module.exports = {
   APP_NAME: 'InCadence Care',
+  APP_ENV: env.APP_ENV || 'production',   // 'staging' on the test copy: made-up families only, a red banner on every page
   LINK_MINUTES: 20,
   PWSET_MINUTES: 30,        // after opening the emailed link, time to choose a password
   CODE_MINUTES: 10,         // the 6-digit code for a new device
@@ -29,8 +30,8 @@ module.exports = {
   REFERRAL_STATUSES: ['Suggested', 'Contacted', 'In place', 'Not needed'],
   FIXED_ANSWERS: ['0.1', '0.1a', 'A.name', 'G.1', 'G.4'],
   NOTIFY_KINDS: { message: 'Messages', plan: 'Plan changes', booking: 'Booking confirmations', meds: 'Medication reminders', notes: 'Notes from Joe' },
-  CO_KINDS: { urgent: 'Urgent messages', missed: 'Missed-dose check-ins', billing: 'Declined cards and payment problems', bookingSoon: 'Bookings for today or tomorrow', message: 'Messages', booking: 'Bookings further out', upload: 'Uploads', meds: 'Medications to review', intake: 'Intake finished or changed', assist: 'Assistance asks and payments in', comment: 'Circle comments to approve', quiet: 'A family gone quiet', medical: 'Medical questions', er: 'ER and 911 alerts', checkin: 'Low check-ins' },
-  CO_DEFAULTS: { urgent: 'instant', missed: 'instant', billing: 'instant', bookingSoon: 'instant', message: 'digest', booking: 'digest', upload: 'digest', meds: 'digest', intake: 'digest', assist: 'digest', comment: 'digest', quiet: 'instant', medical: 'instant', er: 'instant', checkin: 'instant' },
+  CO_KINDS: { urgent: 'Urgent messages', missed: 'Missed-dose check-ins', billing: 'Declined cards and payment problems', bookingSoon: 'Bookings for today or tomorrow', message: 'Messages', booking: 'Bookings further out', upload: 'Uploads', meds: 'Medications to review', intake: 'Intake finished or changed', assist: 'Assistance asks and payments in', comment: 'Circle comments to approve', quiet: 'A family gone quiet, or no update for hours in the hospital', medical: 'Medical questions', er: 'ER and 911 alerts', checkin: 'Low check-ins' },
+  CO_DEFAULTS: { urgent: 'instant', missed: 'instant', billing: 'instant', bookingSoon: 'instant', message: 'digest', booking: 'digest', upload: 'digest', meds: 'digest', intake: 'digest', assist: 'digest', comment: 'instant', step: 'instant', post: 'digest', quiet: 'instant', medical: 'instant', er: 'instant', checkin: 'instant' },
   MED_STATUSES: ['Pending review', 'Accepted', 'Stopped'],
   DOC_KINDS: ['Discharge', 'Insurance', 'Forms', 'Letters', 'Living will', 'Recording', 'Other'],
   DEFAULT_MONTHLY: 599,
@@ -38,7 +39,7 @@ module.exports = {
   ASSIST_STATUSES: ['Suggested', 'Coordinator is on it', 'Applied', 'Approved', 'Not a fit'],
   AVATARS: ['#1C2A3A', '#C09B36', '#2F6B3A', '#7A2E2E', '#3B5B8C'],
   RES_KINDS: ['Video', 'Article', 'Guide', 'Checklist'],
-  UPDATE_KINDS: ['Clinical', 'Faith', 'Family'],                 // the color of an update on the timeline
+  UPDATE_KINDS: ['Clinical', 'Milestone', 'Hard day', 'Faith', 'Prayer request', 'Family', 'Thank you'],                 // the color of an update on the timeline
   RES_TRACKS: ['Open', 'Members'],
   TOPIC_KINDS: { question: 'Question for {CO}', plan: 'About the plan', billing: 'Billing', urgent: 'Something urgent today', medical: 'A medical question', other: 'Something else', auto: 'Automated messages', family: 'Just us' },
   MSG_KEEP: 150,
@@ -56,5 +57,5 @@ module.exports = {
 // What the page receives on first contact. Same shape as the Apps Script's bootConst_().
 module.exports.bootConst = function bootConst() {
   const c = module.exports;
-  return { appName: c.APP_NAME, stages: c.STAGES, categories: c.CATEGORIES, planStatuses: c.PLAN_STATUSES, taskStatuses: c.TASK_STATUSES, topicKinds: c.TOPIC_KINDS, bookKinds: c.BOOK_KINDS, bookHours: c.BOOK_HOURS, phone: c.INCADENCE_PHONE, referralStatuses: c.REFERRAL_STATUSES, defaultMonthly: c.DEFAULT_MONTHLY, assistStatuses: c.ASSIST_STATUSES, coKinds: c.CO_KINDS, updateKinds: c.UPDATE_KINDS, session: null, error: null };
+  return { appEnv: c.APP_ENV, appName: c.APP_NAME, stages: c.STAGES, categories: c.CATEGORIES, planStatuses: c.PLAN_STATUSES, taskStatuses: c.TASK_STATUSES, topicKinds: c.TOPIC_KINDS, bookKinds: c.BOOK_KINDS, bookHours: c.BOOK_HOURS, phone: c.INCADENCE_PHONE, referralStatuses: c.REFERRAL_STATUSES, defaultMonthly: c.DEFAULT_MONTHLY, assistStatuses: c.ASSIST_STATUSES, coKinds: c.CO_KINDS, updateKinds: c.UPDATE_KINDS, session: null, error: null };
 };
