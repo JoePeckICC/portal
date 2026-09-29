@@ -462,12 +462,17 @@ test('a quiet stretch in the hospital tells the coordinator once, and the family
 
 test('who is with them: needs sized, a supporter takes a shift, sees a checklist without names, visits, release', async () => {
   const co = await signIn('joe@incadencecare.com');
-  await db.q(`update clients set circle_enabled=true, paid=true, plan_ready=true, extra = coalesce(extra,'{}'::jsonb) - 'visits_off' - 'med_names_for' where client_id='c2'`);
+  await db.q(`update clients set circle_enabled=true, paid=true, plan_ready=true, extra = coalesce(extra,'{}'::jsonb) - 'visits_off' - 'med_names_for' - 'shift_allowed' where client_id='c2'`);
   await db.q(`insert into users (email,name,role,client_id) values ('sam@example.com','Sam Second','client','c2') on conflict (email) do nothing`);
   await db.q(`delete from coverage where client_id='c2'`); await db.q(`delete from visits where client_id='c2'`); await db.q(`delete from coverage_needs where client_id='c2'`);
   await db.q(`insert into medications (med_id, client_id, name, frequency, times, status) values ('m-shift','c2','Keppra','Daily','20:00','Accepted') on conflict (med_id) do update set status='Accepted', times='20:00'`);
   const a = await api(co, 'addCircle', { clientId: 'c2', email: 'cousin@example.com', name: 'Cousin Kay', relationship: 'Cousin' }); assert.equal(a.ok, true, a.error);
   const sam = await signIn('sam@example.com'), kay = await signIn('cousin@example.com');
+  // the inner circle only: a cousin needs the patient's OK; a sister would not
+  assert.match((await api(kay, 'careGrid', {})).error, /inner circle/, 'a cousin is not in yet');
+  assert.equal((await api(kay, 'bootstrap', {})).innerOk, false);
+  { const r = await api(sam, 'setShiftAllowed', { email: 'cousin@example.com', on: true }); assert.equal(r.ok, true, r.error); assert.ok(r.people.find(x => x.email === 'cousin@example.com').allowed); }
+  assert.equal((await api(kay, 'bootstrap', {})).innerOk, true);
   const g = await api(sam, 'careGrid', {}); assert.equal(g.ok, true, g.error); assert.equal(g.days.length, 7);
   const day = g.days[1].day;
   { const r = await api(sam, 'setNeed', { day, part: 'evening', need: 'need' }); assert.equal(r.ok, true, r.error); assert.equal(r.days[1].slots[2].need, 'need'); }
