@@ -20,7 +20,18 @@ const NEEDS = ['need', 'welcome', 'alone'];
 const needFamily = ctx => must(ctx.clientId, 'Pick a family first');
 const isFam = ctx => core.fam(ctx) || ctx.role === 'coordinator';
 const approver = ctx => ctx.role === 'client' || (ctx.role === 'family' && ctx.user && ctx.user.extra && isTrue(ctx.user.extra.delegate));
+// Who is with them is for the inner circle (Joe 2026-09-29): family with their own sign-in, close family in the Circle
+// (a parent, sibling, spouse, child, grandparent), and anyone else the people who hold the page allow.
+const CLOSE = /\b(sister|brother|sibling|mom|mother|dad|father|parent|spouse|wife|husband|partner|fianc\w*|grand\w*|son|daughter|child|step\w*)\b/i;
+async function allowedIn(ctx, client, c) {
+  if (isFam(ctx)) return true; if (ctx.role !== 'supporter') return false;
+  const me = normEmail(ctx.email), ex = extraOf(client || await core.clientById(ctx.clientId, c));
+  if ((ex.shift_allowed || []).map(normEmail).includes(me)) return true;
+  const row = await db.one(`select relationship from circle where client_id=$1 and lower(supporter_email)=$2 and status='Active'`, [ctx.clientId, me], c);
+  return !!row && CLOSE.test(row.relationship || '');
+}
 const inCircle = ctx => isFam(ctx) || ctx.role === 'supporter';
+async function mustIn(ctx, c) { must(await allowedIn(ctx, null, c), 'This is for the family’s inner circle.'); }
 const ymdTZ = d => new Intl.DateTimeFormat('en-CA', { timeZone: C.TZ || 'America/Chicago' }).format(d);
 const dayOk = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
 const addDays = (s, n) => { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -86,12 +97,14 @@ async function grid(ctx, c, days) {
     }
     return s;
   }) }));
-  return { days: out, parts: PARTS, visitsOff: isTrue(ex.visits_off), home, fam, canNames: approver(ctx),
+  let people;
+  if (fam) { const al = (ex.shift_allowed || []).map(normEmail); people = (await db.all(`select supporter_email email, supporter_name name, relationship from circle where client_id=$1 and status='Active' order by supporter_name`, [ctx.clientId], c)).map(r => ({ email: normEmail(r.email), name: r.name || r.email, relationship: r.relationship || '', close: CLOSE.test(r.relationship || ''), allowed: al.includes(normEmail(r.email)) })); }
+  return { days: out, parts: PARTS, visitsOff: isTrue(ex.visits_off), home, fam, canNames: approver(ctx), canAllow: approver(ctx), people,
     medNamesFor: fam ? names : undefined, shiftPeople: fam ? [...new Map(cov.filter(x => x.kind === 'with' && x.email).map(x => [normEmail(x.email), x.who])).entries()].map(([email, who]) => ({ email, who, names: names.includes(email) })) : undefined,
     pf: first(client.patient_first_name) || '' };
 }
 
-async function careGrid(ctx, p, c) { needFamily(ctx); must(inCircle(ctx), 'Not allowed'); return grid(ctx, c, 7); }
+async function careGrid(ctx, p, c) { needFamily(ctx); await mustIn(ctx, c); return grid(ctx, c, 7); }
 
 async function setNeed(ctx, p, c) {
   needFamily(ctx); must(isFam(ctx), 'Only the family sets this');
@@ -115,7 +128,7 @@ async function setMedNames(ctx, p, c) {
 }
 // Someone from the Circle takes a shift: the slot is theirs, any open ask for it is answered, the family hears.
 async function takeShift(ctx, p, c) {
-  needFamily(ctx); must(inCircle(ctx), 'Not allowed'); must(dayOk(p.day) && PARTS.includes(p.part), 'Pick a time');
+  needFamily(ctx); await mustIn(ctx, c); must(dayOk(p.day) && PARTS.includes(p.part), 'Pick a time');
   must(p.day >= ymdTZ(new Date()), 'That time has passed');
   must(!(await db.one(`select 1 from coverage where client_id=$1 and day=$2 and part=$3 and kind='with'`, [ctx.clientId, p.day, p.part], c)), 'Someone already has this one. Thank you.');
   const who = clean(ctx.user.name || ctx.email, 120);
@@ -135,7 +148,7 @@ async function releaseShift(ctx, p, c) {
   return { ...(await grid(ctx, c, 7)), _after: after };
 }
 async function planVisit(ctx, p, c) {
-  needFamily(ctx); must(inCircle(ctx), 'Not allowed'); must(dayOk(p.day) && PARTS.includes(p.part), 'Pick a time');
+  needFamily(ctx); await mustIn(ctx, c); must(dayOk(p.day) && PARTS.includes(p.part), 'Pick a time');
   const client = await core.clientById(ctx.clientId, c);
   if (isTrue(p.off)) { await db.q(`delete from visits where client_id=$1 and day=$2 and part=$3 and lower(email)=lower($4)`, [ctx.clientId, p.day, p.part, ctx.email], c); return grid(ctx, c, 7); }
   must(!isTrue(extraOf(client).visits_off) || isFam(ctx), 'The family is not taking visits right now. Thank you for asking.');
@@ -177,12 +190,22 @@ async function dropChore(ctx, p, c) {
 }
 // Anyone in the Circle who is there can check one off; the family sees who did it.
 async function doneChore(ctx, p, c) {
-  needFamily(ctx); must(inCircle(ctx), 'Not allowed'); must(dayOk(p.day), 'Pick a day');
+  needFamily(ctx); await mustIn(ctx, c); must(dayOk(p.day), 'Pick a day');
   const ch = await db.one(`select chore_id from shift_chores where client_id=$1 and chore_id=$2 and active`, [ctx.clientId, String(p.choreId || '')], c); must(ch, 'Not found');
   if (isTrue(p.undo)) await db.q(`delete from chore_done where chore_id=$1 and day=$2`, [ch.chore_id, p.day], c);
   else await db.q(`insert into chore_done (chore_id, client_id, day, by_name, by_email) values ($1,$2,$3,$4,$5) on conflict (chore_id, day) do update set by_name=excluded.by_name, by_email=excluded.by_email, at=now()`, [ch.chore_id, ctx.clientId, p.day, clean(ctx.user.name || ctx.email, 120), ctx.email], c);
   return grid(ctx, c, 7);
 }
 
-module.exports = { addChore, dropChore, doneChore, careGrid, setNeed, setVisits, setMedNames, takeShift, releaseShift, planVisit, askAllNeeds, shiftDose };
+// The page holders (the patient and up to two family members) let someone else in the Circle in.
+async function setShiftAllowed(ctx, p, c) {
+  needFamily(ctx); must(approver(ctx), 'Only the patient or the family members who hold the page decide this');
+  const client = await core.clientById(ctx.clientId, c), email = normEmail(p.email); must(email, 'Who?');
+  const list = new Set((extraOf(client).shift_allowed || []).map(normEmail)); if (isTrue(p.on)) list.add(email); else list.delete(email);
+  await db.q(`update clients set extra = coalesce(extra,'{}'::jsonb) || jsonb_build_object('shift_allowed', $2::jsonb) where client_id=$1`, [ctx.clientId, JSON.stringify([...list])], c);
+  return grid(ctx, c, 7);
+}
+
+module.exports = { setShiftAllowed, addChore, dropChore, doneChore, careGrid, setNeed, setVisits, setMedNames, takeShift, releaseShift, planVisit, askAllNeeds, shiftDose };
 Object.defineProperty(module.exports, 'grid', { value: grid, enumerable: false });
+Object.defineProperty(module.exports, 'allowedIn', { value: allowedIn, enumerable: false });

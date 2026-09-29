@@ -28,6 +28,8 @@ async function bootstrap(ctx) {
     out.comments = await CIRCLE.commentsFor(ctx.clientId, true); out.reactionCounts = await CIRCLE.reactionsFor(ctx.clientId);
     out.myReactions = await db.all(`select r.update_id, r.kind from update_reactions r join updates u on u.update_id=r.update_id where u.client_id=$1 and r.who=$2`, [ctx.clientId, ctx.email]);
     out.help = await db.all(`select item_id, title, detail, when_text, status, claimed_by, claimed_email, cov from help_items where client_id=$1 and status<>'Removed' order by added_at`, [ctx.clientId]);
+    out.innerOk = await require('./shifts').allowedIn(ctx, client);   // Who is with them is for the inner circle only
+    if (!out.innerOk) out.help = out.help.filter(h => !h.cov);
     out.fund_url = ce.fund_url || ''; out.fund_note = ce.fund_note || ''; out.theme = ce.theme || 'ink'; out.story = ce.story && ce.story.shared ? { title: ce.story.title, body: ce.story.body } : null;
     return out;
   }
@@ -92,7 +94,7 @@ async function bootstrap(ctx) {
       union all
       select 'help', h.claimed_at, h.claimed_by, h.title, '', '' from help_items h where h.client_id=$1 and h.claimed_at is not null and h.status in ('Claimed','Done') and lower(h.claimed_email)<>lower($2)
     ) n order by at desc nulls last limit 60`, [ctx.clientId, ctx.email]).catch(() => []);
-  out.delegate = (await db.one(`select email from users where client_id=$1 and lower(role)='family' and active and (extra->>'delegate')='true' limit 1`, [ctx.clientId]) || {}).email || '';
+  out.delegates = (await db.all(`select email from users where client_id=$1 and lower(role)='family' and active and (extra->>'delegate')='true' order by email`, [ctx.clientId])).map(r => r.email); out.delegate = out.delegates[0] || '';
   out.restrictions = ce.restrictions || {}; out.restrictionKeys = require('./recovery').RESTRICTIONS; out.red_flags = ce.red_flags || ''; out.red_flags_who = ce.red_flags_who || ''; out.reason = ce.reason || ''; out.disaster = ce.disaster || null;
   if (ctx.role === 'client' || ctx.role === 'coordinator' || ctx.role === 'family') out.icant = ce.icant ? { text: ctx.role === 'client' || ctx.role === 'coordinator' ? ce.icant.text : '', at: ce.icant.at } : null;
   out.checkins = await db.all(`select checkin_id, at, by, role, mood, pain, words, caregiver from checkins where client_id=$1 and at > now() - interval '60 days' order by at desc`, [cid]);

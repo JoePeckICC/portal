@@ -181,7 +181,8 @@ async function askShift(ctx, p, c) {
   const row = await db.insert('help_items', { item_id: id(), client_id: ctx.clientId, title: 'Stay with ' + pf, detail: clean(p.note, 600), when_text: when, status: 'Open', claimed_by: '', added_by: ctx.email, cov: day + '|' + p.part }, c);
   const after = async () => {
     const to = new Set();
-    for (const s of await db.all(`select supporter_email from circle where client_id=$1 and status='Active'`, [ctx.clientId])) to.add(normEmail(s.supporter_email));
+    const SH = require('./shifts'), al = ((client.extra || {}).shift_allowed || []).map(normEmail);
+    for (const s of await db.all(`select supporter_email, relationship from circle where client_id=$1 and status='Active'`, [ctx.clientId])) if (al.includes(normEmail(s.supporter_email)) || /\b(sister|brother|sibling|mom|mother|dad|father|parent|spouse|wife|husband|partner|fianc\w*|grand\w*|son|daughter|child|step\w*)\b/i.test(s.relationship || '')) to.add(normEmail(s.supporter_email));
     for (const u of await db.all(`select email from users where client_id=$1 and active and lower(role)='family'`, [ctx.clientId])) to.add(normEmail(u.email));
     to.delete(normEmail(ctx.email));
     for (const e of to) await mail.notify(e, 'Can you stay with ' + pf + ' ' + when + '?', 'The family is asking the Circle for someone to be with ' + pf + ' ' + when + '.' + (row.detail ? ' ' + row.detail : ''), 'The first person to say yes gets it, and the family sees who.', 'Open the Circle');
@@ -201,6 +202,7 @@ async function claimHelp(ctx, p, c) {
   const row = await db.one(`select * from help_items where client_id=$1 and item_id=$2`, [ctx.clientId, String(p.itemId || '')], c); must(row, 'Not found');
   if (isTrue(p.release)) { must(row.claimed_by === ctx.email || row.claimed_email === ctx.email || ctx.role === 'coordinator' || core.fam(ctx), 'Not yours'); await fillShift(row, '', c); await db.update('help_items', { item_id: row.item_id }, { status: 'Open', claimed_by: '', claimed_at: null }, c); if (row.job_id) await db.q(`update jobs set status='Open', taken_at=null, extra = extra - 'circle_by' where job_id=$1 and status='Taken' and extra ? 'circle_by'`, [row.job_id], c); return { ok: true }; }
   must(row.status === 'Open', 'Someone already has this one');
+  if (row.cov) must(await require('./shifts').allowedIn(ctx, null, c), 'This is for the family’s inner circle.');
   await db.update('help_items', { item_id: row.item_id }, { status: 'Claimed', claimed_by: clean(ctx.user.name || ctx.email, 120), claimed_at: new Date(), claimed_email: ctx.email }, c);
   await fillShift(row, clean(ctx.user.name || ctx.email, 120), c, ctx.email);
   if (row.job_id) must(await require('./jobs').circleTook(row, clean(ctx.user.name || ctx.email, 120), c), 'That one was already taken care of.');   // a casting call: the request is theirs
@@ -228,7 +230,8 @@ async function setDelegate(ctx, p, c) {
   const email = normEmail(p.email);
   const u = await db.one(`select * from users where lower(email)=$1 and client_id=$2 and lower(role)='family' and active`, [email, ctx.clientId], c); must(u, 'That person is not on the inner circle');
   const on = isTrue(p.on);
-  if (on) await db.q(`update users set extra = coalesce(extra,'{}'::jsonb) - 'delegate' where client_id=$1 and lower(role)='family'`, [ctx.clientId], c);   // one delegate at a time
+  // The patient plus up to two family members hold the page (Joe 2026-09-29).
+  if (on && !isTrue(u.extra && u.extra.delegate)) must((await db.one(`select count(*)::int n from users where client_id=$1 and lower(role)='family' and active and (extra->>'delegate')='true'`, [ctx.clientId], c)).n < 2, 'Two family members already hold the page. Take one off first.');
   await db.q(`update users set extra = coalesce(extra,'{}'::jsonb) || $2::jsonb where lower(email)=$1`, [email, JSON.stringify({ delegate: on })], c);
   return { ok: true };
 }
@@ -245,7 +248,7 @@ async function publicPage(p, req) {
     updates: updates.map(u => ({ step: (u.extra && u.extra.step) || '', kinds: (u.extra && Array.isArray(u.extra.kinds)) ? u.extra.kinds : undefined, update_id: u.update_id, posted_at: u.posted_at, title: u.title, body: u.body, kind: u.kind, stage: u.stage, detail: u.detail, quote: u.quote, quote_ref: u.quote_ref,
       photo: photoVisible(u, 'public') ? `${C.API_URL}/files/${u.extra.photo}?p=${encodeURIComponent(p.token)}` : '', sensitive: !!(u.extra && u.extra.sensitive) })),
     comments: await commentsFor(client.client_id, true), reactionCounts: await reactionsFor(client.client_id),
-    help: await db.all(`select item_id, title, detail, when_text, status, claimed_by from help_items where client_id=$1 and status<>'Removed' order by added_at`, [client.client_id]),
+    help: await db.all(`select item_id, title, detail, when_text, status, claimed_by from help_items where client_id=$1 and status<>'Removed' and cov='' order by added_at`, [client.client_id]),
     viewer: tok, comments_off: isTrue(e.comments_off),
   };
 }
@@ -274,7 +277,7 @@ async function publicClaim(p, req) {
   const client = await clientByShare(p.token); must(client, 'This link is not active.');
   must((await auth.bump('pubh:' + (req && req.ip || ''), 600)) <= 10, 'Slow down a little.');
   const name = clean(p.name, 80).trim(); must(name, 'Your name, so the family knows who');
-  const row = await db.one(`select * from help_items where client_id=$1 and item_id=$2 and status='Open'`, [client.client_id, String(p.itemId || '')]); must(row, 'Someone already has this one');
+  const row = await db.one(`select * from help_items where client_id=$1 and item_id=$2 and status='Open' and cov=''`, [client.client_id, String(p.itemId || '')]); must(row, 'Someone already has this one');
   await db.update('help_items', { item_id: row.item_id }, { status: 'Claimed', claimed_by: name, claimed_at: new Date(), claimed_email: '' });
   await fillShift(row, name);
   for (const u of await core.usersFor(client.client_id, 'client')) await mail.notify(u.email, name + ' is taking care of: ' + row.title, name + ' claimed “' + row.title + '”' + (row.when_text ? ' (' + row.when_text + ')' : '') + '.', '', 'Open the Circle');
