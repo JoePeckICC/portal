@@ -80,7 +80,7 @@ async function twoDayReminders() {
   for (const a of rows) {
     const { localStamp } = require('./time');
     await core.notifyFamily(a.client_id, 'booking', 'In two days: ' + a.title, a.title + ' is ' + localStamp(a.starts_at) + (a.location ? ' · ' + a.location : '') + '.',
-      'Three things to have ready:\n1. Your questions, written down, the ones you think of at 2 am.\n2. The newest papers from the hospital or the surgeon, photographed if that is easier.\n3. Who else should be on the call, and whether they can make it.\n\nIf the time no longer works, change it in the portal under Find Care.', 'Open the portal');
+      'Three things to have ready:\n1. Your questions, written down, the ones you think of at 2 am.\n2. The newest papers from the hospital or the surgeon, photographed if that is easier.\n3. Who else should be on the call, and whether they can make it.\n\nIf the time no longer works, change it in the portal under Care.', 'Open the portal');
     await db.q(`insert into lifecycle_sent (client_id, key) values ($1, $2) on conflict do nothing`, [a.client_id, 'r2:' + a.appt_id]); sent++;
   }
   return { sent };
