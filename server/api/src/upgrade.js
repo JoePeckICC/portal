@@ -305,7 +305,17 @@ const STEPS = [
   // a support team member's line about themselves, shown to families on their profile
   `alter table vendors add column if not exists bio text not null default ''`,
   // ---- the circle's casting call: a request can go to the family's circle first (see handlers/jobs.js)
-  `alter table help_items add column if not exists job_id text not null default ''`,   // a vendor's usual free hours (handlers/jobs.js)
+  `alter table help_items add column if not exists job_id text not null default ''`,
+  `alter table help_items add column if not exists cov text not null default ''`,
+  // ---- who is with them, visits (handlers/shifts.js)
+  `alter table coverage add column if not exists email text not null default ''`,
+  `create table if not exists coverage_needs (
+     client_id text not null references clients(client_id) on delete cascade, day date not null, part text not null,
+     need text not null, set_by text not null default '', primary key (client_id, day, part))`,
+  `create table if not exists visits (
+     visit_id text primary key, client_id text not null references clients(client_id) on delete cascade, day date not null,
+     part text not null, who text not null default '', email text not null default '', at timestamptz not null default now(),
+     unique (client_id, day, part, email))`,   // a shift asked of the Circle: 'YYYY-MM-DD|part' (handlers/circle.js askShift)   // a vendor's usual free hours (handlers/jobs.js)
   `do $$ begin if not exists (select 1 from pg_constraint where conname='users_role_chk' and pg_get_constraintdef(oid) like '%vendor%') then
       alter table users drop constraint if exists users_role_chk;
       alter table users add constraint users_role_chk check (role in ('client','family','supporter','coordinator','vendor')); end if; end $$`,
