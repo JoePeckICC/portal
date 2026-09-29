@@ -460,6 +460,24 @@ test('a quiet stretch in the hospital tells the coordinator once, and the family
   await db.q(`update clients set extra = extra - 'tracker' - 'hosp_quiet_at' - 'hosp_night_at' where client_id='c1'`);
 });
 
+test('the Sunday check: appointments on the week, the page holders confirm it, the inner circle hears', async () => {
+  await db.q(`update clients set circle_enabled=true, paid=true, plan_ready=true, extra = coalesce(extra,'{}'::jsonb) - 'week_ok' - 'week_ask_for' where client_id='c2'`);
+  await db.q(`insert into users (email,name,role,client_id) values ('sam@example.com','Sam Second','client','c2') on conflict (email) do nothing`);
+  const sam = await signIn('sam@example.com');
+  const day = (await api(sam, 'careGrid', {})).days[1].day;
+  const r = await api(sam, 'addWeekAppt', { title: 'Follow-up with the surgeon', day, time: '14:00', location: 'Clinic B' }); assert.equal(r.ok, true, r.error);
+  const ap = r.days[1].slots[1].appts[0]; assert.equal(ap.title, 'Follow-up with the surgeon'); assert.equal(ap.mine, true); assert.match(ap.time, /2:00/);
+  assert.ok((await api(sam, 'addWeekAppt', { title: 'x', day: 'soon' })).error, 'needs a day');
+  assert.ok(r.week && r.week.start, 'the week it would confirm');
+  const c = await api(sam, 'confirmWeek', {}); assert.equal(c.ok, true, c.error); assert.equal(c.week.ok.by, 'Sam Second'); assert.equal(c.week.due, false);
+  const jobs = require('../src/jobs'); const w = await jobs.weekCheck(true); assert.equal(w.ok === false, false);
+  assert.equal((await db.one(`select count(*)::int n from clients where client_id='c2' and extra->>'week_ask_for' is not null`)).n, 0, 'no Sunday note once the week is confirmed');
+  const d = await api(sam, 'dropWeekAppt', { apptId: ap.appt_id }); assert.equal(d.ok, true, d.error); assert.equal(d.days[1].slots[1].appts.length, 0, 'set aside');
+  assert.equal((await db.one(`select status from appointments where appt_id=$1`, [ap.appt_id])).status, 'Cancelled', 'never deleted');
+  await db.q(`update clients set extra = extra - 'week_ok' where client_id='c2'`);
+  await jobs.weekCheck(true); assert.equal((await db.one(`select count(*)::int n from clients where client_id='c2' and extra->>'week_ask_for' is not null`)).n, 1, 'asked once when not confirmed');
+});
+
 test('who is with them: needs sized, a supporter takes a shift, sees a checklist without names, visits, release', async () => {
   const co = await signIn('joe@incadencecare.com');
   await db.q(`update clients set circle_enabled=true, paid=true, plan_ready=true, extra = coalesce(extra,'{}'::jsonb) - 'visits_off' - 'med_names_for' - 'shift_allowed' - 'shift_denied' where client_id='c2'`);
@@ -477,7 +495,7 @@ test('who is with them: needs sized, a supporter takes a shift, sees a checklist
   { const r = await api(sam, 'setShiftAllowed', { email: 'cousin@example.com', on: true }); assert.equal(r.ok, true, r.error); assert.ok(r.people.find(x => x.email === 'cousin@example.com').allowed); }
   assert.equal((await api(kay, 'bootstrap', {})).innerOk, true);
   assert.equal((await api(sam, 'bootstrap', {})).circle.find(m => m.supporter_email === 'cousin@example.com').inner, true, 'the People list shows who is in');
-  const g = await api(sam, 'careGrid', {}); assert.equal(g.ok, true, g.error); assert.equal(g.days.length, 7);
+  const g = await api(sam, 'careGrid', {}); assert.equal(g.ok, true, g.error); assert.ok(g.days.length >= 7, 'seven days, eight on a Sunday');
   const day = g.days[1].day;
   { const r = await api(sam, 'setNeed', { day, part: 'evening', need: 'need' }); assert.equal(r.ok, true, r.error); assert.equal(r.days[1].slots[2].need, 'need'); }
   assert.ok((await api(kay, 'setNeed', { day, part: 'evening', need: 'alone' })).error, 'a supporter cannot change needs');
