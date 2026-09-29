@@ -325,7 +325,7 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   const sis = await signIn('sis@example.com');
   assert.equal((await api(pat, 'bootstrap', {})).circleNear, 1, 'someone whose ZIP we do not know can still be asked');
   { const r = await api(sis, 'savePrefs', { zip: '90210' }); assert.equal(r.ok, true, r.error); }
-  assert.match((await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: '1' })).error, /No one in your circle can be asked/, 'far away is left out');
+  assert.match((await api(pat, 'requestJob', { service: 'Pet care', startsAt: new Date(Date.now() + 5 * 86400e3).toISOString(), circle: '1' })).error, /No one in your circle is set up/, 'far away is left out');
   assert.match((await api(sis, 'savePrefs', { zip: '372' })).error, /5-digit/);
   { const r = await api(sis, 'savePrefs', { zip: '37205' }); assert.equal(r.ok, true, r.error); }
   assert.equal((await api(pat, 'bootstrap', {})).circleNear, 1, 'sis lives nearby');
