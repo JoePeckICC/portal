@@ -143,7 +143,8 @@ input,select,textarea,button{scroll-margin-top:110px}
 .ycare{margin-bottom:16px}
 .shtop{display:grid;gap:10px;margin:0 0 6px}.shd{margin:16px 2px 6px;font-weight:700;font-size:13px}
 .shs{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 14px;margin:0 0 6px;font:inherit;color:var(--ink);cursor:pointer}
-.shs .st{font-size:13px;color:var(--muted);text-align:right}.shs.cov .st{color:var(--ink)}
+.shs .st{font-size:13px;color:var(--muted);text-align:right;flex-shrink:0}.shlt{display:flex;flex-direction:column;min-width:0}.shlt small{font-size:12px;font-weight:400;color:var(--muted);margin-top:2px}.shs.need .shlt small{font-size:13px}
+.shchf{display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px}.shchf input{grid-column:1/-1}.shchf .pfp{grid-column:1/-1;margin-top:2px}.shdrop{margin-left:auto}.shs.cov .st{color:var(--ink)}
 .shs.need{border:2px solid var(--gold);padding:16px;background:#FFFBF0}.shs.need b{font-size:17px}.shs.need .st.open{color:#9B2C2C;font-weight:600}
 .shs.alone{border:0;border-bottom:1px dashed var(--line);border-radius:0;background:none;padding:3px 14px;margin:0 0 4px;font-size:12px;color:var(--faint)}.shs.alone b{font-weight:500}.shs.alone .st{font-size:12px;color:var(--faint)}
 .shs.on{box-shadow:0 0 0 2px var(--ink) inset}
@@ -3489,7 +3490,9 @@ function shiftsEl(mode){
       var st=s.with?(s.with.mine?'You’re staying':esc(s.with.who)+' is here'):need==='need'?(fam?(s.asked?'Asked the Circle':'Nobody yet'):'Needs someone'):rest?'Resting':need==='alone'?'Fine alone':'Good time to visit';
       if(fam&&s.visits&&s.visits.length)st+=' · '+s.visits.length+' visiting';
       if(!fam&&s.myVisit)st+=' · you’re stopping by';
-      var cls=rest||need==='alone'?'alone':need,b=el('<button type="button" class="shs '+cls+(s.with?' cov':'')+(S.cgSel===key?' on':'')+'"><b>'+esc(P)+'</b><span class="st'+(need==='need'&&!s.with?' open':'')+'">'+st+'</span></button>');
+      // What else happens then: help that is booked, and the everyday things anyone there can do.
+      var also=(s.booked||[]).map(function(j){return (j.who?first(j.who)+' ':'')+j.service.toLowerCase()+' '+j.time}).concat((s.chores||[]).map(function(ch){return ch.title+(ch.done?' ✓':'')}));
+      var cls=rest||need==='alone'?'alone':need,b=el('<button type="button" class="shs '+cls+(s.with?' cov':'')+(S.cgSel===key?' on':'')+'"><span class="shlt"><b>'+esc(P)+'</b>'+(also.length&&cls!=='alone'?'<small>'+esc(also.join(' · '))+'</small>':'')+'</span><span class="st'+(need==='need'&&!s.with?' open':'')+'">'+st+'</span></button>');
       b.onclick=function(){S.cgSel=S.cgSel===key?null:key;render()};w.appendChild(b);
       if(S.cgSel!==key)return;
       var x=el('<div class="shx"></div>');
@@ -3507,6 +3510,16 @@ function shiftsEl(mode){
         if(!g.visitsOff&&!(s.with&&s.with.mine)&&need!=='alone'){var vb=el('<button type="button" class="btn '+(s.with||need!=='need'?'':'quiet ')+'sm">'+(s.myVisit?'Cancel my visit':'I’ll stop by')+'</button>');vb.onclick=function(){upd('planVisit',{day:d.day,part:s.part,off:s.myVisit},s.myVisit?'Visit canceled.':'See you then.')};acts.appendChild(vb)}
         if(acts.children.length)x.appendChild(acts);else x.appendChild(el('<p class="small muted" style="margin:0">'+(need==='alone'?esc(pf)+' is fine alone then.':'Nothing to do here.')+'</p>'));
       }
+      // Booked help at this time, then While you're there (Joe 2026-09-29: a visit is more than medicine).
+      if((s.booked||[]).length)x.appendChild(el('<div class="shcl"><div class="k" style="margin:12px 0 6px">Booked</div>'+s.booked.map(function(j){return'<div class="shci"><span><b>'+esc(j.time)+'</b> '+esc(j.service)+(j.who?', '+esc(j.who):j.open?', asked, not taken yet':'')+'</span></div>'}).join('')+'</div>'));
+      if((s.chores||[]).length||fam){var wy=el('<div class="shcl"><div class="k" style="margin:12px 0 6px">While you’re there</div></div>');
+        (s.chores||[]).forEach(function(ch){var r=el('<label class="shci"><input type="checkbox"'+(ch.done?' checked':'')+'><span>'+esc(ch.title)+(ch.done&&ch.by?' <span class="muted">· '+esc(ch.by)+'</span>':'')+'</span>'+(fam?'<a href="#" class="small muted shdrop">Remove</a>':'')+'</label>');$('input',r).onchange=function(){upd('doneChore',{choreId:ch.chore_id,day:d.day,undo:!this.checked})};var dr=$('.shdrop',r);if(dr)dr.onclick=function(ev){ev.preventDefault();upd('dropChore',{choreId:ch.chore_id})};wy.appendChild(r)});
+        if(!(s.chores||[]).length&&fam)wy.appendChild(el('<p class="small muted" style="margin:0 0 6px">Things anyone here could do: walk the dog, feed the cat, take out the trash.</p>'));
+        if(fam){var pets=(S.data.pets||[]),sug=[];pets.forEach(function(q){if(q.kind==='Dog')sug.push('Walk '+q.name);sug.push('Feed '+q.name)});sug=sug.concat(['Take out the trash','Bring in the mail','Water the plants']).slice(0,6);
+          var cf=el('<form class="shchf"><input name="title" placeholder="Add something" maxlength="120" required><select name="when"><option value="">Every '+esc(s.part)+'</option><option value="day">Just this '+esc(s.part)+'</option></select><button class="btn sm" type="submit">Add</button><div class="pfp">'+sug.map(function(t){return'<button type="button" class="pfc">'+esc(t)+'</button>'}).join('')+'</div></form>');
+          $all('.pfc',cf).forEach(function(bb){bb.onclick=function(){$('input',cf).value=bb.textContent;$('input',cf).focus()}});
+          cf.onsubmit=function(ev){ev.preventDefault();var fd=formData(cf);upd('addChore',{title:fd.title,part:s.part,day:fd.when==='day'?d.day:''},'Added.')};wy.appendChild(cf)}
+        x.appendChild(wy)}
       // The checklist for this shift: the family, and whoever is staying.
       if(s.checklist&&(fam||(s.with&&s.with.mine))&&(s.checklist.length||(s.todos&&s.todos.length))){
         var cl=el('<div class="shcl"><div class="k" style="margin:12px 0 6px">During this '+esc(s.part)+'</div></div>');
