@@ -35,6 +35,7 @@ async function setTracker(ctx, p, c) {
   must(stage === '' || TRACKER.indexOf(stage) >= 0, 'Not a tracker step');
   await patchExtra(client, { tracker: stage ? { stage, at: new Date().toISOString(), by: ctx.email } : null }, c);
   if (!stage) return { ok: true };
+  await require('./learn').fromTracker(ctx.clientId, stage, ctx.email, c);
   const want = isTrue(client.circle_enabled), visible = want && approver(ctx);
   const u = await db.insert('updates', { update_id: id(), client_id: ctx.clientId, posted_by: ctx.email, stage: client.current_stage || '', title: stage + '.', body: clean(p.note, 600), visible_to_circle: visible, kind: 'Clinical', detail: '', quote: '', quote_ref: '', extra: JSON.stringify(want && !visible ? { pending_share: true } : {}) }, c);
   const after = async () => {
@@ -73,7 +74,8 @@ async function react(ctx, p, c) {
   const u = await db.one(`select * from updates where update_id=$1 and client_id=$2`, [String(p.updateId || ''), ctx.clientId], c); must(u, 'Not found');
   if (ctx.role === 'supporter') must(isTrue(u.visible_to_circle), 'Not found');
   if (isTrue(p.off)) await db.q(`delete from update_reactions where update_id=$1 and who=$2 and kind=$3`, [u.update_id, ctx.email, kind], c);
-  else await db.q(`insert into update_reactions (update_id, who, kind) values ($1,$2,$3) on conflict do nothing`, [u.update_id, ctx.email, kind], c);
+  // One reaction per person, like Facebook: a new one replaces the old.
+  else { await db.q(`delete from update_reactions where update_id=$1 and who=$2`, [u.update_id, ctx.email], c); await db.q(`insert into update_reactions (update_id, who, kind) values ($1,$2,$3) on conflict do nothing`, [u.update_id, ctx.email, kind], c); }
   return { ok: true };
 }
 async function comment(ctx, p, c) {
@@ -206,7 +208,7 @@ async function publicReact(p, req) {
   const u = await db.one(`select * from updates where update_id=$1 and client_id=$2 and visible_to_circle`, [String(p.updateId || ''), client.client_id]); must(u, 'Not found');
   const who = 'link:' + clean(p.viewer, 64);
   if (isTrue(p.off)) await db.q(`delete from update_reactions where update_id=$1 and who=$2 and kind=$3`, [u.update_id, who, kind]);
-  else await db.q(`insert into update_reactions (update_id, who, kind) values ($1,$2,$3) on conflict do nothing`, [u.update_id, who, kind]);
+  else { await db.q(`delete from update_reactions where update_id=$1 and who=$2`, [u.update_id, who]); await db.q(`insert into update_reactions (update_id, who, kind) values ($1,$2,$3) on conflict do nothing`, [u.update_id, who, kind]); }
   return { ok: true };
 }
 async function publicComment(p, req) {

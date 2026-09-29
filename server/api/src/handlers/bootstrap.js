@@ -80,6 +80,7 @@ async function bootstrap(ctx) {
   out.comments = await CIRCLE.commentsFor(ctx.clientId, false); out.reactionCounts = await CIRCLE.reactionsFor(ctx.clientId);
   out.myReactions = await db.all(`select r.update_id, r.kind from update_reactions r join updates u on u.update_id=r.update_id where u.client_id=$1 and r.who=$2`, [ctx.clientId, ctx.email]);
   out.help = await db.all(`select item_id, title, detail, when_text, status, claimed_by, claimed_email from help_items where client_id=$1 and status<>'Removed' order by added_at`, [ctx.clientId]);
+  { const L = require('./learn'); out.milestones = await L.milestonesFor(ctx.clientId); out.milestoneKinds = L.MILESTONES; out.milestoneDest = L.DEST; }
   // What the heart on the Circle shows: reactions, words left, and things taken, newest first (not your own).
   out.circleNotes = await db.all(`select * from (
       select 'react' t, r.at, coalesce(nullif(uu.name,''), nullif(ci.supporter_name,''), case when r.who like 'link:%' then 'Someone with the link' else r.who end) who, r.kind x, up.title ut, up.update_id uid
