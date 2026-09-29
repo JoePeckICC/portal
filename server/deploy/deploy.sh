@@ -2,6 +2,7 @@
 # Builds the API image and deploys it to Cloud Run. Re-run for every release.
 set -euo pipefail
 PROJECT=${PROJECT:-incadence-portal}; REGION=${REGION:-us-central1}
+PORTAL_URL=${PORTAL_URL:-https://portal.incadencecare.com}; APP_ENV=${APP_ENV:-production}; MIN_INSTANCES=${MIN_INSTANCES:-1}
 gcloud config set project "$PROJECT"
 CONN=$(gcloud sql instances describe portal-db --format='value(connectionName)')
 SA="portal-api@${PROJECT}.iam.gserviceaccount.com"
@@ -13,8 +14,8 @@ for s in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET HUNTRESS_HEC_TOKEN; do gcloud s
 gcloud run deploy portal-api --image "$IMG" --region "$REGION" --platform managed --no-invoker-iam-check \
   --service-account "$SA" --add-cloudsql-instances "$CONN" --set-secrets "$SECRETS" \
   --network default --subnet default --vpc-egress private-ranges-only \
-  --set-env-vars "NODE_ENV=production,TZ=America/Chicago,PORTAL_URL=https://portal.incadencecare.com,ALLOWED_ORIGINS=https://portal.incadencecare.com,UPLOAD_BUCKET=${PROJECT}-uploads,MAIL_TRANSPORT=${MAIL_TRANSPORT:-gmail},FROM_EMAIL=${FROM_EMAIL:-care@incadencecare.com},MAIL_AS=${MAIL_AS:-joe@incadencecare.com},CALENDAR_USER=${CALENDAR_USER:-joe@incadencecare.com},IDLE_MINUTES=${IDLE_MINUTES:-0},RETAIN_YEARS=${RETAIN_YEARS:-8}" \
-  --cpu 2 --memory 1Gi --min-instances 1 --max-instances 20 --concurrency 40 --timeout 300
+  --set-env-vars "NODE_ENV=production,APP_ENV=${APP_ENV},TZ=America/Chicago,PORTAL_URL=${PORTAL_URL},ALLOWED_ORIGINS=${PORTAL_URL},UPLOAD_BUCKET=${PROJECT}-uploads,MAIL_TRANSPORT=${MAIL_TRANSPORT:-gmail},FROM_EMAIL=${FROM_EMAIL:-care@incadencecare.com},MAIL_AS=${MAIL_AS:-joe@incadencecare.com},CALENDAR_USER=${CALENDAR_USER:-joe@incadencecare.com},IDLE_MINUTES=${IDLE_MINUTES:-0},RETAIN_YEARS=${RETAIN_YEARS:-8}" \
+  --cpu 2 --memory 1Gi --min-instances "$MIN_INSTANCES" --max-instances 20 --concurrency 40 --timeout 300
 URL=$(gcloud run services describe portal-api --region "$REGION" --format 'value(status.url)')
 # The service needs its own address for the document links it hands out.
 gcloud run services update portal-api --region "$REGION" --update-env-vars "API_URL=${API_URL:-https://api.incadencecare.com}" --quiet >/dev/null
