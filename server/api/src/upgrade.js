@@ -297,6 +297,11 @@ const STEPS = [
      place text not null default '', text text not null default '', status text not null default 'New', created_by text not null default '',
      created_at timestamptz not null default now(), reviewed_by text not null default '', reviewed_at timestamptz)`,
   `create index if not exists tips_place_idx on tips(status, lower(place))`,
+  // ---- what actually happened after surgery, one row per milestone per family (handlers/learn.js)
+  `create table if not exists recovery_milestones (
+     client_id text not null references clients(client_id) on delete cascade, kind text not null, on_date date not null,
+     detail text not null default '', source text not null default 'manual', set_by text not null default '', set_at timestamptz not null default now(),
+     primary key (client_id, kind))`,
   // a support team member's line about themselves, shown to families on their profile
   `alter table vendors add column if not exists bio text not null default ''`,
   // ---- the circle's casting call: a request can go to the family's circle first (see handlers/jobs.js)
