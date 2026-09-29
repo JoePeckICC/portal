@@ -244,7 +244,7 @@ async function addReferral(ctx, p, c) {
   coOnly(ctx); needFamily(ctx);
   const vendor = clean(p.vendor, 160).trim(); must(vendor, 'Name the vendor');
   const row = await db.insert('referrals', { referral_id: id(), client_id: ctx.clientId, vendor, service: clean(p.service, 160), contact: clean(p.contact, 160), note: clean(p.note, 500), status: 'Suggested', added_by: ctx.email }, c);
-  await core.autoMsg(ctx.clientId, 'New referral: ' + vendor + (row.service ? ', ' + row.service : '') + '. See Find Care.', c);
+  await core.autoMsg(ctx.clientId, 'New referral: ' + vendor + (row.service ? ', ' + row.service : '') + '. See Care.', c);
   return { referral: row };
 }
 async function setReferralStatus(ctx, p, c) {

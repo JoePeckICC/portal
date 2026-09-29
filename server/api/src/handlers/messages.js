@@ -130,7 +130,9 @@ async function postUpdate(ctx, p, c) {
   const client = await core.clientById(ctx.clientId, c);
   const title = clean(p.title, 200), body = clean(p.body, 4000);
   must(title.trim(), 'Give it a title');
-  const visible = !!p.visible && isTrue(client.circle_enabled);
+  // Only the patient (or the delegate) puts a post in front of the Circle; anyone else's waits for their yes.
+  const CIRCLE = require('./circle'), okd = CIRCLE.approver(ctx);
+  const want = !!p.visible && isTrue(client.circle_enabled), visible = want && okd, pending = want && !okd;
   // A photo, re-encoded by the page (so nothing like location data rides along), approved by the coordinator before
   // the Circle sees it. The coordinator's own photos are approved as posted.
   let extra = null;
@@ -139,11 +141,12 @@ async function postUpdate(ctx, p, c) {
     must(bytes.length > 0 && bytes.length <= 4 * 1024 * 1024, 'That photo is too large');
     must(bytes[0] === 0xFF && bytes[1] === 0xD8, 'Photos need to be JPEG');
     const row = await require('../storage').saveUpload(ctx, { clientId: ctx.clientId, kind: 'Photos', name: clean(p.photo.name, 80) || 'photo.jpg', mime: 'image/jpeg', bytes, note: 'On an update', shared: true }, c);
-    extra = { photo: row.upload_id, photo_ok: ctx.role === 'coordinator', sensitive: isTrue(p.sensitive) };
+    extra = { photo: row.upload_id, photo_ok: okd, sensitive: isTrue(p.sensitive) };
   }
+  if (pending) extra = { ...(extra || {}), pending_share: true };
   const u = await db.insert('updates', { update_id: id(), client_id: ctx.clientId, posted_by: ctx.email, stage: pick(p.stage, C.STAGES, client.current_stage || ''), title, body, visible_to_circle: visible,
     kind: pick(p.kind, C.UPDATE_KINDS, 'Family'), detail: clean(p.detail, 4000), quote: clean(p.quote, 600), quote_ref: clean(p.quote_ref, 120), extra: JSON.stringify(extra || {}) }, c);
-  if (extra && !extra.photo_ok) { const co = await core.coordinatorFor(client); if (co) await core.notifyCo(co, 'upload', 'A photo to approve, ' + famName(client.family_name), (ctx.user.name || ctx.email) + ' put a photo on “' + title + '”. The Circle sees it once you approve it.', '', 'Open Updates'); }
+  if (pending) for (const a of await CIRCLE.approversOf(ctx.clientId)) if (a.email !== ctx.email) await mail.notify(a.email, 'A post to approve', (ctx.user.name || ctx.email) + ' wrote “' + title + '” for your Circle. It goes out once you say yes.', body.slice(0, 300), 'Open the Circle');
   const after = async () => {
     if (!visible) return;
     for (const s of await db.all(`select supporter_email from circle where client_id=$1 and status='Active'`, [ctx.clientId]))

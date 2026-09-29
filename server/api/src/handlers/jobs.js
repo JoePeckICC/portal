@@ -287,7 +287,7 @@ async function passJob(ctx, p, c) {
   const j = await db.one(`select * from jobs where job_id=$1 and status='Open' and extra->>'for_vendor'=$2`, [String(p.jobId || ''), v.vendor_id], c); must(j, 'Not found');
   await db.q(`update jobs set status='Declined' where job_id=$1`, [j.job_id], c);
   const whenTxt = whenLabel(j, true);
-  if (j.extra && j.extra.topic_id) await db.insert('messages', { message_id: id(), client_id: j.client_id, topic_id: j.extra.topic_id, sender_email: 'system', body: v.name + ' can’t make ' + whenTxt + '. Try another time, or set up another on Find Care.', read_by_client: false, read_by_coordinator: true }, c);
+  if (j.extra && j.extra.topic_id) await db.insert('messages', { message_id: id(), client_id: j.client_id, topic_id: j.extra.topic_id, sender_email: 'system', body: v.name + ' can’t make ' + whenTxt + '. Try another time, or set up another on Care.', read_by_client: false, read_by_coordinator: true }, c);
   return { _after: () => core.notifyFamily(j.client_id, 'message', v.name + ' can’t make that time', v.name + ' can’t make ' + whenTxt + '.', '', 'Open the portal') };
 }
 async function finishJob(ctx, p, c) {

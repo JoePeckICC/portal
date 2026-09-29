@@ -20,7 +20,7 @@ async function bootstrap(ctx) {
   must(client, 'No family on file for this account yet.');
   out.client = core.publicClient(client);
   const CIRCLE = require('./circle');
-  const withPhoto = (rows, role) => rows.map(u => { const e = u.extra || {}; const o = { ...u, extra: undefined }; if (e.photo) { o.photo = CIRCLE.photoVisible(u, role) ? core.fileUrl(ctx, { upload_id: e.photo, storage_key: 'x' }) : ''; o.photo_ok = isTrue(e.photo_ok); o.sensitive = isTrue(e.sensitive); o.photo_id = e.photo; } return o; });
+  const withPhoto = (rows, role) => rows.map(u => { const e = u.extra || {}; const o = { ...u, extra: undefined }; if (e.photo) { o.photo = CIRCLE.photoVisible(u, role) ? core.fileUrl(ctx, { upload_id: e.photo, storage_key: 'x' }) : ''; o.photo_ok = isTrue(e.photo_ok); o.sensitive = isTrue(e.sensitive); o.photo_id = e.photo; } if (isTrue(e.pending_share)) o.pending_share = true; return o; });
   const ce = client.extra || {};
   if (ctx.role === 'supporter') {
     out.updates = withPhoto(await db.all(`select * from updates where client_id=$1 and visible_to_circle order by posted_at desc`, [ctx.clientId]), 'supporter');
@@ -80,6 +80,17 @@ async function bootstrap(ctx) {
   out.comments = await CIRCLE.commentsFor(ctx.clientId, false); out.reactionCounts = await CIRCLE.reactionsFor(ctx.clientId);
   out.myReactions = await db.all(`select r.update_id, r.kind from update_reactions r join updates u on u.update_id=r.update_id where u.client_id=$1 and r.who=$2`, [ctx.clientId, ctx.email]);
   out.help = await db.all(`select item_id, title, detail, when_text, status, claimed_by, claimed_email from help_items where client_id=$1 and status<>'Removed' order by added_at`, [ctx.clientId]);
+  // What the heart on the Circle shows: reactions, words left, and things taken, newest first (not your own).
+  out.circleNotes = await db.all(`select * from (
+      select 'react' t, r.at, coalesce(nullif(uu.name,''), nullif(ci.supporter_name,''), case when r.who like 'link:%' then 'Someone with the link' else r.who end) who, r.kind x, up.title ut
+        from update_reactions r join updates up on up.update_id=r.update_id
+        left join users uu on lower(uu.email)=lower(r.who) left join circle ci on ci.client_id=up.client_id and lower(ci.supporter_email)=lower(r.who)
+       where up.client_id=$1 and lower(r.who)<>lower($2)
+      union all
+      select 'comment', cm.at, cm.author, cm.body, up.title from update_comments cm join updates up on up.update_id=cm.update_id where cm.client_id=$1 and lower(cm.email)<>lower($2) and cm.status<>'Hidden'
+      union all
+      select 'help', h.claimed_at, h.claimed_by, h.title, '' from help_items h where h.client_id=$1 and h.claimed_at is not null and h.status in ('Claimed','Done') and lower(h.claimed_email)<>lower($2)
+    ) n order by at desc nulls last limit 60`, [ctx.clientId, ctx.email]).catch(() => []);
   out.delegate = (await db.one(`select email from users where client_id=$1 and lower(role)='family' and active and (extra->>'delegate')='true' limit 1`, [ctx.clientId]) || {}).email || '';
   out.restrictions = ce.restrictions || {}; out.restrictionKeys = require('./recovery').RESTRICTIONS; out.red_flags = ce.red_flags || ''; out.red_flags_who = ce.red_flags_who || ''; out.reason = ce.reason || ''; out.disaster = ce.disaster || null;
   if (ctx.role === 'client' || ctx.role === 'coordinator' || ctx.role === 'family') out.icant = ce.icant ? { text: ctx.role === 'client' || ctx.role === 'coordinator' ? ce.icant.text : '', at: ce.icant.at } : null;
