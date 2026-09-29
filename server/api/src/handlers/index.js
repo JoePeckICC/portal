@@ -10,7 +10,7 @@ H.READ_ONLY = { careGrid: 1, learnStats: 1, needsReport: 1, accessLog: 1, bootst
 // Supporters (the wider circle) read updates and manage their own account. Nothing else.
 // A vendor can take and finish jobs and talk in their own job threads; nothing else.
 H.VENDOR_OK = { bootstrap: 1, savePrefs: 1, signOutEverywhere: 1, changePassword: 1, forgetDevices: 1, takeJob: 1, passJob: 1, finishJob: 1, saveHours: 1, saveServices: 1, saveBio: 1, sendMessage: 1, readTopic: 1, hideTopic: 1, topicMessages: 1 };
-H.SUPPORTER_OK = { bootstrap: 1, savePrefs: 1, changeEmail: 1, signOutEverywhere: 1, changePassword: 1, forgetDevices: 1, react: 1, comment: 1, claimHelp: 1, careGrid: 1, takeShift: 1, releaseShift: 1, planVisit: 1, shiftDose: 1 };
+H.SUPPORTER_OK = { bootstrap: 1, savePrefs: 1, changeEmail: 1, signOutEverywhere: 1, changePassword: 1, forgetDevices: 1, react: 1, comment: 1, claimHelp: 1, careGrid: 1, takeShift: 1, releaseShift: 1, planVisit: 1, shiftDose: 1, doneChore: 1 };
 // A family's portal stays closed until their first payment is in. Consent and intake are always open.
 // Coordinator actions that are fine on an archived family (everything else is refused until reactivation).
 H.ARCHIVE_OK = { accessLog: 1, changePassword: 1, forgetDevices: 1, reactivateClient: 1, purgeClient: 1, exportClient: 1, savePrefs: 1, saveCoSettings: 1, newFamily: 1, saveResource: 1, signOutEverywhere: 1, changeEmail: 1 };

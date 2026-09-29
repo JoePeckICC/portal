@@ -13,7 +13,7 @@ const db = require('../db');
 const core = require('../core');
 const mail = require('../mail');
 const { localToIso } = require('../time');
-const { id, must, clean, isTrue, normEmail, first } = require('../util');
+const { id, must, clean, isTrue, normEmail, first, hourIn } = require('../util');
 
 const PARTS = ['morning', 'afternoon', 'evening', 'night'];
 const NEEDS = ['need', 'welcome', 'alone'];
@@ -47,7 +47,7 @@ const doseDay = (day, t) => Number(t.slice(0, 2)) < 5 ? addDays(day, 1) : day;
 async function grid(ctx, c, days) {
   const client = await core.clientById(ctx.clientId, c), ex = extraOf(client), fam = isFam(ctx), me = normEmail(ctx.email);
   const start = ymdTZ(new Date()), list = Array.from({ length: days || 7 }, (_, i) => addDays(start, i)), end = list[list.length - 1];
-  const [needs, cov, vis, asks, doses, taken, todos, home] = await Promise.all([
+  const [needs, cov, vis, asks, doses, taken, todos, home, jobs, chores, done] = await Promise.all([
     db.all(`select to_char(day,'YYYY-MM-DD') as day, part, need from coverage_needs where client_id=$1 and day between $2 and $3`, [ctx.clientId, start, end], c),
     db.all(`select to_char(day,'YYYY-MM-DD') as day, part, kind, who, note, email, added_by from coverage where client_id=$1 and day between $2 and $3`, [ctx.clientId, start, end], c),
     db.all(`select visit_id, to_char(day,'YYYY-MM-DD') as day, part, who, email from visits where client_id=$1 and day between $2 and $3`, [ctx.clientId, start, end], c),
@@ -56,7 +56,13 @@ async function grid(ctx, c, days) {
     db.all(`select med_id, due_at from doses where client_id=$1 and status='Taken' and due_at >= now() - interval '2 days'`, [ctx.clientId], c),
     db.all(`select title, to_char(due_date,'YYYY-MM-DD') as day from tasks where client_id=$1 and due_date between $2 and $3 and status<>'Done' and lower(owner)<>'coordinator'`, [ctx.clientId, start, end], c),
     homeDay(client, c),
+    // Help already booked (Joe 2026-09-29: all the help in one place): a sitter, a ride, a meal, by time.
+    db.all(`select j.job_id, j.service, j.starts_at, j.status, j.extra, v.name vendor_name from jobs j left join vendors v on v.vendor_id=coalesce(j.vendor_id, j.extra->>'for_vendor') where j.client_id=$1 and j.status in ('Open','Taken') and j.starts_at >= $2::date - interval '1 day' and j.starts_at < $3::date + interval '2 days'`, [ctx.clientId, start, end], c),
+    // While you're there: the family's everyday things anyone can do on a visit (walk the dog, feed the cat, the trash).
+    db.all(`select chore_id, title, part, coalesce(to_char(day,'YYYY-MM-DD'),'') as day from shift_chores where client_id=$1 and active order by added_at`, [ctx.clientId], c),
+    db.all(`select chore_id, to_char(day,'YYYY-MM-DD') as day, by_name from chore_done where client_id=$1 and day between $2 and $3`, [ctx.clientId, start, end], c),
   ]);
+  const jobAt = jobs.map(j => { const d = new Date(j.starts_at), hh = String(hourIn(C.TZ || 'America/Chicago', d)).padStart(2, '0'); return { day: ymdTZ(d), part: partOf(hh + ':00'), time: new Intl.DateTimeFormat('en-US', { timeZone: C.TZ || 'America/Chicago', hour: 'numeric', minute: '2-digit' }).format(d), service: (j.extra && j.extra.meet) ? 'Meet first' : j.service, who: j.status === 'Taken' && j.vendor_name ? j.vendor_name : '', open: j.status === 'Open' }; });
   const names = Array.isArray(ex.med_names_for) ? ex.med_names_for.map(normEmail) : [];
   const tk = new Set(taken.map(t => t.med_id + '|' + new Date(t.due_at).toISOString()));
   const firstWeek = d => home && d >= home && d < addDays(home, 7);
@@ -70,6 +76,8 @@ async function grid(ctx, c, days) {
     const s = { part, need, set: !!set, asked: asks.some(a => a.cov === day + '|' + part && a.status === 'Open') };
     if (w) s.with = fam ? { who: w.who, note: w.note, mine } : { who: mine ? 'You' : (first(w.who) || 'Someone'), mine };
     if (fam) s.visits = vs.map(x => x.who); else s.myVisit = vs.some(x => x.email && normEmail(x.email) === me);
+    s.booked = jobAt.filter(j => j.day === day && j.part === part).map(j => ({ service: j.service, time: j.time, who: fam ? j.who : (j.who ? first(j.who) : ''), open: j.open }));
+    s.chores = chores.filter(ch => ch.part === part && (!ch.day || String(ch.day).slice(0, 10) === day)).map(ch => { const dn = done.find(x => x.chore_id === ch.chore_id && x.day === day); return { chore_id: ch.chore_id, title: ch.title, done: !!dn, by: dn ? (fam ? dn.by_name : first(dn.by_name)) : '' }; });
     // The checklist: the family always; whoever holds this shift.
     if (fam || mine) {
       const showNames = fam || names.includes(me);
@@ -154,5 +162,27 @@ async function shiftDose(ctx, p, c) {
   return grid(ctx, c, 7);
 }
 
-module.exports = { careGrid, setNeed, setVisits, setMedNames, takeShift, releaseShift, planVisit, askAllNeeds, shiftDose };
+// While you're there: the family lists everyday things by part of the day, every day or one day. Never removed, set aside.
+async function addChore(ctx, p, c) {
+  needFamily(ctx); must(isFam(ctx), 'Only the family adds these');
+  const title = clean(p.title, 120).trim(); must(title, 'What needs doing?'); must(PARTS.includes(p.part), 'Pick a part of the day');
+  must(!p.day || dayOk(p.day), 'Pick a day');
+  await db.q(`insert into shift_chores (chore_id, client_id, title, part, day, added_by) values ($1,$2,$3,$4,$5,$6)`, [id(), ctx.clientId, title, p.part, p.day || null, ctx.email], c);
+  return grid(ctx, c, 7);
+}
+async function dropChore(ctx, p, c) {
+  needFamily(ctx); must(isFam(ctx), 'Only the family changes these');
+  const r = await db.q(`update shift_chores set active=false where client_id=$1 and chore_id=$2`, [ctx.clientId, String(p.choreId || '')], c); must(r.rowCount, 'Not found');
+  return grid(ctx, c, 7);
+}
+// Anyone in the Circle who is there can check one off; the family sees who did it.
+async function doneChore(ctx, p, c) {
+  needFamily(ctx); must(inCircle(ctx), 'Not allowed'); must(dayOk(p.day), 'Pick a day');
+  const ch = await db.one(`select chore_id from shift_chores where client_id=$1 and chore_id=$2 and active`, [ctx.clientId, String(p.choreId || '')], c); must(ch, 'Not found');
+  if (isTrue(p.undo)) await db.q(`delete from chore_done where chore_id=$1 and day=$2`, [ch.chore_id, p.day], c);
+  else await db.q(`insert into chore_done (chore_id, client_id, day, by_name, by_email) values ($1,$2,$3,$4,$5) on conflict (chore_id, day) do update set by_name=excluded.by_name, by_email=excluded.by_email, at=now()`, [ch.chore_id, ctx.clientId, p.day, clean(ctx.user.name || ctx.email, 120), ctx.email], c);
+  return grid(ctx, c, 7);
+}
+
+module.exports = { addChore, dropChore, doneChore, careGrid, setNeed, setVisits, setMedNames, takeShift, releaseShift, planVisit, askAllNeeds, shiftDose };
 Object.defineProperty(module.exports, 'grid', { value: grid, enumerable: false });
