@@ -151,7 +151,7 @@ input,select,textarea,button{scroll-margin-top:110px}
 .shx{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:-2px 0 10px;background:#fff}
 .shseg{display:flex;gap:6px;flex-wrap:wrap}.shseg button{font:inherit;font-size:13px;padding:6px 12px;border-radius:16px;border:1px solid var(--line2);background:#fff;cursor:pointer;color:var(--ink)}.shseg button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .shnf{display:flex;gap:8px;margin-top:10px}.shnf input{flex:1}.shacts{display:flex;gap:8px;flex-wrap:wrap}
-.shci{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:14px;border-top:1px solid var(--line)}.shci input{width:auto;margin-top:3px}.shci span{font-weight:400}.shci b{font-weight:700}.covask{display:grid;gap:8px}.covaskr{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ycr{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid var(--line);text-decoration:none;color:inherit}.ycr:first-child{border-top:0}
+.shci{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:14px;border-top:1px solid var(--line)}.shci input{width:auto;margin-top:3px}.shci span{font-weight:400}.shask1{align-items:center}.shask1>span:first-child{flex:1}.shask{display:grid;gap:8px;margin:4px 0 8px}.shaskr{display:grid;grid-template-columns:1fr 1fr;gap:8px}.shaskr select[hidden]{display:none}.shci b{font-weight:700}.covask{display:grid;gap:8px}.covaskr{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ycr{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid var(--line);text-decoration:none;color:inherit}.ycr:first-child{border-top:0}
 .carehd{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;margin:4px 0 16px}.carehd h1{text-align:center;margin:0;font-size:30px}.carehd .cib{border:0;background:none}
 .cbar .cib,.imbar .cib{border:0;background:none}.imbar .cib span{font-size:16px;font-weight:600}
 .circ .cbar{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;margin:4px 0 16px}.circ .cbar h1{text-align:center;margin:0;font-size:30px}.cib{position:relative;width:44px;height:44px;border-radius:22px;border:1px solid var(--line2);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}.cib svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.cib:hover{border-color:var(--gold)}.cib .bdg{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:#7A2E2E;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}.cfeed{max-width:720px;margin:0 auto}.circ .cirl{max-width:720px;margin-left:auto;margin-right:auto}.rxsum{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:13px;color:var(--muted)}.rxsum .rxic{display:flex}.rxsum .rxic i{width:22px;height:22px;border-radius:11px;background:var(--panel);border:2px solid var(--ground);display:flex;align-items:center;justify-content:center;margin-left:-6px}.rxsum .rxic i:first-child{margin-left:0}.rxsum svg{width:13px;height:13px;fill:none;stroke:var(--gold-ink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -1445,6 +1445,8 @@ function yourCare(){
   var last=(d.jobs||[]).filter(function(j){var w=toDate(j.starts_at);return j.vendor_name&&w&&w<t0&&j.status==='Taken'})[0],lh=last?pastHelper('',last.vendor_name):null;
   if(lh&&!show.some(function(it){return it.j&&it.j.vendor_name===last.vendor_name})){var ba=el('<a href="#" class="ycr"><b>Book '+esc(last.vendor_name)+' again</b><span class="small muted">'+esc(vjWhat(last))+', last on '+esc(fmtShort(toDate(last.starts_at)))+'</span></a>');ba.onclick=function(ev){ev.preventDefault();S.fw='v:'+lh.topic_id;render()};ul.appendChild(ba)}
 
+  var cvT=(d.coverage||[]).filter(function(r){return r.day===ymdLocal(new Date())&&r.kind==='with'});
+  if(cvT.length){var cw=el('<a href="#" class="ycr"><b>Today with '+esc(yo(first((d.client||{}).patient_first_name)||'them').n)+'</b><span class="small muted">'+cvT.map(function(r){return esc(first(r.who))+', '+esc(r.part)}).join(' · ')+'</span><span class="small cumore">This week ›</span></a>');cw.onclick=function(ev){ev.preventDefault();S.cg=null;setView('circle');S.pop='ci:week';render()};ul.appendChild(cw)}
   var rest=items.length-show.length;if(rest>0){var mo=el('<a href="#" class="small hmore" style="display:inline-block;margin-top:10px">All care coming up ('+items.length+') ›</a>');mo.onclick=function(ev){ev.preventDefault();S.pop='cu:all';render()};c.appendChild(mo)}
   return c}
 function findView(){
@@ -1497,7 +1499,7 @@ function findPick(){
     // One set of boxes, most likely first (Joe: no headings): people they already use, what they said they need,
     // who is with them, then the rest.
     var pfn=yo(first((d.client||{}).patient_first_name)||'them');
-    group('',vts.map(function(t){var x=t.extra||{};return['v:'+t.topic_id,x.vendor_name||'Support team',((x.vendor_services&&x.vendor_services.length?x.vendor_services:[x.service]).filter(Boolean).join(', '))+' · book again']}).concat(favS.map(sv)).concat(rest.map(sv)).concat([['cov','Who is with '+pfn.n,'Ask your Circle to take a shift']]));
+    group('',vts.map(function(t){var x=t.extra||{};return['v:'+t.topic_id,x.vendor_name||'Support team',((x.vendor_services&&x.vendor_services.length?x.vendor_services:[x.service]).filter(Boolean).join(', '))+' · book again']}).concat(favS.map(sv)).concat(rest.map(sv)));
     return m}}
 // Tap a box and its form rises over the menu; Done puts it away. The booking confirmation shows there too.
 function fwPop(){
@@ -1507,7 +1509,7 @@ function fwPop(){
   if(S.bk&&S.bk.done){var a=S.bk.done;return popEl('Booked',el('<div class="imsec"><h3 style="margin:0 0 6px">'+esc(a.title)+'</h3><p style="margin:0">'+esc(fmtWhen(a.starts_at))+' · '+esc(a.location)+'</p><p class="small muted" style="margin:6px 0 0">'+esc(a.note)+'. An invite is in your email'+(a.link?', with the video link':'')+'.</p></div>'),close)}
   if(!w)return null;
   var t=w.indexOf('v:')===0?vts.filter(function(x){return x.topic_id===w.slice(2)})[0]:null;if(w.indexOf('v:')===0&&!t){S.fw=null;return null}
-  if(w==='cov'){var cb=el('<div class="fpick"></div>');cb.appendChild(shiftsEl('fam'));return popEl('Who is with '+yo(first((d.client||{}).patient_first_name)||'them').n,cb,function(){close();S.cg=null;S.cgSel=null})}
+  if(w==='cov'){S.fw=null;return null}   // Who is with them moved to Your Circle, This week
   var title=w==='co'?(co?'A call with the family':'Talk with '+cf):t?'Book '+((t.extra||{}).vendor_name||'them'):(HELP_TITLE[w.slice(4)]||w.slice(4));
   var b=el('<div class="fpick"></div>');
   if(w==='co')b.appendChild(coSched(function(ap){S.fw=null;S.bk={done:ap};refresh()}));
@@ -3251,13 +3253,13 @@ function circleView(){
   var hp=(d.help||[]),hOpen=hp.filter(function(x){return x.status==='Open'}).length,hTaken=hp.filter(function(x){return x.status==='Claimed'}).length;
   var ROWS=[
     {k:'people',t:'People',s:active.length?active.map(function(m){return first(m.supporter_name)||m.supporter_email}).join(', '):'Nobody yet'},
-    {k:'help',t:'What would help',s:hp.length?(hOpen+' open'+(hTaken?', '+hTaken+' taken':'')):(d.what_i_need?'A note for everyone':'Nothing listed yet')},
+    {k:'week',t:'This week',s:'Who is with '+yo(first(c.patient_first_name)||'them').n+', meals, rides, visits'+(hOpen?' · '+hOpen+' open':'')},
     fam||co?{k:'story',t:'Our story',s:d.story?(d.story.shared?'Shared':'Private for now'):'Not written yet'}:null,
   ].filter(Boolean);
   var rl=el('<div class="cirl"></div>');
-  ROWS.forEach(function(r){var a=el('<a href="#" class="cir"><span class="t"><b>'+esc(r.t)+'</b><span class="small muted">'+esc(r.s)+'</span></span><span class="gt">›</span></a>');a.onclick=function(ev){ev.preventDefault();S.pop='ci:'+r.k;render()};rl.appendChild(a)});
+  ROWS.forEach(function(r){var a=el('<a href="#" class="cir"><span class="t"><b>'+esc(r.t)+'</b><span class="small muted">'+esc(r.s)+'</span></span><span class="gt">›</span></a>');a.onclick=function(ev){ev.preventDefault();if(r.k==='week')S.cg=null;S.pop='ci:'+r.k;render()};rl.appendChild(a)});
   v.appendChild(rl);
-  var pk=String(S.pop||'');if(pk.indexOf('ci:')===0){var pb=circlePop(pk.slice(3),{fam:fam,co:co,act:act});if(pb)v.appendChild(popEl('Your Circle',pb,function(){S.pop=null},true));else S.pop=null}
+  var pk=String(S.pop||'');if(pk.indexOf('ci:')===0){var wkp=pk==='ci:week'||pk==='ci:help',pb=circlePop(pk.slice(3),{fam:fam,co:co,act:act});if(pb)v.appendChild(popEl(wkp?'This week':'Your Circle',pb,function(){S.pop=null;if(wkp){S.cg=null;S.cgSel=null;S.cgAsk=false}},!wkp));else S.pop=null}
   return v;
 }
 // One Circle page at a time, over the feed.
@@ -3284,7 +3286,7 @@ function circlePop(k,o){
     groups.forEach(function(g){if(!g[1].length)return;w.appendChild(el('<div class="k ntg">'+g[0]+'</div>'));
       g[1].forEach(function(n){var what=n.t==='react'?' reacted <b>'+esc(n.x)+'</b> to “'+esc(n.ut)+'”':n.t==='comment'?' left a word on “'+esc(n.ut)+'”: <span class="ntq">'+esc(String(n.x||'').slice(0,120))+'</span>':' is taking <b>'+esc(n.x)+'</b>';
         var r=el('<a href="#" class="ntr'+(g[0]==='New'?' nw':'')+'"><span class="av">'+esc(initial(n.who))+'</span><span class="ntx"><b>'+esc(n.who)+'</b>'+what+' <span class="muted ntt">'+ago(n.at)+'</span></span></a>');
-        r.onclick=function(ev){ev.preventDefault();if(n.t==='help'){S.pop='ci:help';render();return}S.pop=null;render();var el2=document.getElementById('u-'+n.uid);if(el2){el2.scrollIntoView({block:'center'});el2.classList.add('flash');setTimeout(function(){el2.classList.remove('flash')},1600)}};
+        r.onclick=function(ev){ev.preventDefault();if(n.t==='help'){S.pop='ci:week';S.cg=null;render();return}S.pop=null;render();var el2=document.getElementById('u-'+n.uid);if(el2){el2.scrollIntoView({block:'center'});el2.classList.add('flash');setTimeout(function(){el2.classList.remove('flash')},1600)}};
         w.appendChild(r)})});
     side.appendChild(w);return side}
   if(k==='people'){
@@ -3303,7 +3305,12 @@ function circlePop(k,o){
     side.appendChild(pl);
     // Add more people right here, under the list.
     var ad=circlePop('add',o);if(ad)side.appendChild(ad.firstChild);return side}
-  if(k==='help'){
+  // This week (Joe 2026-09-29): one place for everything the inner circle does, by day, plus Anytime.
+  if(k==='week'||k==='help'){var wk=el('<div class="card"></div>');wk.appendChild(shiftsEl('fam'));side.appendChild(wk);
+    var wn2=el('<div class="card"><div class="k">A note for everyone</div><p class="small muted" style="margin:6px 0 10px">“Texts are great, calls are hard.” “Please no visitors until the 14th.”</p><form><textarea maxlength="600" placeholder="What I need right now">'+esc(d.what_i_need||'')+'</textarea><div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" type="submit">Save</button><span class="small ok"></span></div><p class="err"></p></form></div>');
+    $('form',wn2).onsubmit=function(ev){ev.preventDefault();call('setWhatINeed',{text:$('textarea',wn2).value}).then(function(){$('.ok',wn2).textContent='Saved.';refresh()}).catch(function(e){$('.err',wn2).textContent=e.message})};
+    if(fam||co)side.appendChild(wn2);return side}
+  if(k==='help-old'){
   var wn=el('<div class="card" style="margin-top:0"><div class="k">What I need right now</div><p class="small muted" style="margin:6px 0 10px">One note the whole Circle sees, so nobody has to explain it ten times. “Texts are great, calls are hard.” “Please no visitors until the 14th.”</p>'+(fam||co?'<form><textarea name="text" maxlength="3000" placeholder="What helps, what does not, what to expect from us.">'+esc(d.what_i_need||'')+'</textarea><div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" type="submit">Save</button><span class="small muted ok"></span></div><p class="err"></p></form>':'<div>'+esc(d.what_i_need||'Nothing written yet.')+'</div>')+'</div>');
   var wf=$('form',wn);if(wf)wf.onsubmit=function(ev){ev.preventDefault();call('setWhatINeed',{text:$('textarea',wf).value}).then(function(){$('.ok',wf).textContent='Saved.';refresh()}).catch(function(e){$('.err',wf).textContent=e.message})};
     if(fam||co)side.appendChild(wn);side.appendChild(helpFor(d,fam||co));return side}
@@ -3348,8 +3355,8 @@ function supporterPage(){
   $('#trk',p).appendChild(trackerEl(d.tracker,d.trackerSteps||[],false,null));
   if(d.what_i_need)$('#need',p).appendChild(el('<div class="note" style="margin-bottom:20px"><div class="k" style="margin-bottom:6px">From the family</div>'+esc(d.what_i_need).replace(/\n/g,'<br>')+'</div>'));
   var feed=$('#feed',p);var ql=quietLine(d.tracker,d.updates,'');if(ql)feed.appendChild(ql);feed.appendChild(tlFeed(d.updates||[],c,{compact:true,soc:socFor(d),empty:'Nothing shared yet. You will get an email when there is.'}));feed.style.marginBottom='24px';
-  if(d.innerOk){var h=helpFor(d,false);h.style.marginBottom='24px';$('#help',p).appendChild(h)}   // What would help: the inner circle only
-  if(d.innerOk){var cv=el('<div class="card" style="margin-bottom:24px"><span class="k">Plan a visit</span></div>');cv.appendChild(shiftsEl('circle'));$('#help',p).appendChild(cv)}var fe=fundEl(false);if(fe){fe.style.marginBottom='24px';$('#help',p).appendChild(fe)}
+
+  if(d.innerOk){var cv=el('<div class="card" style="margin-bottom:24px"><span class="k">This week</span></div>');cv.appendChild(shiftsEl('circle'));$('#help',p).appendChild(cv)}   // shifts, visits, meals, rides: the inner circle onlyvar fe=fundEl(false);if(fe){fe.style.marginBottom='24px';$('#help',p).appendChild(fe)}
   return p;
 }
 
@@ -3480,12 +3487,23 @@ function shiftsEl(mode){
   function upd(action,params,msg){return call(action,params).then(function(r){S.cg=r;if(msg)toast(msg);render()}).catch(alertErr)}
   if(fam){
     var open=0;g.days.forEach(function(d){d.slots.forEach(function(s){if(s.need==='need'&&!s.with&&!s.asked)open++})});
-    var top=el('<div class="shtop"><label class="cmsw"><input type="checkbox"'+(g.visitsOff?'':' checked')+'> <span>Visits are welcome<span class="small muted"> · the Circle sees good times to stop by</span></span></label>'+(open?'<button type="button" class="btn sm">Ask the Circle for '+(open===1?'the open time':'all '+open+' open times')+'</button>':'')+'</div>');
+    var top=el('<div class="shtop"><button type="button" class="btn askb">+ Ask for help</button><label class="cmsw"><input type="checkbox"'+(g.visitsOff?'':' checked')+'> <span>Visits are welcome<span class="small muted"> · your inner circle sees good times to stop by</span></span></label>'+(open?'<button type="button" class="btn quiet sm opena">Ask for someone at '+(open===1?'the open time':'all '+open+' open times')+'</button>':'')+'</div>');
     $('input',top).onchange=function(){upd('setVisits',{on:this.checked},this.checked?'Visits are on.':'Visits are off.')};
-    var ab=$('button',top);if(ab)ab.onclick=function(){busy(ab,true,'Asking…');upd('askAllNeeds',{},'Asked your Circle.')};
+    var ab=$('.opena',top);if(ab)ab.onclick=function(){busy(ab,true,'Asking…');upd('askAllNeeds',{},'Asked your inner circle.')};
+    $('.askb',top).onclick=function(){S.cgAsk=!S.cgAsk;render()};
     w.appendChild(top);
+    // One way to ask for anything (Joe 2026-09-29): a meal, a ride, an errand, or someone to stay. A day puts it on the week.
+    if(S.cgAsk){var dys=g.days.map(function(x){return x.day}),sg=['A meal','Groceries','A ride','Walk the dog','Errands','Stay with '+pn].concat((S.data.pets||[]).filter(function(q){return q.kind==='Dog'}).map(function(q){return 'Walk '+q.name}).slice(0,1));
+      var af=el('<form class="card shask"><div class="k">Ask your inner circle</div><input name="title" placeholder="What would help" maxlength="160" required><div class="pfp">'+sg.filter(function(v,i,a){return a.indexOf(v)===i}).map(function(t){return'<button type="button" class="pfc">'+esc(t)+'</button>'}).join('')+'</div><div class="shaskr"><select name="day"><option value="">Anytime</option>'+dys.map(function(x){var dd=new Date(x+'T12:00:00');return'<option value="'+x+'">'+esc(dd.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}))+'</option>'}).join('')+'</select><select name="part">'+['morning','afternoon','evening','night'].map(function(p){return'<option'+(p==='evening'?' selected':'')+'>'+p+'</option>'}).join('')+'</select></div><input name="detail" placeholder="Anything they should know (optional)" maxlength="600"><div style="display:flex;gap:10px;align-items:center"><button class="btn" type="submit">Ask</button><a href="#" class="small cx">Cancel</a></div><p class="err"></p></form>');
+      var ps=$('select[name=part]',af),dsel=$('select[name=day]',af);function pv(){ps.hidden=!dsel.value}pv();dsel.onchange=pv;
+      $all('.pfc',af).forEach(function(bb){bb.onclick=function(){$('input[name=title]',af).value=bb.textContent}});
+      $('.cx',af).onclick=function(ev){ev.preventDefault();S.cgAsk=false;render()};
+      af.onsubmit=function(ev){ev.preventDefault();var fd=formData(af),stay=/^stay with/i.test(fd.title.trim()),b=$('button[type=submit]',af);
+        if(stay&&!fd.day){$('.err',af).textContent='Pick a day for someone to stay.';return}busy(b,true,'Asking…');
+        (stay?call('askShift',{day:fd.day,part:fd.part,note:fd.detail}):call('addHelp',{title:fd.title,detail:fd.detail,day:fd.day,part:fd.day?fd.part:''})).then(function(){S.cgAsk=false;S.cg=null;toast('Asked your inner circle.');render()}).catch(function(e){$('.err',af).textContent=e.message;busy(b,false,'Ask')})};
+      w.appendChild(af)}
   }else{
-    w.appendChild(el('<p class="small muted" style="margin:0 0 6px">'+(g.visitsOff?'The family is resting and not taking visits right now. The gold times are when '+esc(pf)+' still needs someone to stay.':'Gold times are when '+esc(pf)+' needs someone. Staying then covers it. The others are good times to stop by.')+'</p>'));
+    w.appendChild(el('<p class="small muted" style="margin:0 0 6px">'+(g.visitsOff?'The family is resting and not taking visits right now. The gold times are when '+esc(pf)+' still needs someone to stay.':'Gold times are when '+esc(pf)+' needs someone. Staying then covers it. Tap any time to see what the family asked for then.')+'</p>'));
   }
   var t0=ymdLocal(new Date()),t1=ymdLocal(new Date(Date.now()+864e5));
   g.days.forEach(function(d){
@@ -3496,7 +3514,7 @@ function shiftsEl(mode){
       if(fam&&s.visits&&s.visits.length)st+=' · '+s.visits.length+' visiting';
       if(!fam&&s.myVisit)st+=' · you’re stopping by';
       // What else happens then: help that is booked, and the everyday things anyone there can do.
-      var also=(s.booked||[]).map(function(j){return (j.who?first(j.who)+' ':'')+j.service.toLowerCase()+' '+j.time}).concat((s.chores||[]).map(function(ch){return ch.title+(ch.done?' ✓':'')}));
+      var also=(s.booked||[]).map(function(j){return (j.who?first(j.who)+' ':'')+j.service.toLowerCase()+' '+j.time}).concat((s.asks||[]).map(function(h){return h.title+(h.status==='Open'?' needed':' · '+h.by)})).concat((s.chores||[]).map(function(ch){return ch.title+(ch.done?' ✓':'')}));
       var cls=rest||need==='alone'?'alone':need,b=el('<button type="button" class="shs '+cls+(s.with?' cov':'')+(S.cgSel===key?' on':'')+'"><span class="shlt"><b>'+esc(P)+'</b>'+(also.length&&cls!=='alone'?'<small>'+esc(also.join(' · '))+'</small>':'')+'</span><span class="st'+(need==='need'&&!s.with?' open':'')+'">'+st+'</span></button>');
       b.onclick=function(){S.cgSel=S.cgSel===key?null:key;render()};w.appendChild(b);
       if(S.cgSel!==key)return;
@@ -3515,6 +3533,8 @@ function shiftsEl(mode){
         if(!g.visitsOff&&!(s.with&&s.with.mine)&&need!=='alone'){var vb=el('<button type="button" class="btn '+(s.with||need!=='need'?'':'quiet ')+'sm">'+(s.myVisit?'Cancel my visit':'I’ll stop by')+'</button>');vb.onclick=function(){upd('planVisit',{day:d.day,part:s.part,off:s.myVisit},s.myVisit?'Visit canceled.':'See you then.')};acts.appendChild(vb)}
         if(acts.children.length)x.appendChild(acts);else x.appendChild(el('<p class="small muted" style="margin:0">'+(need==='alone'?esc(pf)+' is fine alone then.':'Nothing to do here.')+'</p>'));
       }
+      // What the family asked for at this time (a meal, a ride), then booked help, then While you're there.
+      if((s.asks||[]).length){var ak2=el('<div class="shcl"><div class="k" style="margin:12px 0 6px">Asked for</div></div>');s.asks.forEach(function(h){ak2.appendChild(askRow(h))});x.appendChild(ak2)}
       // Booked help at this time, then While you're there (Joe 2026-09-29: a visit is more than medicine).
       if((s.booked||[]).length)x.appendChild(el('<div class="shcl"><div class="k" style="margin:12px 0 6px">Booked</div>'+s.booked.map(function(j){return'<div class="shci"><span><b>'+esc(j.time)+'</b> '+esc(j.service)+(j.who?', '+esc(j.who):j.open?', asked, not taken yet':'')+'</span></div>'}).join('')+'</div>'));
       if((s.chores||[]).length||fam){var wy=el('<div class="shcl"><div class="k" style="margin:12px 0 6px">While you’re there</div></div>');
@@ -3533,6 +3553,13 @@ function shiftsEl(mode){
         if(!fam)cl.appendChild(el('<p class="small muted" style="margin:8px 0 0">You remind; you never give or change a medicine. For an emergency, call 911.</p>'));
         x.appendChild(cl)}
       w.appendChild(x)})});
+  // Anytime: what would help with no day on it.
+  if((g.anytime||[]).length||fam){var an=el('<div class="shcl"><div class="k" style="margin:20px 0 6px">Anytime</div></div>');(g.anytime||[]).forEach(function(h){an.appendChild(askRow(h))});if(!(g.anytime||[]).length)an.appendChild(el('<p class="small muted" style="margin:0">Nothing without a day. Use + Ask for help to add one.</p>'));w.appendChild(an)}
+  function askRow(h){var r=el('<div class="shci shask1"><span><b>'+esc(h.title)+'</b>'+(h.detail?'<span class="small muted"> · '+esc(h.detail)+'</span>':'')+'<br><span class="small '+(h.status==='Open'?'muted':'')+'">'+(h.status==='Open'?'Nobody yet':h.status==='Done'?'Done':esc(h.by)+' has it')+'</span></span><span class="shacts"></span></div>'),a=$('.shacts',r);
+    if(!fam&&h.status==='Open'){var t=el('<button type="button" class="btn sm">I’ll do it</button>');t.onclick=function(){busy(t,true,'…');call('claimHelp',{itemId:h.item_id}).then(function(){S.cg=null;toast('Thank you. The family knows.');render()}).catch(alertErr)};a.appendChild(t)}
+    if(h.mine&&h.status==='Claimed'){var rl=el('<a href="#" class="small">I can’t anymore</a>');rl.onclick=function(ev){ev.preventDefault();call('claimHelp',{itemId:h.item_id,release:true}).then(function(){S.cg=null;render()}).catch(alertErr)};a.appendChild(rl)}
+    if(fam){var rm=el('<a href="#" class="small muted">Remove</a>');rm.onclick=function(ev){ev.preventDefault();call('setHelpStatus',{itemId:h.item_id,status:'Removed'}).then(function(){S.cg=null;render()}).catch(alertErr)};a.appendChild(rm)}
+    return r}
   if(fam&&g.canAllow&&g.people&&g.people.length){var wl=el('<div class="shcl"><div class="k" style="margin:18px 0 6px">Who sees this</div><p class="small muted" style="margin:0 0 6px">The inner circle: family with their own sign-in, plus the people checked here. Close family starts checked.</p></div>');
     g.people.forEach(function(p){var r=el('<label class="cmsw"><input type="checkbox"'+(p.allowed?' checked':'')+'> <span>'+esc(p.name)+(p.relationship?' <span class="small muted">· '+esc(p.relationship)+'</span>':'')+'</span></label>');$('input',r).onchange=function(){upd('setShiftAllowed',{email:p.email,on:this.checked})};wl.appendChild(r)});w.appendChild(wl)}
   if(fam&&g.canNames&&g.shiftPeople&&g.shiftPeople.length){var mn=el('<div class="shcl"><div class="k" style="margin:18px 0 6px">Medicine names</div><p class="small muted" style="margin:0 0 6px">People staying a shift see “A medicine is due” unless you let them see the names.</p></div>');
