@@ -312,6 +312,12 @@ const STEPS = [
   `create table if not exists coverage_needs (
      client_id text not null references clients(client_id) on delete cascade, day date not null, part text not null,
      need text not null, set_by text not null default '', primary key (client_id, day, part))`,
+  `create table if not exists shift_chores (
+     chore_id text primary key, client_id text not null references clients(client_id) on delete cascade, title text not null,
+     part text not null, day date, active boolean not null default true, added_by text not null default '', added_at timestamptz not null default now())`,
+  `create table if not exists chore_done (
+     chore_id text not null references shift_chores(chore_id) on delete cascade, client_id text not null, day date not null,
+     by_name text not null default '', by_email text not null default '', at timestamptz not null default now(), primary key (chore_id, day))`,
   `create table if not exists visits (
      visit_id text primary key, client_id text not null references clients(client_id) on delete cascade, day date not null,
      part text not null, who text not null default '', email text not null default '', at timestamptz not null default now(),
