@@ -418,6 +418,25 @@ test('supporters only get updates', async () => {
   assert.equal(gone.error, 'signed_out', 'removed supporter is signed out');
 });
 
+test('the patient says yes to what the Circle sees; the coordinator only takes things down', async () => {
+  const co = await signIn('joe@incadencecare.com'), pat = await signIn('pat@example.com');
+  const cid = (await api(pat, 'bootstrap', {})).client.client_id;
+  await db.q(`update clients set circle_enabled=true where client_id=$1`, [cid]);
+  const p1 = await api(co, 'postUpdate', { clientId: cid, title: 'From the coordinator', body: 'x', visible: true });
+  assert.equal(p1.ok, true, p1.error); assert.equal(p1.update.visible_to_circle, false, 'waits for the patient');
+  assert.ok((await api(co, 'approveUpdate', { clientId: cid, updateId: p1.update.update_id, ok: true })).error, 'coordinator cannot share');
+  assert.equal((await api(pat, 'approveUpdate', { updateId: p1.update.update_id, ok: true })).ok, true);
+  assert.equal((await db.one(`select visible_to_circle from updates where update_id=$1`, [p1.update.update_id])).visible_to_circle, true);
+  assert.equal((await api(co, 'approveUpdate', { clientId: cid, updateId: p1.update.update_id, ok: false })).ok, true, 'coordinator can take it down');
+  const p2 = await api(pat, 'postUpdate', { title: 'From me', body: 'y', visible: true });
+  assert.equal(p2.update.visible_to_circle, true, 'the patient posts straight out');
+  await db.q(`insert into update_comments (comment_id, update_id, client_id, author, email, body, status, by_role) values ('cmt-t1',$1,$2,'Aunt','aunt@example.com','Love you','Pending','supporter') on conflict (comment_id) do update set status='Pending'`, [p2.update.update_id, cid]);
+  assert.ok((await api(co, 'moderateComment', { clientId: cid, commentId: 'cmt-t1', status: 'Approved' })).error, 'coordinator cannot approve a word');
+  assert.equal((await api(co, 'moderateComment', { clientId: cid, commentId: 'cmt-t1', status: 'Hidden' })).ok, true, 'coordinator can hide');
+  assert.equal((await api(pat, 'moderateComment', { commentId: 'cmt-t1', status: 'Approved' })).ok, true);
+  assert.ok((await api(co, 'setDelegate', { clientId: cid, email: 'x@example.com', on: true })).error, 'only the patient names a delegate');
+});
+
 test('sign out everywhere kills every session', async () => {
   const s1 = await signIn('pat@example.com'); const s2 = await signIn('pat@example.com');
   const r = await api(s1, 'signOutEverywhere', {});
