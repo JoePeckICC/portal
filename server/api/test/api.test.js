@@ -345,6 +345,14 @@ test('vendors: invited, told by text, first to take it has it, then talk in Mess
   const hi2 = (await db.all(`select * from help_items where job_id=$1`, [only.job.job_id]))[0];
   { const r = await api(sis, 'claimHelp', { itemId: hi2.item_id }); assert.equal(r.ok, true, r.error); }
   const oj2 = (await api(pat, 'bootstrap', {})).jobs.find(j => j.job_id === only.job.job_id); assert.equal(oj2.status, 'Taken'); assert.ok(oj2.circle_by);
+  // Who is with: the family asks the Circle for a shift, the one who says yes fills the slot, letting go empties it
+  const sday = new Date(Date.now() + 3 * 86400e3).toISOString().slice(0, 10);
+  const ask = await api(pat, 'askShift', { day: sday, part: 'night', note: 'First night home' }); assert.equal(ask.ok, true, ask.error);
+  assert.ok((await api(pat, 'askShift', { day: sday, part: 'night' })).error, 'one ask per shift');
+  { const r = await api(sis, 'claimHelp', { itemId: ask.item.item_id }); assert.equal(r.ok, true, r.error); }
+  assert.equal((await db.one(`select who from coverage where client_id=$1 and day=$2 and part='night' and kind='with'`, [ask.item.client_id, sday])).who.length > 0, true, 'the slot is filled');
+  { const r = await api(sis, 'claimHelp', { itemId: ask.item.item_id, release: true }); assert.equal(r.ok, true, r.error); }
+  assert.ok(!(await db.one(`select who from coverage where client_id=$1 and day=$2 and part='night' and kind='with'`, [ask.item.client_id, sday])), 'letting go empties it');
   // the loan closet: the coordinator lends a walker from the Nashville closet and it comes back
   const coord = await signIn('joe@incadencecare.com');
   const eq = await api(coord, 'saveEquipment', { kind: 'Walker', label: 'Walker #1', city: 'Nashville', state: 'TN' }); assert.equal(eq.ok, true, eq.error);
@@ -450,6 +458,34 @@ test('a quiet stretch in the hospital tells the coordinator once, and the family
   if (mail.outbox || mail.sent) assert.ok((mail.outbox || mail.sent).slice(sent0).some(m => /before you sleep/i.test(m.subject || '')), 'the family gets the night email');
   const n2 = await jobs.hospitalQuiet('night'); assert.equal(n2.flagged, 0, 'once a night');
   await db.q(`update clients set extra = extra - 'tracker' - 'hosp_quiet_at' - 'hosp_night_at' where client_id='c1'`);
+});
+
+test('who is with them: needs sized, a supporter takes a shift, sees a checklist without names, visits, release', async () => {
+  const co = await signIn('joe@incadencecare.com');
+  await db.q(`update clients set circle_enabled=true, paid=true, plan_ready=true, extra = coalesce(extra,'{}'::jsonb) - 'visits_off' - 'med_names_for' where client_id='c2'`);
+  await db.q(`insert into users (email,name,role,client_id) values ('sam@example.com','Sam Second','client','c2') on conflict (email) do nothing`);
+  await db.q(`delete from coverage where client_id='c2'`); await db.q(`delete from visits where client_id='c2'`); await db.q(`delete from coverage_needs where client_id='c2'`);
+  await db.q(`insert into medications (med_id, client_id, name, frequency, times, status) values ('m-shift','c2','Keppra','Daily','20:00','Accepted') on conflict (med_id) do update set status='Accepted', times='20:00'`);
+  const a = await api(co, 'addCircle', { clientId: 'c2', email: 'cousin@example.com', name: 'Cousin Kay', relationship: 'Cousin' }); assert.equal(a.ok, true, a.error);
+  const sam = await signIn('sam@example.com'), kay = await signIn('cousin@example.com');
+  const g = await api(sam, 'careGrid', {}); assert.equal(g.ok, true, g.error); assert.equal(g.days.length, 7);
+  const day = g.days[1].day;
+  { const r = await api(sam, 'setNeed', { day, part: 'evening', need: 'need' }); assert.equal(r.ok, true, r.error); assert.equal(r.days[1].slots[2].need, 'need'); }
+  assert.ok((await api(kay, 'setNeed', { day, part: 'evening', need: 'alone' })).error, 'a supporter cannot change needs');
+  const t = await api(kay, 'takeShift', { day, part: 'evening' }); assert.equal(t.ok, true, t.error);
+  const ks = t.days[1].slots[2]; assert.equal(ks.with.mine, true); assert.equal(ks.checklist[0].label, 'A medicine', 'no names by default'); assert.equal(ks.visits, undefined, 'supporters do not see visitors');
+  assert.ok((await api(sam, 'takeShift', { day, part: 'evening' })).error, 'one person per shift');
+  { const r = await api(sam, 'setMedNames', { email: 'cousin@example.com', on: true }); assert.equal(r.ok, true, r.error); }
+  assert.equal((await api(kay, 'careGrid', {})).days[1].slots[2].checklist[0].label, 'Keppra', 'the patient let Kay see names');
+  { const r = await api(kay, 'shiftDose', { day, part: 'evening', medId: 'm-shift', time: '20:00' }); assert.equal(r.ok, true, r.error); assert.equal(r.days[1].slots[2].checklist[0].done, true); }
+  assert.ok((await api(kay, 'shiftDose', { day, part: 'morning', medId: 'm-shift', time: '20:00' })).error, 'only on her own shift');
+  { const r = await api(kay, 'planVisit', { day, part: 'afternoon' }); assert.equal(r.ok, true, r.error); assert.equal(r.days[1].slots[1].myVisit, true); }
+  assert.deepEqual((await api(sam, 'careGrid', {})).days[1].slots[1].visits, ['Cousin Kay'], 'the family sees who is visiting');
+  { const r = await api(sam, 'setVisits', { on: false }); assert.equal(r.ok, true, r.error); }
+  assert.match((await api(kay, 'planVisit', { day, part: 'morning' })).error, /not taking visits/);
+  { const r = await api(kay, 'releaseShift', { day, part: 'evening' }); assert.equal(r.ok, true, r.error); assert.equal(r.days[1].slots[2].with, undefined); }
+  { const r = await api(sam, 'askAllNeeds', {}); assert.equal(r.ok, true, r.error); assert.ok(r.asked >= 1); assert.equal(r.days[1].slots[2].asked, true); }
+  await db.q(`update clients set extra = extra - 'visits_off' where client_id='c2'`);
 });
 
 test('learning: the tracker fills milestones; only families who said yes count; no range under 11 families', async () => {
