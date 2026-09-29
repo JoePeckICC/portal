@@ -437,6 +437,28 @@ test('the patient says yes to what the Circle sees; the coordinator only takes t
   assert.ok((await api(co, 'setDelegate', { clientId: cid, email: 'x@example.com', on: true })).error, 'only the patient names a delegate');
 });
 
+test('learning: the tracker fills milestones; only families who said yes count; no range under 11 families', async () => {
+  const co = await signIn('joe@incadencecare.com'), pat = await signIn('pat@example.com');
+  const cid = (await api(pat, 'bootstrap', {})).client.client_id;
+  await db.q(`delete from recovery_milestones where client_id=$1`, [cid]);
+  assert.equal((await api(pat, 'setTracker', { stage: 'In surgery' })).ok, true);
+  const b = await api(pat, 'bootstrap', {});
+  assert.ok(b.milestones.some(m => m.kind === 'surgery'), 'surgery day came from the tracker');
+  assert.ok((await api(pat, 'setMilestone', { kind: 'nope', date: '2026-01-01' })).error);
+  assert.equal((await api(co, 'setMilestone', { clientId: cid, kind: 'discharge', date: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10), detail: 'Inpatient rehab' })).ok, true);
+  assert.ok((await api(pat, 'learnStats', {})).error, 'families do not see the cohort numbers');
+  await db.q(`delete from intake_answers where client_id=$1 and question_id in ('G.learn','G.4b')`, [cid]);
+  let r = await api(co, 'learnStats', {});
+  assert.equal(r.ok, true, r.error); const before = r.total;
+  await db.q(`insert into intake_answers (client_id, question_id, answer) values ($1,'G.learn','Yes, count it'),($1,'G.4b','VP shunt')`, [cid]);
+  r = await api(co, 'learnStats', {});
+  assert.equal(r.total, before + 1, 'a yes counts');
+  const g = r.groups.find(x => x.surgery === 'VP shunt'); assert.ok(g);
+  const dis = g.milestones.find(m => m.k === 'discharge');
+  assert.equal(dis.mid, undefined, 'no typical day until 11 families'); assert.equal(g.dest, null, 'no destination split under 11');
+  await db.q(`delete from intake_answers where client_id=$1 and question_id in ('G.learn','G.4b')`, [cid]);
+});
+
 test('sign out everywhere kills every session', async () => {
   const s1 = await signIn('pat@example.com'); const s2 = await signIn('pat@example.com');
   const r = await api(s1, 'signOutEverywhere', {});
