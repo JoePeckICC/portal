@@ -141,7 +141,7 @@ input,select,textarea,button{scroll-margin-top:110px}
 
 /* circle */
 .ycare{margin-bottom:16px}.ycr{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid var(--line);text-decoration:none;color:inherit}.ycr:first-child{border-top:0}
-.carehd h1{text-align:center;margin:4px 0 0;font-size:30px}
+.carehd{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;margin:4px 0 16px}.carehd h1{text-align:center;margin:0;font-size:30px}.carehd .cib{border:0;background:none}
 .cbar .cib,.imbar .cib{border:0;background:none}.imbar .cib span{font-size:16px;font-weight:600}
 .circ .cbar{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;margin:4px 0 16px}.circ .cbar h1{text-align:center;margin:0;font-size:30px}.cib{position:relative;width:44px;height:44px;border-radius:22px;border:1px solid var(--line2);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}.cib svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.cib:hover{border-color:var(--gold)}.cib .bdg{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:#7A2E2E;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}.cfeed{max-width:720px;margin:0 auto}.circ .cirl{max-width:720px;margin-left:auto;margin-right:auto}.rxsum{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:13px;color:var(--muted)}.rxsum .rxic{display:flex}.rxsum .rxic i{width:22px;height:22px;border-radius:11px;background:var(--panel);border:2px solid var(--ground);display:flex;align-items:center;justify-content:center;margin-left:-6px}.rxsum .rxic i:first-child{margin-left:0}.rxsum svg{width:13px;height:13px;fill:none;stroke:var(--gold-ink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .rxbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px 22px;margin-top:10px;padding-top:6px;border-top:1px solid var(--line)}.rxb,.rxbar .tlcl{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;margin:0 -8px;border-radius:20px;background:none;border:0;padding:0;color:var(--muted);cursor:pointer;text-decoration:none}.rxb:hover,.rxbar .tlcl:hover,.rxbar .tlcl.on{color:var(--ink);background:var(--panel)}.rxb svg,.rxbar .tlcl svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.rxb i{display:flex}.rxb.on{color:var(--gold-ink)}
@@ -1436,9 +1436,12 @@ function findView(){
   var d=S.data;S.fc=S.fc||'book';
   if(S.fc==='team'||S.fc==='vendors'||S.fc==='ref'){var tp=el('<div><a href="#" class="small back" style="display:inline-block;margin-bottom:10px">‹ Care</a><div class="head"><div class="k">Care</div><h1>Your team</h1></div></div>');$('.back',tp).onclick=function(ev){ev.preventDefault();S.fc='book';S.pop=null;render();toTiles()};tp.appendChild(teamView());popsInto(tp);return tp}
   if(S.fc==='help'){S.fc='book'}
-  var v=el('<div><div class="head carehd"><h1>Care</h1></div><div class="cols"><section class="left"></section><aside class="stack"></aside></div></div>');
+  var v=el('<div><div class="cbar carehd"><button type="button" class="cib cal" aria-label="All care coming up"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></button><h1>Care</h1><button type="button" class="cib add" aria-label="Set up care"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button></div><div class="cols"><section class="left"></section><aside class="stack"></aside></div></div>');
+  // The calendar opens all care coming up; the + goes to the menu of care they can set up (Joe 2026-09-29).
+  $('.cal',v).onclick=function(){S.pop='cu:all';render()};
   $('.left',v).appendChild(yourCare());
-  $('.left',v).appendChild(findPick());
+  var pick=findPick();$('.left',v).appendChild(pick);
+  $('.add',v).onclick=function(){var hb=$('.sitebar'),t=$('.left .card:nth-child(2)')||pick;scrollTo({top:Math.max(0,t.getBoundingClientRect().top+scrollY-(hb?hb.getBoundingClientRect().height:0)-16),behavior:'smooth'})};
   var side=$('aside',v);side.appendChild(teamCard());side.appendChild(reachUs());
   popsInto(v);
   return v}
