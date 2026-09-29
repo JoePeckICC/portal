@@ -169,12 +169,40 @@ async function addHelp(ctx, p, c) {
   const row = await db.insert('help_items', { item_id: id(), client_id: ctx.clientId, title, detail: clean(p.detail, 600), when_text: clean(p.when, 120), status: 'Open', claimed_by: '', added_by: ctx.email }, c);
   return { item: row };
 }
+// Who is with them (Joe 2026-09-29): we never put people with a patient; the family asks its own Circle. A shift
+// becomes a "what would help" item everyone following can claim, and whoever claims it fills the slot.
+const PARTS = ['morning', 'afternoon', 'evening', 'night'];
+async function askShift(ctx, p, c) {
+  actOrFam(ctx); needFamily(ctx);
+  const day = String(p.day || ''); must(/^\d{4}-\d{2}-\d{2}$/.test(day), 'Pick a day'); must(PARTS.includes(p.part), 'Pick a part of the day');
+  must(!(await db.one(`select 1 from help_items where client_id=$1 and cov=$2 and status in ('Open','Claimed')`, [ctx.clientId, day + '|' + p.part], c)), 'The Circle already has this one.');
+  const client = await core.clientById(ctx.clientId, c), pf = first(client.patient_first_name) || 'them';
+  const when = new Date(day + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) + ', ' + p.part;
+  const row = await db.insert('help_items', { item_id: id(), client_id: ctx.clientId, title: 'Stay with ' + pf, detail: clean(p.note, 600), when_text: when, status: 'Open', claimed_by: '', added_by: ctx.email, cov: day + '|' + p.part }, c);
+  const after = async () => {
+    const to = new Set();
+    for (const s of await db.all(`select supporter_email from circle where client_id=$1 and status='Active'`, [ctx.clientId])) to.add(normEmail(s.supporter_email));
+    for (const u of await db.all(`select email from users where client_id=$1 and active and lower(role)='family'`, [ctx.clientId])) to.add(normEmail(u.email));
+    to.delete(normEmail(ctx.email));
+    for (const e of to) await mail.notify(e, 'Can you stay with ' + pf + ' ' + when + '?', 'The family is asking the Circle for someone to be with ' + pf + ' ' + when + '.' + (row.detail ? ' ' + row.detail : ''), 'The first person to say yes gets it, and the family sees who.', 'Open the Circle');
+  };
+  return { item: row, _after: after };
+}
+// A claimed shift fills (or, when let go, empties) that slot of Who is with.
+async function fillShift(row, who, c, email) {
+  if (!row.cov) return; const [day, part] = row.cov.split('|');
+  if (who) await db.q(`insert into coverage (slot_id, client_id, day, part, kind, who, note, added_by) values ($1,$2,$3,$4,'with',$5,'From the Circle','circle')
+    on conflict (client_id, day, part, kind) do update set who=excluded.who, note=excluded.note, added_by=excluded.added_by`, [id(), row.client_id, day, part, who], c);
+  if (who && email) await db.q(`update coverage set email=$4 where client_id=$1 and day=$2 and part=$3 and kind='with'`, [row.client_id, day, part, email], c);
+  else await db.q(`delete from coverage where client_id=$1 and day=$2 and part=$3 and kind='with' and added_by='circle'`, [row.client_id, day, part], c);
+}
 async function claimHelp(ctx, p, c) {
   needFamily(ctx);
   const row = await db.one(`select * from help_items where client_id=$1 and item_id=$2`, [ctx.clientId, String(p.itemId || '')], c); must(row, 'Not found');
-  if (isTrue(p.release)) { must(row.claimed_by === ctx.email || row.claimed_email === ctx.email || ctx.role === 'coordinator' || core.fam(ctx), 'Not yours'); await db.update('help_items', { item_id: row.item_id }, { status: 'Open', claimed_by: '', claimed_at: null }, c); if (row.job_id) await db.q(`update jobs set status='Open', taken_at=null, extra = extra - 'circle_by' where job_id=$1 and status='Taken' and extra ? 'circle_by'`, [row.job_id], c); return { ok: true }; }
+  if (isTrue(p.release)) { must(row.claimed_by === ctx.email || row.claimed_email === ctx.email || ctx.role === 'coordinator' || core.fam(ctx), 'Not yours'); await fillShift(row, '', c); await db.update('help_items', { item_id: row.item_id }, { status: 'Open', claimed_by: '', claimed_at: null }, c); if (row.job_id) await db.q(`update jobs set status='Open', taken_at=null, extra = extra - 'circle_by' where job_id=$1 and status='Taken' and extra ? 'circle_by'`, [row.job_id], c); return { ok: true }; }
   must(row.status === 'Open', 'Someone already has this one');
   await db.update('help_items', { item_id: row.item_id }, { status: 'Claimed', claimed_by: clean(ctx.user.name || ctx.email, 120), claimed_at: new Date(), claimed_email: ctx.email }, c);
+  await fillShift(row, clean(ctx.user.name || ctx.email, 120), c, ctx.email);
   if (row.job_id) must(await require('./jobs').circleTook(row, clean(ctx.user.name || ctx.email, 120), c), 'That one was already taken care of.');   // a casting call: the request is theirs
   const after = async () => { for (const u of await core.usersFor(ctx.clientId, 'client')) await mail.notify(u.email, (ctx.user.name || 'Someone') + ' is taking care of: ' + row.title, (ctx.user.name || ctx.email) + ' claimed “' + row.title + '”' + (row.when_text ? ' (' + row.when_text + ')' : '') + '.', '', 'Open the Circle'); };
   return { ok: true, _after: after };
@@ -248,8 +276,9 @@ async function publicClaim(p, req) {
   const name = clean(p.name, 80).trim(); must(name, 'Your name, so the family knows who');
   const row = await db.one(`select * from help_items where client_id=$1 and item_id=$2 and status='Open'`, [client.client_id, String(p.itemId || '')]); must(row, 'Someone already has this one');
   await db.update('help_items', { item_id: row.item_id }, { status: 'Claimed', claimed_by: name, claimed_at: new Date(), claimed_email: '' });
+  await fillShift(row, name);
   for (const u of await core.usersFor(client.client_id, 'client')) await mail.notify(u.email, name + ' is taking care of: ' + row.title, name + ' claimed “' + row.title + '”' + (row.when_text ? ' (' + row.when_text + ')' : '') + '.', '', 'Open the Circle');
   return { ok: true };
 }
 
-module.exports = { setComments, setUpdatePublic, approver, approversOf, approveUpdate, TRACKER, REACTIONS, setTracker, setShare, clientByShare, react, comment, moderateComment, approvePhoto, photoVisible, blockCircle, addHelp, claimHelp, setHelpStatus, setWhatINeed, setDelegate, publicPage, publicReact, publicComment, publicClaim, commentsFor, reactionsFor, canAct };
+module.exports = { askShift, setComments, setUpdatePublic, approver, approversOf, approveUpdate, TRACKER, REACTIONS, setTracker, setShare, clientByShare, react, comment, moderateComment, approvePhoto, photoVisible, blockCircle, addHelp, claimHelp, setHelpStatus, setWhatINeed, setDelegate, publicPage, publicReact, publicComment, publicClaim, commentsFor, reactionsFor, canAct };
