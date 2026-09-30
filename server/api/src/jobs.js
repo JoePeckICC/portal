@@ -50,7 +50,8 @@ async function dailyDigest() {
   await auth.pruneLogin();
   await db.q(`delete from rate_limits where window_end < now() - interval '1 day'`);
   const hour = hourIn(C.TZ), today = ymd(new Date(), C.TZ);
-  if (hour === 4) await db.q(`delete from audit where at < now() - interval '366 days'`);
+  // The access log is never deleted by a job (Joe 2026-09-30): HIPAA looks to it first, and records here are kept at
+  // least 8 years like everything else. A person decides if anything older ever goes.
   if (hour === 9) { try { await intakeNudges(); } catch (e) { console.error('nudge', e.message); } try { await twoDayReminders(); } catch (e) { console.error('twoDay', e.message); } try { await quietFamilies(); } catch (e) { console.error('quiet', e.message); } try { await circleNudges(); } catch (e) { console.error('circleNudge', e.message); } }
   try { await hospitalQuiet(); } catch (e) { console.error('hospitalQuiet', e.message); }
   if (hour === 16) { try { await weekCheck(); } catch (e) { console.error('weekCheck', e.message); } }
