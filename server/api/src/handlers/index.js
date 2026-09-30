@@ -6,14 +6,14 @@ Object.assign(H, require('./stubs'), require('./bootstrap'), require('./messages
 
 Object.assign(H, require('./shifts'));   // who is with them, visits, the shift checklist
 // Reads never wait on a lock and are not audited unless they fail.
-H.READ_ONLY = { careGrid: 1, learnStats: 1, needsReport: 1, accessLog: 1, bootstrap: 1, billing: 1, allBilling: 1, inbasket: 1, resources: 1, planPdf: 1, summaryPdf: 1, readDischarge: 1, topicMessages: 1, exportClient: 1, slots: 1 };
+H.READ_ONLY = { familyRecords: 1, careGrid: 1, learnStats: 1, needsReport: 1, accessLog: 1, bootstrap: 1, billing: 1, allBilling: 1, inbasket: 1, resources: 1, planPdf: 1, summaryPdf: 1, readDischarge: 1, topicMessages: 1, exportClient: 1, slots: 1 };
 // Supporters (the wider circle) read updates and manage their own account. Nothing else.
 // A vendor can take and finish jobs and talk in their own job threads; nothing else.
 H.VENDOR_OK = { bootstrap: 1, savePrefs: 1, signOutEverywhere: 1, changePassword: 1, forgetDevices: 1, takeJob: 1, passJob: 1, finishJob: 1, saveHours: 1, saveServices: 1, saveBio: 1, sendMessage: 1, readTopic: 1, hideTopic: 1, topicMessages: 1 };
 H.SUPPORTER_OK = { bootstrap: 1, savePrefs: 1, changeEmail: 1, signOutEverywhere: 1, changePassword: 1, forgetDevices: 1, react: 1, comment: 1, claimHelp: 1, careGrid: 1, takeShift: 1, releaseShift: 1, planVisit: 1, shiftDose: 1, doneChore: 1 };
 // A family's portal stays closed until their first payment is in. Consent and intake are always open.
 // Coordinator actions that are fine on an archived family (everything else is refused until reactivation).
-H.ARCHIVE_OK = { accessLog: 1, changePassword: 1, forgetDevices: 1, reactivateClient: 1, purgeClient: 1, exportClient: 1, savePrefs: 1, saveCoSettings: 1, newFamily: 1, saveResource: 1, signOutEverywhere: 1, changeEmail: 1 };
+H.ARCHIVE_OK = { familyRecords: 1, archiveTestFamilies: 1, accessLog: 1, changePassword: 1, forgetDevices: 1, reactivateClient: 1, purgeClient: 1, exportClient: 1, savePrefs: 1, saveCoSettings: 1, newFamily: 1, saveResource: 1, signOutEverywhere: 1, changeEmail: 1 };
 H.OPEN_BEFORE_PAID = ['bootstrap', 'changePassword', 'forgetDevices', 'signConsent', 'saveIntake', 'submitIntake', 'planPdf', 'checkoutLink', 'savePrefs', 'changeEmail'];
 
 module.exports = H;

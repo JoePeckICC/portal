@@ -18,6 +18,36 @@ async function archiveClient(ctx, p, c) {
   await db.q(`delete from sessions where email in (select email from users where client_id=$1)`, [cl.client_id], c);
   return { client: core.publicClient(await core.clientById(ctx.clientId, c)), retain_until: ymd(until, 'UTC') };
 }
+// Test families (Joe 2026-09-30): archived in bulk once they are done, never deleted. A family counts as a test only when
+// every sign-in on it is a test address (Joe's plus-addressed Gmail or an example.com address), or it has no sign-ins and
+// its name says test, demo or sample. Anything else is a real family and never appears here.
+const TEST_EMAIL = /^(joepeck\.usa(\+[^@]*)?@gmail\.com|[^@]+@example\.(com|org|net))$/i;
+const TEST_NAME = /\b(test|demo|sample|fake)\b/i;
+async function testFamilyRows(c) {
+  const rows = await db.all(`select c.client_id, c.family_name, c.patient_first_name, c.created_at, coalesce(array_agg(lower(u.email)) filter (where u.email is not null and lower(u.role) in ('client','family')), '{}') emails
+    from clients c left join users u on u.client_id=c.client_id where c.status <> 'Archived' group by c.client_id order by c.created_at`, [], c);
+  return rows.filter(r => r.emails.length ? r.emails.every(e => TEST_EMAIL.test(e)) : TEST_NAME.test((r.family_name || '') + ' ' + (r.patient_first_name || '')));
+}
+async function familyRecords(ctx, p, c) {
+  coOnly(ctx);
+  const test = (await testFamilyRows(c)).map(r => ({ client_id: r.client_id, family_name: r.family_name, patient_first_name: r.patient_first_name, created_at: r.created_at, emails: r.emails }));
+  const archived = await db.all(`select client_id, family_name, patient_first_name, archived_at, to_char(retain_until,'YYYY-MM-DD') retain_until from clients where status='Archived' order by archived_at desc nulls last`, [], c);
+  return { test, archived };
+}
+async function archiveOne(clientId, c) {
+  const until = new Date(); until.setFullYear(until.getFullYear() + RETAIN_YEARS);
+  await db.q(`update clients set status='Archived', archived_at=now(), retain_until=$2 where client_id=$1 and status <> 'Archived'`, [clientId, ymd(until, 'UTC')], c);
+  await db.q(`update users set active=false, session_ver=session_ver+1 where client_id=$1 and lower(role) in ('client','family','supporter')`, [clientId], c);
+  await db.q(`delete from sessions where email in (select email from users where client_id=$1)`, [clientId], c);
+}
+// Only the families picked, and only if each one still passes the test rule at the moment of archiving.
+async function archiveTestFamilies(ctx, p, c) {
+  coOnly(ctx);
+  const want = new Set((Array.isArray(p.clientIds) ? p.clientIds : []).map(String)); must(want.size, 'Pick at least one');
+  const ok = (await testFamilyRows(c)).filter(r => want.has(String(r.client_id)));
+  for (const r of ok) await archiveOne(r.client_id, c);
+  return { ...(await familyRecords(ctx, p, c)), count: ok.length, skipped: want.size - ok.length };
+}
 async function reactivateClient(ctx, p, c) {
   coOnly(ctx);
   const cl = await core.clientById(ctx.clientId, c); must(cl && cl.status === 'Archived', 'Not archived');
@@ -57,4 +87,4 @@ async function purgeClient(ctx, p, c) {
   return { purged: cl.client_id };
 }
 
-module.exports = { archiveClient, reactivateClient, exportClient, purgeClient };
+module.exports = { archiveClient, reactivateClient, exportClient, purgeClient, familyRecords, archiveTestFamilies };
