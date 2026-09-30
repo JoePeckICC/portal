@@ -776,8 +776,7 @@ function pwWatch(root,p1,p2){
     if(bar){Array.prototype.forEach.call(bar.querySelectorAll('b'),function(s,i){s.classList.toggle('on',i<n)});$('.lbl',bar).textContent=!p1.value?'':n<3?'Weak':n<5?'Almost there':'Strong'}
     if(match&&p2){var a=p1.value,b=p2.value;match.className='pwmatch'+(!b?'':a===b?' ok':' bad');match.textContent=!b?'':a===b?'Passwords match':'These do not match yet'}}
   p1.addEventListener('input',upd);if(p2)p2.addEventListener('input',upd);
-  // The second box is a check that you can retype it: no copying out of the first, no pasting into the second.
-  if(p2){['copy','cut'].forEach(function(e){p1.addEventListener(e,function(ev){ev.preventDefault()})});['paste','drop'].forEach(function(e){p2.addEventListener(e,function(ev){ev.preventDefault();if(match){match.className='pwmatch bad';match.textContent='Please type it again rather than pasting it.'}})})}
+  // Pasting is allowed everywhere (Joe 2026-09-29): password managers paste, and blocking it pushes people to weaker passwords.
 }
 function $(sel,root){return (root||document).querySelector(sel)}
 function $all(sel,root){return Array.prototype.slice.call((root||document).querySelectorAll(sel))}
