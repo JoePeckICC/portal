@@ -2445,6 +2445,14 @@ function chartHome(){
   if(!docs.length)D.appendChild(el('<div class="wempty">Nothing uploaded yet.</div>'));
   docs.slice(0,4).forEach(function(u){D.appendChild(el('<a href="'+esc(u.url)+'" target="_blank" rel="noopener" class="wl"><span class="k dk" style="color:'+docColor(u.kind)+'">'+esc(u.kind)+'</span><div style="min-width:0"><span class="ell">'+esc(u.name)+'</span><div class="small muted">'+esc(first(userName(u.uploaded_by)))+' · '+esc(fmtDay(u.uploaded_at))+(u.note?' · '+esc(u.note):'')+'</div></div></a>'))});
   two2.appendChild(D);L.appendChild(two2);
+  // Archive this one family (Joe 2026-09-30): for any family, test or real, once they are done. Nothing is deleted.
+  if(c.status!=='Archived'){var AR=el('<div class="pn"><div class="ph"><span>Family record</span></div><div style="padding:10px 12px"></div></div>'),ab=$('div[style]',AR);
+    if(S.arcAsk!==c.client_id){var b0=el('<button type="button" class="btn quiet sm">Archive this family</button>');b0.onclick=function(){S.arcAsk=c.client_id;render()};ab.appendChild(b0)}
+    else{ab.appendChild(el('<p class="small" style="margin:0 0 8px">Archive '+esc(famName(c.family_name))+'? Their sign-ins stop. Nothing is deleted: the record is kept 8 years, and you can reactivate it from Family records in your In Basket.</p>'));
+      var b1=el('<button type="button" class="btn sm">Yes, archive</button>'),b2=el('<a href="#" class="small" style="margin-left:12px">Cancel</a>');
+      b1.onclick=function(){busy(b1,true,'Archiving…');call('archiveClient',{clientId:c.client_id}).then(function(){S.arcAsk=null;S.fr=null;S.clientId=null;S.cv='inbasket';toast('Archived. The record is kept.');refresh()}).catch(alertErr)};
+      b2.onclick=function(ev){ev.preventDefault();S.arcAsk=null;render()};ab.appendChild(b1);ab.appendChild(b2)}
+    L.appendChild(AR)}
   $('.wsnote',v).appendChild(notePane());
   return v;
 }
