@@ -460,6 +460,25 @@ test('a quiet stretch in the hospital tells the coordinator once, and the family
   await db.q(`update clients set extra = extra - 'tracker' - 'hosp_quiet_at' - 'hosp_night_at' where client_id='c1'`);
 });
 
+test('test families: only all-test sign-ins are listed, archived in bulk, kept, and reactivated', async () => {
+  const co = await signIn('joe@incadencecare.com');
+  await db.q(`insert into clients (client_id,family_name,patient_first_name,status,coordinator_email) values ('tf1','Testerson','Tess','Active','joe@incadencecare.com'),('tf2','Realname','Rae','Active','joe@incadencecare.com') on conflict (client_id) do update set status='Active'`);
+  await db.q(`insert into users (email,name,role,client_id) values ('joepeck.usa+tf1@gmail.com','Tess','client','tf1'),('rae@realfamily.org','Rae','client','tf2') on conflict (email) do nothing`);
+  const r = await api(co, 'familyRecords', {}); assert.equal(r.ok, true, r.error);
+  assert.ok(r.test.some(f => f.client_id === 'tf1'), 'the test family is listed');
+  assert.ok(!r.test.some(f => f.client_id === 'tf2'), 'a real family never is');
+  const a = await api(co, 'archiveTestFamilies', { clientIds: ['tf1', 'tf2'] }); assert.equal(a.ok, true, a.error);
+  assert.equal(a.count, 1); assert.equal(a.skipped, 1, 'the real family is refused even if picked');
+  assert.equal((await db.one(`select status from clients where client_id='tf1'`)).status, 'Archived');
+  assert.equal((await db.one(`select status from clients where client_id='tf2'`)).status, 'Active');
+  assert.ok((await db.one(`select 1 from clients where client_id='tf1'`)), 'kept, not deleted');
+  assert.ok(a.archived.some(f => f.client_id === 'tf1'), 'shows under Archived');
+  const re = await api(co, 'reactivateClient', { clientId: 'tf1' }); assert.equal(re.ok, true, re.error);
+  assert.equal((await db.one(`select status from clients where client_id='tf1'`)).status, 'Active');
+  assert.ok((await api((await signIn('rae@realfamily.org')), 'familyRecords', {})).error, 'families cannot see this');
+  await db.q(`update clients set status='Archived' where client_id in ('tf1','tf2')`);
+});
+
 test('the Sunday check: appointments on the week, the page holders confirm it, the inner circle hears', async () => {
   await db.q(`update clients set circle_enabled=true, paid=true, plan_ready=true, extra = coalesce(extra,'{}'::jsonb) - 'week_ok' - 'week_ask_for' where client_id='c2'`);
   await db.q(`insert into users (email,name,role,client_id) values ('sam@example.com','Sam Second','client','c2') on conflict (email) do nothing`);
