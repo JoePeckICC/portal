@@ -254,6 +254,7 @@ html[data-env=staging] body::before{content:'TEST SITE · made-up families only'
 .hgo{border-left:4px solid var(--gold);padding:4px 0 4px 16px}.hgo .hgt{font-family:'Fraunces',Georgia,serif;font-size:26px;line-height:1.2;margin:4px 0 2px}
 .shwk{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;margin:0 0 12px;border:1px solid var(--gold);border-radius:3px}.shok{margin:0 0 10px}
 .wkc .wkl{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px}.wkc .wkb{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.frx .frr span{overflow-wrap:anywhere;min-width:0}
 .hck{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px;background:#fff;border:1px solid var(--line);border-radius:3px;text-decoration:none;color:var(--ink)}.hck:hover{border-color:var(--gold)}
 .hero .hsub{position:relative;color:rgba(255,255,255,.82);font-size:15px;font-weight:600;margin-top:4px}
 @media (max-width:760px){.medalert,.hosp{padding:16px}.medalert .man{font-size:21px}.medalert .mar{flex-wrap:wrap}.medalert .mab{width:100%}}
@@ -2316,6 +2317,23 @@ function coShell(){
 }
 function loadInbasket(force){if(S.ib&&!force&&S.ibAt&&Date.now()-S.ibAt<45000)return Promise.resolve(S.ib);return call('inbasket').then(function(r){S.ib=r;S.ibAt=Date.now();return r})}
 function kindPill(k){var c={Meds:'red',Urgent:'red',ER:'red',Medical:'red',Distress:'red',Billing:'red',Message:'',Plan:'',Implement:'',Coordinate:'',Intake:'blue',Assistance:'blue',Papers:'blue',Circle:'blue'}[k]||'gray';return '<span class="wpill '+c+'">'+esc(k)+'</span>'}
+// Family records (Joe 2026-09-30): test families archive in bulk after a look at who they are; archived families come
+// back with one tap. Archiving never deletes: sign-ins stop and the record is kept for the retention period.
+function familyRecordsEl(){
+  var p=el('<div class="pn frx"><div class="ph">Family records</div><div class="frb"></div></div>'),b=$('.frb',p),fr=S.fr;
+  if(!fr){b.appendChild(el('<p class="small muted" style="margin:6px 0">Loading…</p>'));if(!S.frLoad){S.frLoad=true;call('familyRecords',{}).then(function(r){S.fr=r;S.frLoad=false;render()}).catch(function(){S.frLoad=false})}return p}
+  var T=fr.test||[],A=fr.archived||[];S.frPick=S.frPick||{};
+  var t=el('<div><a href="#" class="ibf"><span>Test families</span><b>'+T.length+'</b></a></div>');$('a',t).onclick=function(ev){ev.preventDefault();S.frOpen=S.frOpen==='t'?null:'t';render()};b.appendChild(t);
+  if(S.frOpen==='t'){
+    if(!T.length)b.appendChild(el('<p class="small muted" style="margin:4px 0 8px">None. Every active family has a real sign-in.</p>'));
+    else{b.appendChild(el('<p class="small muted" style="margin:4px 0 6px">Every sign-in on these is a test address. Uncheck any you still use.</p>'));
+      T.forEach(function(f){if(S.frPick[f.client_id]===undefined)S.frPick[f.client_id]=true;var r=el('<label class="cmsw frr"><input type="checkbox"'+(S.frPick[f.client_id]?' checked':'')+'> <span><b>'+esc(f.family_name?famName(f.family_name):'(no name)')+'</b>'+(f.patient_first_name?' · '+esc(f.patient_first_name):'')+'<br><span class="small muted">'+esc((f.emails||[]).join(', ')||'no sign-in')+'</span></span></label>');$('input',r).onchange=function(){S.frPick[f.client_id]=this.checked};b.appendChild(r)});
+      var n=T.filter(function(f){return S.frPick[f.client_id]}).length,go=el('<button type="button" class="btn sm" style="margin:8px 0">Archive '+n+' test famil'+(n===1?'y':'ies')+'</button>');
+      go.onclick=function(){var ids=T.filter(function(f){return S.frPick[f.client_id]}).map(function(f){return f.client_id});if(!ids.length)return;busy(go,true,'Archiving…');call('archiveTestFamilies',{clientIds:ids}).then(function(r){S.fr=r;S.frPick={};toast('Archived '+r.count+'. Records are kept; sign-ins are off.');refresh()}).catch(alertErr)};b.appendChild(go)}}
+  var ar=el('<div><a href="#" class="ibf"><span>Archived</span><b>'+A.length+'</b></a></div>');$('a',ar).onclick=function(ev){ev.preventDefault();S.frOpen=S.frOpen==='a'?null:'a';render()};b.appendChild(ar);
+  if(S.frOpen==='a'){if(!A.length)b.appendChild(el('<p class="small muted" style="margin:4px 0 8px">No archived families.</p>'));
+    A.forEach(function(f){var r=el('<div class="frr" style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:4px 0"><span><b>'+esc(f.family_name?famName(f.family_name):'(no name)')+'</b><br><span class="small muted">Kept until '+esc(f.retain_until||'')+'</span></span><button type="button" class="btn quiet sm">Reactivate</button></div>'),rb=$('button',r);rb.onclick=function(){busy(rb,true,'…');call('reactivateClient',{clientId:f.client_id}).then(function(){S.fr=null;toast('Reactivated. Family sign-ins work again.');refresh()}).catch(alertErr)};b.appendChild(r)})}
+  return p}
 function inbasketView(){
   var v=el('<div class="wspage ibx"><div class="ibl"></div><div class="ibc"><p class="muted">Loading your in basket…</p></div><div class="ibr"></div></div>');
   function draw(r){
@@ -2324,7 +2342,7 @@ function inbasketView(){
     var newc=(r.needs||[]).filter(function(n){return n.kind==='Plan'});
     var kinds={};(r.needs||[]).forEach(function(n){if(n.kind!=='Plan')kinds[n.kind]=(kinds[n.kind]||0)+1});
     var fo=el('<div class="pn"><div class="ph">Folders</div></div>');[['','Needs you',(r.needs||[]).length-newc.length]].concat(Object.keys(kinds).map(function(k){return[k,k,kinds[k]]})).forEach(function(f){var a=el('<a href="#" class="ibf'+((S.ibk||'')===f[0]?' on':'')+'"><span>'+esc(f[1])+'</span><span>'+f[2]+'</span></a>');a.onclick=function(ev){ev.preventDefault();S.ibk=f[0];draw(r)};fo.appendChild(a)});L.appendChild(fo);
-    var q=el('<div class="pn"><div class="ph">Quick</div><div class="ibq"><label class="small muted" style="display:block;width:100%">For <select class="qf" style="width:100%;margin-top:4px">'+(r.families||[]).map(function(f){return'<option value="'+esc(f.client_id)+'"'+(String(f.client_id)===String(S.clientId)?' selected':'')+'>'+esc(f.family+(f.patient&&f.family.indexOf(' · ')<0?' · '+f.patient:''))+'</option>'}).join('')+'</select></label><a href="#" class="btn quiet sm" data-g="find:book">+ Appointment</a><a href="#" class="btn quiet sm" data-g="tasks">+ Task</a><a href="#" class="btn quiet sm" data-g="record:letters">Write a letter</a></div></div>');$all('a',q).forEach(function(a){a.onclick=function(ev){ev.preventDefault();var g=a.getAttribute('data-g'),cid=$('.qf',q)&&$('.qf',q).value;if(!cid){toast('Add a family first.');return}openFamily(cid,g)}});L.appendChild(q);
+    var q=el('<div class="pn"><div class="ph">Quick</div><div class="ibq"><label class="small muted" style="display:block;width:100%">For <select class="qf" style="width:100%;margin-top:4px">'+(r.families||[]).map(function(f){return'<option value="'+esc(f.client_id)+'"'+(String(f.client_id)===String(S.clientId)?' selected':'')+'>'+esc(f.family+(f.patient&&f.family.indexOf(' · ')<0?' · '+f.patient:''))+'</option>'}).join('')+'</select></label><a href="#" class="btn quiet sm" data-g="find:book">+ Appointment</a><a href="#" class="btn quiet sm" data-g="tasks">+ Task</a><a href="#" class="btn quiet sm" data-g="record:letters">Write a letter</a></div></div>');$all('a',q).forEach(function(a){a.onclick=function(ev){ev.preventDefault();var g=a.getAttribute('data-g'),cid=$('.qf',q)&&$('.qf',q).value;if(!cid){toast('Add a family first.');return}openFamily(cid,g)}});L.appendChild(q);L.appendChild(familyRecordsEl());
     var needs=(r.needs||[]).filter(function(n){return n.kind!=='Plan'&&(!S.ibk||n.kind===S.ibk)});
     // New clients: the form is in, the plan is not. Build opens the setup and nothing else.
     var NC=el('<div class="pn"><div class="ph"><span>New clients <span class="wpill'+(newc.length?' red':' gray')+'">'+newc.length+'</span></span><span class="muted small">Their form is in · Build walks you through the setup</span></div><div class="wt"></div></div>');
