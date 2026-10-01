@@ -748,7 +748,7 @@ test('record: visit notes, allergies, pharmacy, documents, help', async () => {
   assert.match((await api(pat, 'keepAttachment', { messageId: m.message.message_id, fileId: m.message.attachments[0].id })).error, /Already/);
   // help ask lands in a named topic and pings the coordinator
   const h = await api(pat, 'askHelp', { what: 'Rides', body: 'Need a ride Tuesday' });
-  assert.equal(h.ok, true); assert.equal(h.topic.title, 'Help with Rides');
+  assert.equal(h.ok, true); assert.equal(h.topic.title, 'Rides');
   const h2 = await api(pat, 'askHelp', { what: 'Rides' });
   assert.equal(h2.topic.topic_id, h.topic.topic_id, 'same topic reused');
 });
