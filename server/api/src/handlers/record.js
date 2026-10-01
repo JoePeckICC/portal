@@ -84,11 +84,11 @@ async function keepAttachment(ctx, p, c) {
 // Help with one thing: a Messages topic named for it, so the ask never gets lost.
 async function askHelp(ctx, p, c) {
   must(core.fam(ctx), 'Not allowed');
-  const what = clean(p.what, 120).trim(); must(what, 'What do you need help with?');
-  const title = 'Help with ' + what;
+  const what = clean(p.what, 120).trim(); must(what, 'What should we take care of?');
+  const title = what;
   let t = await db.one(`select * from topics where client_id=$1 and title=$2 and status<>'Archived' limit 1`, [ctx.clientId, title], c);
   if (!t) t = await db.insert('topics', { topic_id: id(), client_id: ctx.clientId, title, kind: 'other', status: 'Active', created_by: ctx.email }, c);
-  const body = clean(p.body, 2000).trim() || 'I could use help with ' + what.toLowerCase() + '.';
+  const body = clean(p.body, 2000).trim() || 'Please take care of ' + what.toLowerCase() + '.';
   await db.insert('messages', { message_id: id(), client_id: ctx.clientId, topic_id: t.topic_id, sender_email: ctx.email, body, read_by_client: ctx.role === 'client', read_by_coordinator: false }, c);
   await db.q(`update topics set last_at=now(), status='Active' where topic_id=$1`, [t.topic_id], c);
   const client = await core.clientById(ctx.clientId, c), co = await core.coordinatorFor(client, c);
