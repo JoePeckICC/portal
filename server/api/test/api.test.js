@@ -61,6 +61,7 @@ test('requestLink is quiet for unknown emails and sends for known ones', async (
   assert.equal(r1.ok, true); assert.equal(mail.sent.length, n);
   const r2 = await api(null, 'requestLink', { email: 'PAT@example.com' });
   assert.equal(r2.ok, true); assert.equal(mail.sent.length, n + 1); assert.equal(lastMail().to, 'pat@example.com');
+  assert.match(lastMail().html, /Confidentiality notice: This email and any attachments/);   // on every email
 });
 
 test('an emailed link works once and never signs in by itself', async () => {
