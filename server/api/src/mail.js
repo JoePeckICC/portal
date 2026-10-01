@@ -32,7 +32,11 @@ async function fromEmail() {
   try { const r = await require('./db').one(`select value from settings where key='FROM_EMAIL'`); fromCache = { at: Date.now(), v: r ? r.value : '' }; } catch { fromCache = { at: Date.now(), v: '' }; }
   return fromCache.v;
 }
+// Every email carries the confidentiality notice (Joe, 2026-10-01).
+const NOTICE = 'Confidentiality notice: This email and any attachments are intended only for the named recipient and may contain confidential, privileged, or protected health information. If you are not the intended recipient, any review, use, disclosure, or distribution is prohibited. If you received this in error, please notify the sender immediately and delete all copies.';
+const withNotice = html => html + `<p style="margin-top:20px;font-size:11px;color:#5B6470;line-height:1.5;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px">${NOTICE}</p>`;
 async function sendMail(to, subject, html) {
+  html = withNotice(html);
   const from = await fromEmail();
   const bcc = C.BCC_EMAIL && normEmail(C.BCC_EMAIL) !== normEmail(to) ? C.BCC_EMAIL : '';
   const msg = { to, from, bcc, subject, html, at: new Date() };
@@ -63,4 +67,4 @@ async function notify(to, subject, lead, body, cta, url) {
   } catch (e) { console.error('notify failed', to, e.message); }
 }
 
-module.exports = { sendMail, notify, frame, button, footer, sent };
+module.exports = { sendMail, notify, frame, button, footer, sent, NOTICE };
